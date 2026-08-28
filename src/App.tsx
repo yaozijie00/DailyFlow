@@ -6,6 +6,7 @@ import { usePomodoroStore } from "./stores/pomodoroStore";
 import Today from "./pages/Today";
 import Focus from "./pages/Focus";
 import Settings from "./pages/Settings";
+import { useShortcuts } from "./hooks/useShortcuts";
 import { databaseService } from "./services/databaseService";
 
 const pages = {
@@ -15,6 +16,7 @@ const pages = {
 } as const;
 
 function App() {
+  useShortcuts();
   const currentPage = useAppStore((s) => s.currentPage);
   const setDbStatus = useAppStore((s) => s.setDbStatus);
   const dbStatus = useAppStore((s) => s.dbStatus);
