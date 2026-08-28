@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Download, Upload, ShieldCheck } from "lucide-react";
+import { getVersion } from "@tauri-apps/api/app";
 import { useSettingsStore } from "../stores/settingsStore";
 import { exportBackup, listBackups, restoreBackup } from "../services/backupService";
 
@@ -26,6 +27,11 @@ export default function Settings() {
     snapMinutes: settings.timelineSnapMinutes,
   });
   const [saved, setSaved] = useState(false);
+  const [appVersion, setAppVersion] = useState("");
+
+  useEffect(() => {
+    getVersion().then(setAppVersion).catch(() => {});
+  }, []);
 
   // —— 数据备份 / 恢复 ——
   const [backups, setBackups] = useState<string[]>([]);
@@ -114,6 +120,7 @@ export default function Settings() {
       <header className="mb-4">
         <h1 className="text-xl font-semibold">设置</h1>
         <p className="text-sm text-neutral-500">修改后立即保存到本地数据库，重启后依然生效。</p>
+        <p className="mt-1 text-xs text-neutral-400">DailyFlow 版本 {appVersion || "…"}</p>
       </header>
 
       <div className="space-y-4 rounded-md border border-neutral-200 bg-white p-5">

@@ -22,3 +22,8 @@ tauri = { version = "2", features = [] }
 tauri-plugin-sql = { version = "2", features = ["sqlite"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+windows-sys = { version = "0.59", features = ["Win32_UI_WindowsAndMessaging", "Win32_System_Com"] }
+# 仅用于启动自诊断：探测 WebView2 加载器将使用的运行时版本
+webview2-com-sys = "0.38"
+webview2-com = "0.38"
+windows-core = "0.61"

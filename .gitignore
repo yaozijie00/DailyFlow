@@ -40,3 +40,13 @@ coverage
 *.njsproj
 *.sln
 *.sw?
+
+# Tauri / Rust build output
+src-tauri/target/
+src-tauri/gen/schemas/
+src-tauri/MicrosoftEdgeWebview2Setup.exe
+# WebView2 Fixed Version 运行时（第三方二进制 ~422MB；构建必需，恢复方法见报告）
+src-tauri/webview2/
+
+# Release distribution output
+release/

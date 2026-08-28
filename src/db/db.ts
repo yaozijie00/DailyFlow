@@ -1,4 +1,5 @@
 import Database from "@tauri-apps/plugin-sql";
+import { invoke } from "@tauri-apps/api/core";
 import { drizzle, type SqliteRemoteDatabase } from "drizzle-orm/sqlite-proxy";
 import * as schema from "./schema";
 import { runMigrations, type RunMigrationsOptions } from "./migrate";
@@ -13,10 +14,14 @@ export type Db = SqliteRemoteDatabase<typeof schema>;
  * 而插件 select 返回对象，故这里用 Object.values 转换为值数组。
  */
 let sqlite: Database | null = null;
+let dbPath: string | null = null;
 
 async function getSqlite(): Promise<Database> {
   if (!sqlite) {
-    sqlite = await Database.load("sqlite:dailyflow.db");
+    // 用户数据目录 %LOCALAPPDATA%\DailyFlow\（确保存在后取相对路径，经插件解析）
+    await invoke("data_dir");
+    dbPath ??= await invoke<string>("db_relative_path");
+    sqlite = await Database.load("sqlite:" + dbPath);
   }
   return sqlite;
 }
