@@ -1,9 +1,9 @@
 import { create } from "zustand";
 
-export type Page = "today" | "focus" | "settings";
+export type Page = "today" | "focus" | "news" | "settings";
 export type DbStatus = "idle" | "ready" | "error";
 
-export type ToastType = "info" | "success" | "error";
+export type ToastType = "info" | "success" | "warning" | "error";
 
 export interface Toast {
   id: number;

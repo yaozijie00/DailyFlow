@@ -3,6 +3,7 @@ import { useAppStore } from "../stores/appStore";
 const STYLE: Record<string, string> = {
   info: "border-neutral-300 bg-white text-neutral-800",
   success: "border-green-300 bg-green-50 text-green-800",
+  warning: "border-amber-300 bg-amber-50 text-amber-800",
   error: "border-red-300 bg-red-50 text-red-800",
 };
 

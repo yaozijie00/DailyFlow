@@ -32,6 +32,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     createdAt: 0,
     updatedAt: 0,
     completedAt: null,
+    notes: null,
     ...overrides,
   };
 }

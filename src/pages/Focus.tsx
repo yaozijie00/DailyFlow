@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { useAppStore } from "../stores/appStore";
 import { useTaskStore } from "../stores/taskStore";
+import { PageHeader } from "../components/ui/PageHeader";
 import PomodoroPanel from "../components/pomodoro/PomodoroPanel";
 
 export default function Focus() {
@@ -15,10 +16,10 @@ export default function Focus() {
 
   return (
     <div>
-      <header className="mb-4">
-        <h1 className="text-xl font-semibold">专注</h1>
-        <p className="text-sm text-neutral-500">番茄钟：专注一个任务，完成后记录本次专注。</p>
-      </header>
+      <PageHeader
+        title="专注"
+        description="番茄钟：专注一个任务，完成后记录本次专注。"
+      />
       <PomodoroPanel />
     </div>
   );

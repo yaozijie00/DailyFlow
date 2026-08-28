@@ -21,6 +21,10 @@ export interface AppSettings {
   timelineEndMinutes: number;
   /** 时间轴吸附粒度（分钟） */
   timelineSnapMinutes: number;
+  /** 时间轴缩放（每像素分钟数，默认 1.5） */
+  timelinePxPerMinute: number;
+  /** 新闻自动刷新间隔（分钟） */
+  newsRefreshIntervalMinutes: number;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -31,6 +35,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   timelineStartMinutes: 8 * 60, // 08:00
   timelineEndMinutes: 24 * 60, // 24:00
   timelineSnapMinutes: 15,
+  timelinePxPerMinute: 1.5,
+  newsRefreshIntervalMinutes: 30,
 };
 
 /** settings 表键名（存储格式：时长用秒或分钟、时间用 "HH:mm"、粒度用分钟）。 */
@@ -41,7 +47,9 @@ const KEY_LONG_BREAK_INTERVAL = "long_break_interval";
 const KEY_TIMELINE_START = "timeline_start";
 const KEY_TIMELINE_END = "timeline_end";
 const KEY_TIMELINE_SNAP = "timeline_snap";
+const KEY_TIMELINE_PX_PER_MINUTE = "timeline_px_per_minute";
 const KEY_SHORTCUTS = "shortcuts";
+const KEY_NEWS_REFRESH_INTERVAL = "news_refresh_interval";
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
@@ -63,6 +71,12 @@ export function parseHHMMToMinutes(value: string): number | null {
 }
 
 function parseIntSafe(value: string | undefined, fallback: number): number {
+  if (value == null) return fallback;
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+function parseFloatSafe(value: string | undefined, fallback: number): number {
   if (value == null) return fallback;
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? n : fallback;
@@ -108,6 +122,10 @@ export class SettingsService {
         parseHHMMToMinutes(stored[KEY_TIMELINE_END] ?? "") ??
         DEFAULT_SETTINGS.timelineEndMinutes,
       timelineSnapMinutes: Math.round(parseIntSafe(stored[KEY_TIMELINE_SNAP], 15)),
+      timelinePxPerMinute: parseFloatSafe(stored[KEY_TIMELINE_PX_PER_MINUTE], 1.5),
+      newsRefreshIntervalMinutes: Math.round(
+        parseIntSafe(stored[KEY_NEWS_REFRESH_INTERVAL], 30),
+      ),
     };
   }
 
@@ -142,6 +160,16 @@ export class SettingsService {
     if (partial.timelineSnapMinutes !== undefined) {
       const s = clamp(Math.round(partial.timelineSnapMinutes), 5, 60);
       writes.push([KEY_TIMELINE_SNAP, String(s)]);
+    }
+    if (partial.timelinePxPerMinute !== undefined) {
+      const p = clamp(partial.timelinePxPerMinute, 1, 3);
+      writes.push([KEY_TIMELINE_PX_PER_MINUTE, String(p)]);
+    }
+    if (partial.newsRefreshIntervalMinutes !== undefined) {
+      writes.push([
+        KEY_NEWS_REFRESH_INTERVAL,
+        String(clamp(Math.round(partial.newsRefreshIntervalMinutes), 5, 1440)),
+      ]);
     }
     for (const [k, v] of writes) {
       await this.repo.set(k, v);

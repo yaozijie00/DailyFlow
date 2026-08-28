@@ -30,6 +30,8 @@ describe("SettingsService", () => {
       timelineStartMinutes: 8 * 60,
       timelineEndMinutes: 24 * 60,
       timelineSnapMinutes: 15,
+      timelinePxPerMinute: 1.5,
+      newsRefreshIntervalMinutes: 30,
     });
     const s = await service.getSettings();
     expect(s).toEqual(DEFAULT_SETTINGS);
@@ -69,6 +71,8 @@ describe("SettingsService", () => {
       timelineStartMinutes: 9 * 60,
       timelineEndMinutes: 21 * 60,
       timelineSnapMinutes: 30,
+      timelinePxPerMinute: 1.5,
+      newsRefreshIntervalMinutes: 30,
     });
   });
 

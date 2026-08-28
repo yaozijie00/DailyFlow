@@ -11,6 +11,7 @@ export default function GeneralSection() {
     startHour: Math.floor(settings.timelineStartMinutes / 60),
     endHour: Math.floor(settings.timelineEndMinutes / 60),
     snapMinutes: settings.timelineSnapMinutes,
+    pxPerMinute: settings.timelinePxPerMinute,
   });
   const [saved, setSaved] = useState(false);
 
@@ -19,6 +20,7 @@ export default function GeneralSection() {
       timelineStartMinutes: draft.startHour * 60,
       timelineEndMinutes: draft.endHour * 60,
       timelineSnapMinutes: draft.snapMinutes,
+      timelinePxPerMinute: draft.pxPerMinute,
     });
     setSaved(true);
     window.setTimeout(() => setSaved(false), 2000);
@@ -59,6 +61,22 @@ export default function GeneralSection() {
           ))}
         </select>
       </div>
+      <div className="flex items-center justify-between gap-4">
+        <label htmlFor="px" className="text-sm text-neutral-700">时间轴缩放（每像素分钟数）</label>
+        <input
+          id="px"
+          type="number"
+          min={1}
+          max={3}
+          step={0.25}
+          value={draft.pxPerMinute}
+          onChange={(e) => setDraft((d) => ({ ...d, pxPerMinute: Number(e.target.value) }))}
+          className="w-20 rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+        />
+      </div>
+      <p className="text-xs text-neutral-400">
+        数值越大时间轴越稀疏（1 = 1 分钟 1px，1.5 = 默认，3 = 最密）；时间轴上按住 Ctrl + 鼠标滚轮也可缩放。
+      </p>
       <div className="flex items-center gap-3 pt-1">
         <button
           onClick={handleSave}

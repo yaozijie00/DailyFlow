@@ -14,6 +14,7 @@ export interface CreateTaskInput {
   plannedEnd?: number | null;
   actualDuration?: number;
   completedAt?: number | null;
+  notes?: string | null;
 }
 
 export type UpdateTaskInput = Partial<CreateTaskInput>;
@@ -37,6 +38,7 @@ export class TaskRepository {
         createdAt: now,
         updatedAt: now,
         completedAt: input.completedAt ?? null,
+        notes: input.notes ?? null,
       })
       .returning()
       .all();

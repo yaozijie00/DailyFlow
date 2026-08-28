@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { useTaskStore } from "../../stores/taskStore";
 import { formatDuration } from "../../lib/format";
@@ -10,7 +11,11 @@ export default function TaskDetail() {
   const completeTask = useTaskStore((s) => s.completeTask);
   const cancelTask = useTaskStore((s) => s.cancelTask);
   const deleteTask = useTaskStore((s) => s.deleteTask);
+  const updateTask = useTaskStore((s) => s.updateTask);
   const openEdit = useTaskStore((s) => s.openEdit);
+
+  const [notesEditing, setNotesEditing] = useState(false);
+  const [notesDraft, setNotesDraft] = useState("");
 
   const task = tasks.find((t) => t.id === selectedTaskId);
 
@@ -21,6 +26,12 @@ export default function TaskDetail() {
       </div>
     );
   }
+
+  const saveNotes = async () => {
+    const v = notesDraft.trim();
+    await updateTask(task.id, { notes: v === "" ? null : v });
+    setNotesEditing(false);
+  };
 
   const categoryName =
     task.categoryId != null
@@ -51,6 +62,53 @@ export default function TaskDetail() {
           <dd className="text-neutral-900">{TASK_STATUS_LABEL[task.status] ?? task.status}</dd>
         </div>
       </dl>
+
+      {/* 备注（可内联编辑） */}
+      <div className="mb-4">
+        <div className="mb-1 flex items-center justify-between">
+          <span className="text-sm text-neutral-500">备注</span>
+          {!notesEditing && (
+            <button
+              onClick={() => {
+                setNotesDraft(task.notes ?? "");
+                setNotesEditing(true);
+              }}
+              className="text-xs text-neutral-400 hover:text-neutral-600"
+            >
+              {task.notes ? "编辑" : "添加备注"}
+            </button>
+          )}
+        </div>
+        {notesEditing ? (
+          <div className="space-y-1.5">
+            <textarea
+              value={notesDraft}
+              onChange={(e) => setNotesDraft(e.target.value)}
+              rows={3}
+              placeholder="记录补充信息…"
+              className="w-full resize-none rounded-md border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:border-neutral-900"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={() => void saveNotes()}
+                className="rounded-md bg-neutral-900 px-3 py-1 text-xs text-white hover:bg-neutral-700"
+              >
+                保存
+              </button>
+              <button
+                onClick={() => setNotesEditing(false)}
+                className="rounded-md border border-neutral-300 px-3 py-1 text-xs text-neutral-700 hover:bg-neutral-100"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        ) : task.notes ? (
+          <p className="whitespace-pre-wrap text-sm text-neutral-700">{task.notes}</p>
+        ) : (
+          <p className="text-sm text-neutral-300">无</p>
+        )}
+      </div>
 
       <div className="flex flex-wrap gap-2">
         {!completed && !cancelled && (

@@ -23,19 +23,31 @@ export function useWindowDrag() {
   const start = useCallback(
     (handlers: WindowDragHandlers, abortState: () => void) => {
       activeRef.current?.cleanup(); // 上一个拖拽若未结束先清理
-      const handleMove = (e: MouseEvent) => handlers.onMove(e);
+      const handleMove = (e: MouseEvent) => {
+        e.preventDefault(); // 拖拽期间阻止默认行为（如文字选中），避免出现蓝色选区
+        handlers.onMove(e);
+      };
       const handleUp = (e: MouseEvent) => {
         handlers.onUp(e);
+        activeRef.current?.cleanup();
+        activeRef.current = null;
+      };
+      const handleKey = (e: KeyboardEvent) => {
+        if (e.key !== "Escape") return;
+        // ESC 取消拖拽：清理预览/拖拽状态并移除监听器，不触发保存
+        activeRef.current?.abortState();
         activeRef.current?.cleanup();
         activeRef.current = null;
       };
       const cleanup = () => {
         window.removeEventListener("mousemove", handleMove);
         window.removeEventListener("mouseup", handleUp);
+        window.removeEventListener("keydown", handleKey);
       };
       activeRef.current = { cleanup, abortState };
       window.addEventListener("mousemove", handleMove);
       window.addEventListener("mouseup", handleUp);
+      window.addEventListener("keydown", handleKey);
     },
     [],
   );

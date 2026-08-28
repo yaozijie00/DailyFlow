@@ -29,15 +29,22 @@ fn read_storage_paths(app: &tauri::AppHandle) -> StoragePaths {
     }
 }
 
-/// 数据目录：配置了 data_dir 用之，否则 %LOCALAPPDATA%\DailyFlow。
-fn dailyflow_data_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+/// 安装目录（可执行文件所在目录）。
+fn install_dir() -> Result<PathBuf, String> {
+    std::env::current_exe()
+        .map_err(|e| format!("无法获取可执行文件路径：{e}"))?
+        .parent()
+        .map(|p| p.to_path_buf())
+        .ok_or_else(|| "无法解析可执行文件目录".into())
+}
+
+/// 数据目录：配置了 data_dir 用之，否则 <安装目录>\data。
+fn dailyflow_data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let cfg = read_storage_paths(app);
     let dir = if cfg.data_dir.trim().is_empty() {
-        let local = std::env::var("LOCALAPPDATA")
-            .map_err(|e| format!("无法获取 LOCALAPPDATA：{e}"))?;
-        std::path::Path::new(&local).join("DailyFlow")
+        install_dir()?.join("data")
     } else {
-        std::path::PathBuf::from(cfg.data_dir.trim())
+        PathBuf::from(cfg.data_dir.trim())
     };
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir)
@@ -263,6 +270,19 @@ fn resolve_backups_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(backups)
 }
 
+/// 缓存目录：配置了 cache_dir 用之，否则 <数据目录>\cache。
+fn resolve_cache_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let cfg = read_storage_paths(app);
+    if !cfg.cache_dir.trim().is_empty() {
+        let dir = PathBuf::from(cfg.cache_dir.trim());
+        fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        return Ok(dir);
+    }
+    let dir = dailyflow_data_dir(app)?.join("cache");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+
 /// 计算从 from_dir 到 to_file 的相对路径（含必要的 ".." 上溯）。
 fn relative_path(from_dir: &Path, to_file: &Path) -> Option<PathBuf> {
     let ancestors: Vec<&Path> = from_dir.ancestors().collect();
@@ -397,9 +417,15 @@ fn get_storage_paths(app: tauri::AppHandle) -> Result<StoragePaths, String> {
     } else {
         std::path::PathBuf::from(cfg.backup_dir.trim())
     };
+    let cache = if cfg.cache_dir.trim().is_empty() {
+        data.join("cache")
+    } else {
+        std::path::PathBuf::from(cfg.cache_dir.trim())
+    };
+    std::fs::create_dir_all(&cache).map_err(|e| e.to_string())?;
     Ok(StoragePaths {
         data_dir: data.to_string_lossy().into_owned(),
-        cache_dir: cfg.cache_dir.clone(),
+        cache_dir: cache.to_string_lossy().into_owned(),
         backup_dir: backup.to_string_lossy().into_owned(),
     })
 }
@@ -427,6 +453,83 @@ fn set_storage_paths(
     std::fs::write(&path, serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?)
         .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+/// 用系统默认浏览器打开外链（新闻原文；不做内置浏览器）。
+#[tauri::command]
+fn open_url(url: String) -> Result<(), String> {
+    open::that(&url).map_err(|e| e.to_string())
+}
+
+/// 异步拉取 URL 文本（RSS 源）。阻塞网络 I/O 放到 spawn_blocking，避免阻塞主线程；
+/// 前端经此绕过浏览器 CORS 限制抓取公开 Feed。
+#[tauri::command]
+async fn fetch_text(url: String) -> Result<String, String> {
+    let result = tauri::async_runtime::spawn_blocking(move || -> Result<String, String> {
+        let resp = ureq::get(&url)
+            .set(
+                "User-Agent",
+                "DailyFlow/1.1 (news reader; +https://dailyflow.local)",
+            )
+            .set(
+                "Accept",
+                "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
+            )
+            .timeout(std::time::Duration::from_secs(8))
+            .call()
+            .map_err(|e| format!("请求失败：{e}"))?;
+        let status = resp.status();
+        let body = resp.into_string().map_err(|e| format!("读取响应失败：{e}"))?;
+        if status >= 400 {
+            return Err(format!("HTTP {status}"));
+        }
+        Ok(body)
+    })
+    .await
+    .map_err(|e| format!("线程错误：{e}"))?;
+    result
+}
+
+/// 下载新闻图片到缓存目录（已存在则跳过下载），返回绝对路径。
+/// 前端用 convertFileSrc 转成可加载的 asset URL。
+#[tauri::command]
+async fn cache_image(
+    app: tauri::AppHandle,
+    url: String,
+    filename: String,
+) -> Result<String, String> {
+    if filename.is_empty()
+        || filename.contains('/')
+        || filename.contains('\\')
+        || filename.contains("..")
+    {
+        return Err("非法文件名".into());
+    }
+    let dir = resolve_cache_dir(&app)?.join("news-images");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let dest = dir.join(&filename);
+    if dest.is_file() {
+        return Ok(dest.to_string_lossy().into_owned()); // 已缓存
+    }
+    let dest_for_task = dest.clone();
+    let result: Result<(), String> = tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
+        let resp = ureq::get(&url)
+            .set("User-Agent", "DailyFlow/1.1")
+            .timeout(std::time::Duration::from_secs(8))
+            .call()
+            .map_err(|e| format!("请求失败：{e}"))?;
+        if resp.status() >= 400 {
+            return Err(format!("HTTP {}", resp.status()));
+        }
+        let mut reader = resp.into_reader();
+        let mut file = std::fs::File::create(&dest_for_task).map_err(|e| e.to_string())?;
+        std::io::copy(&mut reader, &mut file).map_err(|e| e.to_string())?;
+        Ok(())
+    })
+    .await
+    .map_err(|e| format!("线程错误：{e}"))?;
+    result?;
+    Ok(dest.to_string_lossy().into_owned())
 }
 
 /// 启动失败时弹出可读提示（避免「白屏挂起」无从排查）。
@@ -526,7 +629,10 @@ pub fn run() {
             restore_backup,
             append_log,
             get_storage_paths,
-            set_storage_paths
+            set_storage_paths,
+            fetch_text,
+            cache_image,
+            open_url
         ])
         .run(tauri::generate_context!());
 

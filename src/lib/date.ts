@@ -7,6 +7,13 @@ export function todayString(): string {
   return `${y}-${m}-${d}`;
 }
 
+const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
+
+/** 返回中文星期，如「星期六」。 */
+export function weekdayLabel(date: Date = new Date()): string {
+  return `星期${WEEKDAYS[date.getDay()]}`;
+}
+
 /** 今天本地时区 0 点的时间戳（Unix ms）。 */
 export function startOfToday(): number {
   const now = new Date();

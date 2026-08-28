@@ -21,8 +21,8 @@ describe("getAppliedMigrationNames", () => {
   });
 });
 
-describe("runMigrations 事务化（H1）", () => {
-  it("迁移中途失败时整体回滚：已执行语句不残留、迁移名不记录", async () => {
+describe("runMigrations 幂等收敛（H1 重试安全）", () => {
+  it("中途失败：已执行语句保留、迁移名不记录，可安全重试", async () => {
     const { db, close } = await createTestDb();
     const bad = {
       "0001_bad.sql":
@@ -33,7 +33,7 @@ describe("runMigrations 事务化（H1）", () => {
     const tables = await db.values(
       sql`SELECT name FROM sqlite_master WHERE name = 'tmp_a'`,
     );
-    expect(tables.length).toBe(0); // 已执行语句被回滚
+    expect(tables.length).toBe(1); // 逐语句执行，已执行语句保留（不依赖回滚）
     const applied = await getAppliedMigrationNames(db);
     expect(applied).not.toContain("0001_bad.sql");
     await close();
@@ -54,6 +54,17 @@ describe("runMigrations 事务化（H1）", () => {
       sql`SELECT name FROM sqlite_master WHERE name = 'tmp_b'`,
     );
     expect(tables.length).toBe(1);
+    await close();
+  });
+
+  it("「表已存在/列已存在」类错误被跳过（幂等）", async () => {
+    const { db, close } = await createTestDb();
+    const files = {
+      "0001_dup.sql":
+        "CREATE TABLE tmp_x (id integer); --> statement-breakpoint CREATE TABLE tmp_x (id integer);",
+    };
+    const applied = await runMigrations(db, { files });
+    expect(applied).toEqual(["0001_dup.sql"]); // 第二次建表报 already exists 被跳过
     await close();
   });
 

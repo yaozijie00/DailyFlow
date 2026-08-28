@@ -19,11 +19,11 @@ export default function PomodoroSection() {
   });
   const [saved, setSaved] = useState(false);
 
-  const fields: { key: keyof Draft; label: string; min: number; max: number; hint?: string }[] = [
-    { key: "focusMinutes", label: "专注时长", min: 1, max: 180 },
-    { key: "shortBreak", label: "短休息", min: 1, max: 30 },
-    { key: "longBreak", label: "长休息", min: 1, max: 60 },
-    { key: "interval", label: "长休息间隔（个番茄）", min: 2, max: 10 },
+  const fields: { key: keyof Draft; label: string; min: number; max: number; unit: string }[] = [
+    { key: "focusMinutes", label: "专注时长", min: 1, max: 180, unit: "分钟" },
+    { key: "shortBreak", label: "短休息", min: 1, max: 30, unit: "分钟" },
+    { key: "longBreak", label: "长休息", min: 1, max: 60, unit: "分钟" },
+    { key: "interval", label: "长休息间隔", min: 2, max: 10, unit: "个番茄" },
   ];
 
   const handleSave = async () => {
@@ -51,7 +51,7 @@ export default function PomodoroSection() {
               onChange={(e) => setDraft((d) => ({ ...d, [f.key]: Number(e.target.value) }))}
               className="w-20 rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
             />
-            <span className="text-sm text-neutral-500">分钟</span>
+            <span className="text-sm text-neutral-500">{f.unit}</span>
           </div>
         </div>
       ))}

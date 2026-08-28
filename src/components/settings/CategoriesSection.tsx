@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from "lucide-react";
 import { useTaskStore } from "../../stores/taskStore";
+import { CATEGORY_COLORS, NO_CATEGORY_COLOR } from "../../lib/categoryColors";
 
 export default function CategoriesSection() {
   const categories = useTaskStore((s) => s.categories);
@@ -8,11 +9,13 @@ export default function CategoriesSection() {
   const renameCategory = useTaskStore((s) => s.renameCategory);
   const deleteCategory = useTaskStore((s) => s.deleteCategory);
   const moveCategory = useTaskStore((s) => s.moveCategory);
+  const changeCategoryColor = useTaskStore((s) => s.changeCategoryColor);
 
   const [newName, setNewName] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [colorOpenId, setColorOpenId] = useState<number | null>(null);
 
   const handleCreate = async () => {
     const name = newName.trim();
@@ -46,6 +49,14 @@ export default function CategoriesSection() {
           ) : (
             <span className="flex-1 text-sm text-neutral-700">{c.name}</span>
           )}
+
+          <button
+            onClick={() => setColorOpenId(colorOpenId === c.id ? null : c.id)}
+            className="h-5 w-5 shrink-0 rounded-full border border-neutral-300"
+            style={{ background: c.color ?? NO_CATEGORY_COLOR }}
+            aria-label="设置分类颜色"
+            title="设置分类颜色"
+          />
 
           <button
             onClick={() => moveCategory(c.id, -1)}
@@ -93,6 +104,34 @@ export default function CategoriesSection() {
           </button>
         </div>
       ))}
+
+      {colorOpenId != null && (
+        <div className="rounded-md border border-neutral-200 bg-neutral-50 p-2">
+          <div className="mb-1.5 flex items-center gap-1">
+            {CATEGORY_COLORS.map((col) => (
+              <button
+                key={col}
+                onClick={() => {
+                  void changeCategoryColor(colorOpenId, col);
+                  setColorOpenId(null);
+                }}
+                className="h-5 w-5 rounded-full border border-neutral-300"
+                style={{ background: col }}
+                aria-label={col}
+              />
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-neutral-500">自定义</span>
+            <input
+              type="color"
+              value={categories.find((c) => c.id === colorOpenId)?.color ?? NO_CATEGORY_COLOR}
+              onChange={(e) => void changeCategoryColor(colorOpenId, e.target.value)}
+              className="h-6 w-10 cursor-pointer"
+            />
+          </div>
+        </div>
+      )}
 
       {confirmDeleteId != null && (
         <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">

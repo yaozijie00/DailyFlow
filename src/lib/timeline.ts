@@ -1,17 +1,19 @@
 /**
  * 时间轴（纵向）核心换算：时间 ↔ 像素。
- * 所有 Task Block 定位、当前时间线、以及拖拽逻辑都必须基于这里的函数：
- *   - timeToY(timeMs) → 像素 Y
- *   - yToTime(y)     → 时间戳（今天）
+ * 坐标系：Y 为「当天 00:00 起的绝对像素」，时间轴范围 = 全天 00:00-24:00（1440 分钟）。
+ * 用户设定的开始/结束范围（config.startMinutes/endMinutes）只用于「视觉强调 + 分割线」，
+ * 不参与坐标换算与任务钳制（任务可排在全天任意时间）。
+ * 缩放：pxPerMinute（每像素分钟数，设置项，默认 1.5）。
  *
- * 范围与吸附粒度可用 TimelineConfig 配置（设置页可修改），
- * 省略 config 时使用默认值：08:00（顶部）→ 24:00（底部），吸附 15 分钟。
+ * 所有 Task Block 定位、当前时间线、以及拖拽逻辑都必须基于这里的函数：
+ *   - timeToY(timeMs, pxPerMinute) → 像素 Y
+ *   - yToTime(y, pxPerMinute)     → 时间戳（今天）
  */
 
 export interface TimelineConfig {
-  /** 时间轴开始（当天分钟数，如 08:00 = 480） */
+  /** 时间轴开始（当天分钟数，如 08:00 = 480）——视觉强调范围 */
   startMinutes: number;
-  /** 时间轴结束（当天分钟数，如 24:00 = 1440） */
+  /** 时间轴结束（当天分钟数，如 24:00 = 1440）——视觉强调范围 */
   endMinutes: number;
   /** 吸附粒度（分钟） */
   snapMinutes: number;
@@ -23,7 +25,10 @@ export const DEFAULT_TIMELINE_CONFIG: TimelineConfig = {
   snapMinutes: 15, // 15 分钟粒度
 };
 
-export const PX_PER_MINUTE = 1.5; // 1 分钟 = 1.5px → 1 小时 = 90px
+export const PX_PER_MINUTE = 1.5; // 默认 1 分钟 = 1.5px → 1 小时 = 90px
+
+/** 全天分钟数（00:00-24:00）。 */
+export const FULL_DAY_MINUTES = 24 * 60;
 
 /** 任务块最小渲染高度（px），避免超短任务不可见。 */
 export const MIN_BLOCK_HEIGHT = 8;
@@ -33,8 +38,8 @@ export const TIMELINE_START_MINUTES = DEFAULT_TIMELINE_CONFIG.startMinutes;
 export const TIMELINE_END_MINUTES = DEFAULT_TIMELINE_CONFIG.endMinutes;
 export const SNAP_MINUTES = DEFAULT_TIMELINE_CONFIG.snapMinutes;
 
-export const TIMELINE_TOTAL_HEIGHT =
-  (TIMELINE_END_MINUTES - TIMELINE_START_MINUTES) * PX_PER_MINUTE; // 1440px
+/** 全天总高度（默认缩放）。 */
+export const TIMELINE_TOTAL_HEIGHT = FULL_DAY_MINUTES * PX_PER_MINUTE; // 2160px
 
 /** 时间戳 → 当天「分钟数」（0-1440，本地时区，忽略秒）。 */
 function timestampToMinutes(timeMs: number): number {
@@ -54,45 +59,29 @@ function minutesToTimestamp(minutes: number): number {
   ).getTime();
 }
 
-/** 拖拽允许的最大结束分钟数（末尾减一个吸附粒度），避免跨天问题。 */
-function maxDragMinutes(config: TimelineConfig): number {
-  return config.endMinutes - config.snapMinutes;
+/** 全天范围内钳制分钟数（0-1440）。 */
+function clampMinutes(m: number): number {
+  return Math.min(Math.max(m, 0), FULL_DAY_MINUTES);
 }
 
-function clampMinutes(m: number, config: TimelineConfig): number {
-  return Math.min(Math.max(m, config.startMinutes), maxDragMinutes(config));
+/** 分钟数 → 像素 Y（全天绝对坐标）。 */
+export function minutesToY(minutes: number, pxPerMinute: number = PX_PER_MINUTE): number {
+  return minutes * pxPerMinute;
 }
 
-/** 分钟数 → 像素 Y。 */
-export function minutesToY(
-  minutes: number,
-  config: TimelineConfig = DEFAULT_TIMELINE_CONFIG,
-): number {
-  return (minutes - config.startMinutes) * PX_PER_MINUTE;
-}
-
-/** 像素 Y → 分钟数。 */
-export function yToMinutes(
-  y: number,
-  config: TimelineConfig = DEFAULT_TIMELINE_CONFIG,
-): number {
-  return config.startMinutes + y / PX_PER_MINUTE;
+/** 像素 Y → 分钟数（全天绝对坐标）。 */
+export function yToMinutes(y: number, pxPerMinute: number = PX_PER_MINUTE): number {
+  return y / pxPerMinute;
 }
 
 /** 时间戳 → 像素 Y。 */
-export function timeToY(
-  timeMs: number,
-  config: TimelineConfig = DEFAULT_TIMELINE_CONFIG,
-): number {
-  return minutesToY(timestampToMinutes(timeMs), config);
+export function timeToY(timeMs: number, pxPerMinute: number = PX_PER_MINUTE): number {
+  return minutesToY(timestampToMinutes(timeMs), pxPerMinute);
 }
 
 /** 像素 Y → 时间戳（今天）。 */
-export function yToTime(
-  y: number,
-  config: TimelineConfig = DEFAULT_TIMELINE_CONFIG,
-): number {
-  return minutesToTimestamp(yToMinutes(y, config));
+export function yToTime(y: number, pxPerMinute: number = PX_PER_MINUTE): number {
+  return minutesToTimestamp(yToMinutes(y, pxPerMinute));
 }
 
 /** 分钟数 → "HH:mm"。 */
@@ -117,22 +106,23 @@ export interface TimeRange {
 
 /**
  * 拖拽范围（两个像素 Y）→ 吸附后的时间范围（分钟）。
- * 规则：按配置吸附、自动交换上下、最小一个粒度、不越界。
+ * 规则：按配置吸附、自动交换上下、最小一个粒度、全天范围内不越界。
  */
 export function dragRangeToMinutes(
   y1: number,
   y2: number,
   config: TimelineConfig = DEFAULT_TIMELINE_CONFIG,
+  pxPerMinute: number = PX_PER_MINUTE,
 ): TimeRange {
-  const m1 = snapMinutes(clampMinutes(yToMinutes(y1, config), config), config);
-  const m2 = snapMinutes(clampMinutes(yToMinutes(y2, config), config), config);
+  const m1 = snapMinutes(clampMinutes(yToMinutes(y1, pxPerMinute)), config);
+  const m2 = snapMinutes(clampMinutes(yToMinutes(y2, pxPerMinute)), config);
   let start = Math.min(m1, m2);
   let end = Math.max(m1, m2);
   if (end - start < config.snapMinutes) {
     end = start + config.snapMinutes;
-    if (end > maxDragMinutes(config)) {
-      start = maxDragMinutes(config) - config.snapMinutes;
-      end = maxDragMinutes(config);
+    if (end > FULL_DAY_MINUTES) {
+      start = FULL_DAY_MINUTES - config.snapMinutes;
+      end = FULL_DAY_MINUTES;
     }
   }
   return { startMinutes: start, endMinutes: end };
@@ -143,8 +133,9 @@ export function dragRangeToTimes(
   y1: number,
   y2: number,
   config: TimelineConfig = DEFAULT_TIMELINE_CONFIG,
+  pxPerMinute: number = PX_PER_MINUTE,
 ): { startMs: number; endMs: number } {
-  const { startMinutes, endMinutes } = dragRangeToMinutes(y1, y2, config);
+  const { startMinutes, endMinutes } = dragRangeToMinutes(y1, y2, config, pxPerMinute);
   return {
     startMs: minutesToTimestamp(startMinutes),
     endMs: minutesToTimestamp(endMinutes),
@@ -163,10 +154,11 @@ export function resizeStartTo(
   newY: number,
   endMs: number,
   config: TimelineConfig = DEFAULT_TIMELINE_CONFIG,
+  pxPerMinute: number = PX_PER_MINUTE,
 ): number {
   const endMinutes = timestampToMinutes(endMs);
-  const maxStart = Math.max(endMinutes - config.snapMinutes, config.startMinutes);
-  let start = snapMinutes(clampMinutes(yToMinutes(newY, config), config), config);
+  const maxStart = Math.max(endMinutes - config.snapMinutes, 0);
+  let start = snapMinutes(clampMinutes(yToMinutes(newY, pxPerMinute)), config);
   start = Math.min(start, maxStart);
   return minutesToTimestamp(start);
 }
@@ -176,10 +168,11 @@ export function resizeEndTo(
   newY: number,
   startMs: number,
   config: TimelineConfig = DEFAULT_TIMELINE_CONFIG,
+  pxPerMinute: number = PX_PER_MINUTE,
 ): number {
   const startMinutes = timestampToMinutes(startMs);
-  const minEnd = Math.min(startMinutes + config.snapMinutes, maxDragMinutes(config));
-  let end = snapMinutes(clampMinutes(yToMinutes(newY, config), config), config);
+  const minEnd = Math.min(startMinutes + config.snapMinutes, FULL_DAY_MINUTES);
+  let end = snapMinutes(clampMinutes(yToMinutes(newY, pxPerMinute)), config);
   end = Math.max(end, minEnd);
   return minutesToTimestamp(end);
 }
@@ -190,20 +183,15 @@ export function moveTaskBy(
   endMs: number,
   deltaY: number,
   config: TimelineConfig = DEFAULT_TIMELINE_CONFIG,
+  pxPerMinute: number = PX_PER_MINUTE,
 ): { startMs: number; endMs: number } {
   const startMinutes = timestampToMinutes(startMs);
   const durationMinutes = (endMs - startMs) / 60_000; // 时间戳差，跨天不为负
-  const deltaMinutes = deltaY / PX_PER_MINUTE;
+  const deltaMinutes = deltaY / pxPerMinute;
 
-  const maxStart = Math.max(
-    config.startMinutes,
-    maxDragMinutes(config) - durationMinutes,
-  );
+  const maxStart = Math.max(0, FULL_DAY_MINUTES - durationMinutes);
   let newStartMinutes = snapMinutes(startMinutes + deltaMinutes, config);
-  newStartMinutes = Math.min(
-    Math.max(newStartMinutes, config.startMinutes),
-    maxStart,
-  );
+  newStartMinutes = Math.min(Math.max(newStartMinutes, 0), maxStart);
 
   return {
     startMs: minutesToTimestamp(newStartMinutes),
@@ -246,4 +234,80 @@ export function findOverlappingIds(spans: TimeSpan[]): Set<number> {
     }
   }
   return overlapping;
+}
+
+export interface LaneLayout {
+  /** 1-based 栏号 */
+  lane: number;
+  /** 所在重叠组的栏数（1 = 全宽） */
+  laneCount: number;
+}
+
+/**
+ * 重叠任务分栏（甘特式）：
+ * - 以「时间重叠为边」找连通组（并查集）；
+ * - 组内按开始时间贪心分配栏位（区间图着色，栏数最优）；
+ * - prefer：可选，返回某任务「偏好栏位」（0-based），偏好栏空闲则优先使用（用户横向换栏）；
+ * - 无重叠的任务不在返回的 Map 中（渲染时保持全宽）。
+ */
+export function computeLanes(
+  spans: TimeSpan[],
+  prefer?: (id: number) => number | undefined,
+): Map<number, LaneLayout> {
+  const n = spans.length;
+  const parent = Array.from({ length: n }, (_, i) => i);
+  const find = (x: number): number => (parent[x] === x ? x : (parent[x] = find(parent[x])));
+  const union = (a: number, b: number): void => {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra !== rb) parent[rb] = ra;
+  };
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const a = spans[i];
+      const b = spans[j];
+      if (a.startMs < b.endMs && b.startMs < a.endMs) union(i, j);
+    }
+  }
+  const groups = new Map<number, number[]>();
+  for (let i = 0; i < n; i++) {
+    const root = find(i);
+    const arr = groups.get(root) ?? [];
+    arr.push(i);
+    groups.set(root, arr);
+  }
+  /** 第一个「末尾时间已结束」的空闲栏；无则新开一栏。 */
+  const firstFreeLane = (laneEnd: number[], start: number): number => {
+    let lane = 0;
+    while (lane < laneEnd.length && laneEnd[lane] > start) lane++;
+    return lane;
+  };
+  const result = new Map<number, LaneLayout>();
+  for (const idxs of groups.values()) {
+    if (idxs.length < 2) continue; // 单任务组 → 全宽
+    const sorted = [...idxs].sort((x, y) => spans[x].startMs - spans[y].startMs);
+    const laneEnd: number[] = [];
+    const assigned: { idx: number; lane: number }[] = [];
+    for (const idx of sorted) {
+      const p = prefer ? prefer(spans[idx].id) : undefined;
+      let lane: number;
+      if (p !== undefined && p >= 0) {
+        while (laneEnd.length <= p) laneEnd.push(-Infinity); // 空栏视为空闲
+        if (laneEnd[p] <= spans[idx].startMs) {
+          lane = p; // 偏好栏空闲 → 使用
+        } else {
+          lane = firstFreeLane(laneEnd, spans[idx].startMs); // 偏好被占用 → 贪心回退
+        }
+      } else {
+        lane = firstFreeLane(laneEnd, spans[idx].startMs);
+      }
+      laneEnd[lane] = spans[idx].endMs;
+      assigned.push({ idx, lane: lane + 1 });
+    }
+    const laneCount = assigned.reduce((m, a) => Math.max(m, a.lane), 0);
+    for (const { idx, lane } of assigned) {
+      result.set(spans[idx].id, { lane, laneCount });
+    }
+  }
+  return result;
 }

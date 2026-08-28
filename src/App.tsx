@@ -5,6 +5,7 @@ import { useSettingsStore } from "./stores/settingsStore";
 import { usePomodoroStore } from "./stores/pomodoroStore";
 import Today from "./pages/Today";
 import Focus from "./pages/Focus";
+import News from "./pages/News";
 import Settings from "./pages/Settings";
 import { useShortcuts } from "./hooks/useShortcuts";
 import { databaseService } from "./services/databaseService";
@@ -12,6 +13,7 @@ import { databaseService } from "./services/databaseService";
 const pages = {
   today: Today,
   focus: Focus,
+  news: News,
   settings: Settings,
 } as const;
 

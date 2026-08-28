@@ -130,13 +130,13 @@ describe("refresh（UI 轮询刷新）", () => {
   });
 });
 
-describe("continueFocus / reset", () => {
+describe("startNextFocus / reset", () => {
   it("继续专注：同一任务重新开始", () => {
     const { store, clock } = makeStore();
     store.getState().startFocus(7);
     clock.advance(25 * MINUTE);
     store.getState().refresh(); // 自动完成
-    store.getState().continueFocus();
+    store.getState().startNextFocus();
     const s = store.getState();
     expect(s.snapshot.state).toBe("RUNNING");
     expect(s.showResult).toBe(false);
@@ -155,6 +155,78 @@ describe("continueFocus / reset", () => {
     expect(s.taskId).toBeNull();
     expect(s.showResult).toBe(false);
     expect(s.snapshot.remainingMs).toBe(25 * MINUTE);
+  });
+});
+
+describe("休息循环（Focus → Break）", () => {
+  it("专注完成后 startBreak 进入短休息并累计计数", () => {
+    const { store, clock } = makeStore();
+    store.getState().startFocus(7);
+    clock.advance(25 * MINUTE);
+    store.getState().refresh(); // 自动完成
+    store.getState().startBreak();
+    const s = store.getState();
+    expect(s.phase).toBe("short_break");
+    expect(s.completedFocusCount).toBe(1);
+    expect(s.snapshot.durationMs).toBe(5 * MINUTE); // 短休息 5 分钟
+    expect(s.snapshot.state).toBe("RUNNING");
+  });
+
+  it("达到长休息间隔后进入长休息并清零计数", () => {
+    const { store, clock } = makeStore();
+    store.getState().startFocus(7);
+    clock.advance(25 * MINUTE);
+    store.getState().refresh(); // 自动完成
+    store.setState({ completedFocusCount: 3 }); // 模拟已累计 3 次
+    store.getState().startBreak();
+    const s = store.getState();
+    expect(s.phase).toBe("long_break");
+    expect(s.completedFocusCount).toBe(0);
+    expect(s.snapshot.durationMs).toBe(15 * MINUTE); // 长休息 15 分钟
+  });
+
+  it("休息结束后 startNextFocus 回到专注", () => {
+    const { store, clock } = makeStore();
+    store.getState().startFocus(7);
+    clock.advance(25 * MINUTE);
+    store.getState().refresh();
+    store.getState().startBreak(); // 短休息
+    clock.advance(5 * MINUTE);
+    store.getState().refresh(); // 休息自动完成
+    store.getState().startNextFocus();
+    const s = store.getState();
+    expect(s.phase).toBe("focus");
+    expect(s.snapshot.state).toBe("RUNNING");
+    expect(s.taskId).toBe(7);
+  });
+
+  it("休息进行中可跳过休息直接开始下一专注", () => {
+    const { store, clock } = makeStore();
+    store.getState().startFocus(7);
+    clock.advance(25 * MINUTE);
+    store.getState().refresh();
+    store.getState().startBreak(); // 进入短休息
+    clock.advance(2 * MINUTE); // 休息进行中
+    store.getState().startNextFocus(); // 跳过休息
+    const s = store.getState();
+    expect(s.phase).toBe("focus");
+    expect(s.snapshot.state).toBe("RUNNING");
+    expect(s.taskId).toBe(7);
+    expect(s.snapshot.elapsedMs).toBe(0);
+  });
+
+  it("finalizeFocus 落定专注并累计计数（幂等）", async () => {
+    const { store, clock, focus } = makeStore();
+    store.getState().startFocus(7);
+    clock.advance(25 * MINUTE);
+    store.getState().refresh(); // 自动完成
+    store.getState().finalizeFocus();
+    expect(focus.finish).toHaveBeenCalledWith(true, 25 * 60);
+    expect(store.getState().completedFocusCount).toBe(1);
+    // 再次调用不重复持久化
+    store.getState().finalizeFocus();
+    expect(focus.finish).toHaveBeenCalledTimes(1);
+    expect(store.getState().completedFocusCount).toBe(1);
   });
 });
 

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import {
   CalendarDays,
   Timer,
+  Newspaper,
   Settings as SettingsIcon,
   Database,
 } from "lucide-react";
@@ -11,6 +12,7 @@ import Toasts from "./Toasts";
 const navItems: { page: Page; label: string; icon: typeof CalendarDays }[] = [
   { page: "today", label: "今日", icon: CalendarDays },
   { page: "focus", label: "专注", icon: Timer },
+  { page: "news", label: "新闻", icon: Newspaper },
   { page: "settings", label: "设置", icon: SettingsIcon },
 ];
 
@@ -31,7 +33,8 @@ export default function Layout({ children }: { children: ReactNode }) {
             <button
               key={page}
               onClick={() => setPage(page)}
-              className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm ${
+              aria-current={currentPage === page ? "page" : undefined}
+              className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/30 ${
                 currentPage === page
                   ? "bg-neutral-900 text-white"
                   : "text-neutral-600 hover:bg-neutral-100"

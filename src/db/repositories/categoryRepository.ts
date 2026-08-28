@@ -1,6 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { categories } from "../schema";
+import { defaultCategoryColor } from "../../lib/categoryColors";
 
 export type Category = typeof categories.$inferSelect;
 
@@ -36,9 +37,15 @@ export class CategoryRepository {
   }
 
   async create(name: string): Promise<Category> {
+    const sortOrder = await this.nextSortOrder();
     const rows = await this.db
       .insert(categories)
-      .values({ name, createdAt: Date.now(), sortOrder: await this.nextSortOrder() })
+      .values({
+        name,
+        color: defaultCategoryColor(sortOrder),
+        createdAt: Date.now(),
+        sortOrder,
+      })
       .returning()
       .all();
     return rows[0];
@@ -52,10 +59,13 @@ export class CategoryRepository {
     return Number(row?.max ?? 1);
   }
 
-  async update(id: number, name: string): Promise<Category | null> {
+  async update(
+    id: number,
+    input: { name?: string; color?: string | null },
+  ): Promise<Category | null> {
     const rows = await this.db
       .update(categories)
-      .set({ name })
+      .set(input)
       .where(eq(categories.id, id))
       .returning()
       .all();
@@ -84,9 +94,18 @@ export class CategoryRepository {
 
   async seedDefaults(): Promise<Category[]> {
     const result: Category[] = [];
-    for (const name of DEFAULT_CATEGORIES) {
+    for (let i = 0; i < DEFAULT_CATEGORIES.length; i++) {
+      const name = DEFAULT_CATEGORIES[i];
       const existing = await this.findByName(name);
-      result.push(existing ?? (await this.create(name)));
+      if (existing) {
+        if (!existing.color) {
+          result.push((await this.update(existing.id, { color: defaultCategoryColor(i) }))!);
+        } else {
+          result.push(existing);
+        }
+      } else {
+        result.push(await this.create(name));
+      }
     }
     return result;
   }

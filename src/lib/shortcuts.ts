@@ -5,6 +5,8 @@ export type ShortcutAction =
   | "complete_task"
   | "open_today"
   | "open_focus"
+  | "open_news"
+  | "refresh_news"
   | "open_settings";
 
 export type ShortcutMap = Record<ShortcutAction, string>;
@@ -16,16 +18,20 @@ export const SHORTCUT_ACTIONS: ShortcutAction[] = [
   "complete_task",
   "open_today",
   "open_focus",
+  "open_news",
+  "refresh_news",
   "open_settings",
 ];
 
 export const SHORTCUT_ACTION_LABELS: Record<ShortcutAction, string> = {
-  open_dailyflow: "打开 DailyFlow",
-  create_task: "创建任务",
-  pomodoro_toggle: "开始/暂停番茄钟",
-  complete_task: "完成当前任务",
+  open_dailyflow: "显示 DailyFlow 窗口",
+  create_task: "新建任务（打开弹窗）",
+  pomodoro_toggle: "暂停/继续番茄钟",
+  complete_task: "完成选中任务",
   open_today: "打开今日",
   open_focus: "打开专注",
+  open_news: "打开新闻",
+  refresh_news: "刷新新闻",
   open_settings: "打开设置",
 };
 
@@ -36,7 +42,9 @@ export const DEFAULT_SHORTCUTS: ShortcutMap = {
   complete_task: "Ctrl+Shift+Enter",
   open_today: "Ctrl+1",
   open_focus: "Ctrl+2",
-  open_settings: "Ctrl+3",
+  open_news: "Ctrl+3",
+  refresh_news: "Ctrl+Shift+R",
+  open_settings: "Ctrl+4",
 };
 
 type ComboEvent = Pick<KeyboardEvent, "ctrlKey" | "altKey" | "shiftKey" | "metaKey" | "key">;

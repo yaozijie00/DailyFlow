@@ -15,7 +15,11 @@ export class CategoryService {
   }
 
   async rename(id: number, name: string): Promise<Category | null> {
-    return this.categories.update(id, name);
+    return this.categories.update(id, { name });
+  }
+
+  async changeColor(id: number, color: string): Promise<Category | null> {
+    return this.categories.update(id, { color });
   }
 
   async delete(id: number): Promise<boolean> {

@@ -48,8 +48,8 @@ export default function StorageSection() {
   };
 
   const fields: { key: keyof StoragePaths; label: string; hint: string }[] = [
-    { key: "dataDir", label: "SQLite 数据目录", hint: "dailyflow.db 存放位置；留空使用默认（%LOCALAPPDATA%\\DailyFlow）" },
-    { key: "cacheDir", label: "缓存目录", hint: "留空使用默认；当前版本暂未使用缓存" },
+    { key: "dataDir", label: "SQLite 数据目录", hint: "dailyflow.db 存放位置；留空使用默认（安装目录\\data）" },
+    { key: "cacheDir", label: "缓存目录", hint: "留空使用默认（安装目录\\cache）；为新闻图片等缓存预留" },
     { key: "backupDir", label: "备份目录", hint: "备份文件存放位置；留空使用默认（数据目录\\backups）" },
   ];
 

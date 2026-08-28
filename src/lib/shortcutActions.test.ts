@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   completeTask: vi.fn(),
   pause: vi.fn(),
   resume: vi.fn(),
+  refreshNews: vi.fn(),
   show: vi.fn(),
   unminimize: vi.fn(),
   setFocus: vi.fn(),
@@ -41,6 +42,11 @@ vi.mock("../stores/pomodoroStore", () => ({
     }),
   },
 }));
+vi.mock("../stores/newsStore", () => ({
+  useNewsStore: {
+    getState: () => ({ refresh: mocks.refreshNews }),
+  },
+}));
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
     show: mocks.show,
@@ -63,6 +69,14 @@ describe("dispatchShortcut", () => {
     expect(mocks.setPage).toHaveBeenCalledWith("focus");
     dispatchShortcut("open_settings");
     expect(mocks.setPage).toHaveBeenCalledWith("settings");
+  });
+
+  test("open_news 切换页面，refresh_news 切换并刷新", () => {
+    dispatchShortcut("open_news");
+    expect(mocks.setPage).toHaveBeenCalledWith("news");
+    dispatchShortcut("refresh_news");
+    expect(mocks.setPage).toHaveBeenCalledWith("news");
+    expect(mocks.refreshNews).toHaveBeenCalled();
   });
 
   test("create_task 切到今日并打开新建弹窗", () => {

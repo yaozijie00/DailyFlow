@@ -43,8 +43,17 @@ describe("CategoryRepository", () => {
 
   it("updates a category name", async () => {
     const created = await repo.create("工作");
-    const updated = await repo.update(created.id, "工作-改");
+    const updated = await repo.update(created.id, { name: "工作-改" });
     expect(updated?.name).toBe("工作-改");
+  });
+
+  it("create 自动分配默认颜色，update 可改颜色", async () => {
+    const created = await repo.create("测试色");
+    expect(created.color).toBeTruthy();
+    const updated = await repo.update(created.id, { color: "#123456" });
+    expect(updated?.color).toBe("#123456");
+    const found = await repo.findById(created.id);
+    expect(found?.color).toBe("#123456");
   });
 
   it("deletes a category", async () => {

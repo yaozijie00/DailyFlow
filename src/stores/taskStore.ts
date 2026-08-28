@@ -22,6 +22,8 @@ interface TaskState {
   isCreateOpen: boolean;
   editingTaskId: number | null;
   createDraft: CreateDraft | null;
+  /** 任务列表 → 时间轴拖拽中的瞬时状态（不落库，松开/取消后清空）。 */
+  taskDrag: { taskId: number } | null;
 
   load: () => Promise<void>;
   createTask: (input: TaskCreateInput) => Promise<void>;
@@ -33,8 +35,11 @@ interface TaskState {
   changeEstimatedDuration: (id: number, seconds: number | null) => Promise<void>;
   createCategory: (name: string) => Promise<void>;
   renameCategory: (id: number, name: string) => Promise<void>;
+  changeCategoryColor: (id: number, color: string) => Promise<void>;
   deleteCategory: (id: number) => Promise<void>;
   moveCategory: (id: number, direction: -1 | 1) => Promise<void>;
+  startTaskDrag: (taskId: number) => void;
+  endTaskDrag: () => void;
 
   selectTask: (id: number | null) => void;
   openCreate: (draft?: CreateDraft | null) => void;
@@ -56,6 +61,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   isCreateOpen: false,
   editingTaskId: null,
   createDraft: null,
+  taskDrag: null,
 
   load: async () => {
     set({ loading: true });
@@ -154,6 +160,14 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       fail("修改分类失败");
     }
   },
+  changeCategoryColor: async (id, color) => {
+    try {
+      await categoryService.changeColor(id, color);
+      await get().load();
+    } catch {
+      fail("修改分类颜色失败");
+    }
+  },
   deleteCategory: async (id) => {
     try {
       await categoryService.delete(id);
@@ -182,4 +196,6 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   closeCreate: () => set({ isCreateOpen: false, createDraft: null }),
   openEdit: (id) => set({ editingTaskId: id }),
   closeEdit: () => set({ editingTaskId: null }),
+  startTaskDrag: (taskId) => set({ taskDrag: { taskId } }),
+  endTaskDrag: () => set({ taskDrag: null }),
 }));

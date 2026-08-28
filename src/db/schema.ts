@@ -16,6 +16,7 @@ export const categories = sqliteTable("categories", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull().unique(),
   sortOrder: integer("sort_order").notNull().default(0),
+  color: text("color"),
   createdAt: integer("created_at").notNull(),
 });
 
@@ -34,6 +35,7 @@ export const tasks = sqliteTable("tasks", {
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
   completedAt: integer("completed_at"),
+  notes: text("notes"),
 });
 
 export const focusSessions = sqliteTable("focus_sessions", {
@@ -52,4 +54,29 @@ export const focusSessions = sqliteTable("focus_sessions", {
 export const settings = sqliteTable("settings", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
+});
+
+export const newsItems = sqliteTable("news_items", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  guid: text("guid").unique(),
+  url: text("url").notNull().unique(),
+  title: text("title").notNull(),
+  source: text("source").notNull(),
+  imageUrl: text("image_url"),
+  summary: text("summary"),
+  category: text("category").notNull(),
+  publishedAt: integer("published_at"),
+  isRead: integer("is_read", { mode: "boolean" }).notNull().default(false),
+  isFavorite: integer("is_favorite", { mode: "boolean" }).notNull().default(false),
+  createdAt: integer("created_at").notNull(),
+});
+
+export const newsSources = sqliteTable("news_sources", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  url: text("url").notNull().unique(),
+  category: text("category").notNull(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: integer("created_at").notNull(),
 });

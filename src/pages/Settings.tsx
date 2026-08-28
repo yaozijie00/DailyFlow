@@ -1,22 +1,25 @@
 import { useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { useEffect } from "react";
+import { PageHeader } from "../components/ui/PageHeader";
 import GeneralSection from "../components/settings/GeneralSection";
 import PomodoroSection from "../components/settings/PomodoroSection";
 import ShortcutsSection from "../components/settings/ShortcutsSection";
 import CategoriesSection from "../components/settings/CategoriesSection";
 import StorageSection from "../components/settings/StorageSection";
 import DataSection from "../components/settings/DataSection";
+import NewsSourcesSection from "../components/settings/NewsSourcesSection";
 
-type Tab = "general" | "pomodoro" | "shortcuts" | "categories" | "storage" | "data";
+type Tab = "general" | "pomodoro" | "shortcuts" | "categories" | "news" | "storage" | "data";
 
 const TABS: { id: Tab; label: string }[] = [
-  { id: "general", label: "General" },
-  { id: "pomodoro", label: "Pomodoro" },
-  { id: "shortcuts", label: "Shortcuts" },
-  { id: "categories", label: "Categories" },
-  { id: "storage", label: "Storage" },
-  { id: "data", label: "Data" },
+  { id: "general", label: "通用" },
+  { id: "pomodoro", label: "番茄钟" },
+  { id: "shortcuts", label: "快捷键" },
+  { id: "categories", label: "分类" },
+  { id: "news", label: "新闻" },
+  { id: "storage", label: "存储" },
+  { id: "data", label: "数据" },
 ];
 
 export default function Settings() {
@@ -28,12 +31,18 @@ export default function Settings() {
   }, []);
 
   return (
-    <div className="max-w-lg">
-      <header className="mb-4">
-        <h1 className="text-xl font-semibold">设置</h1>
-        <p className="text-sm text-neutral-500">修改后立即保存到本地数据库，重启后依然生效。</p>
-        <p className="mt-1 text-xs text-neutral-400">DailyFlow 版本 {appVersion || "…"}</p>
-      </header>
+    <div className="mx-auto w-full max-w-2xl">
+      <PageHeader
+        title="设置"
+        description={
+          <>
+            修改后立即保存到本地数据库，重启后依然生效。
+            <span className="mt-1 block text-xs text-neutral-400">
+              DailyFlow 版本 {appVersion || "…"}
+            </span>
+          </>
+        }
+      />
 
       <nav className="mb-4 flex flex-wrap gap-1">
         {TABS.map((t) => (
@@ -55,6 +64,7 @@ export default function Settings() {
       {tab === "pomodoro" && <PomodoroSection />}
       {tab === "shortcuts" && <ShortcutsSection />}
       {tab === "categories" && <CategoriesSection />}
+      {tab === "news" && <NewsSourcesSection />}
       {tab === "storage" && <StorageSection />}
       {tab === "data" && <DataSection />}
     </div>

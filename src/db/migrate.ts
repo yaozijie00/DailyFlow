@@ -5,9 +5,16 @@ import * as schema from "./schema";
 /**
  * 迁移执行器：按文件名顺序应用 src/db/migrations/*.sql。
  * 已应用的迁移记录在 __drizzle_migrations 表，避免重复执行。
- * 每个迁移文件在「单个事务」中执行：中途失败整体回滚，可安全重试（H1）。
+ *
+ * 事务说明：Tauri 生产环境经 @tauri-apps/plugin-sql（sqlx 连接池）执行，
+ * 池内多连接下「BEGIN/COMMIT」可能落在不同连接上，事务不可靠（曾导致
+ * 建表成功但迁移未记录、后续迁移中断）。因此改为：
+ *   - 每条语句独立执行，不依赖事务；
+ *   - 迁移 SQL 必须幂等（CREATE/INDEX 用 IF NOT EXISTS）；
+ *   - 「表/索引已存在」「列已存在（duplicate column）」类错误视为已应用并跳过；
+ * 这样部分应用的迁移可在下次启动时收敛完成，可安全重试。
+ *
  * 通过 sqlite-proxy 的抽象 db 执行，同时兼容「Tauri 插件」与「测试内存库」。
- * 注意：生产环境迁移在启动早期串行执行，连接池实际为单连接，事务可靠。
  */
 const defaultMigrationFiles = import.meta.glob("./migrations/*.sql", {
   query: "?raw",
@@ -71,20 +78,25 @@ export async function runMigrations(
     );
     if (existing.length > 0) continue;
 
-    // 事务包裹：失败整体回滚，迁移名不记录 → 可安全重试
-    await db.run(sql.raw("BEGIN"));
-    try {
-      for (const statement of splitStatements(content as string)) {
+    // 逐语句执行（不依赖跨连接事务）；「已存在/重复列」类幂等错误跳过，保证重试收敛
+    for (const statement of splitStatements(content as string)) {
+      try {
         await db.run(sql.raw(statement));
+      } catch (e) {
+        // drizzle 会把底层错误包成 "Failed query: ..."，真实信息在 cause 链上
+        let msg = e instanceof Error ? e.message : String(e);
+        let cause: unknown = e instanceof Error ? (e as { cause?: unknown }).cause : undefined;
+        while (cause instanceof Error) {
+          msg += ` ${cause.message}`;
+          cause = (cause as { cause?: unknown }).cause;
+        }
+        if (/already exists|duplicate column/i.test(msg)) continue;
+        throw e;
       }
-      await db.run(
-        sql`INSERT INTO __drizzle_migrations (name, created_at) VALUES (${name}, ${Date.now()})`,
-      );
-      await db.run(sql.raw("COMMIT"));
-    } catch (e) {
-      await db.run(sql.raw("ROLLBACK")).catch(() => {});
-      throw e;
     }
+    await db.run(
+      sql`INSERT INTO __drizzle_migrations (name, created_at) VALUES (${name}, ${Date.now()})`,
+    );
 
     applied.push(name);
   }

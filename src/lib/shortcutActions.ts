@@ -2,6 +2,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useAppStore } from "../stores/appStore";
 import { usePomodoroStore } from "../stores/pomodoroStore";
 import { useTaskStore } from "../stores/taskStore";
+import { useNewsStore } from "../stores/newsStore";
 import type { ShortcutAction } from "./shortcuts";
 
 /** 执行快捷键动作（所有副作用走 store getState，便于测试）。 */
@@ -35,6 +36,13 @@ export function dispatchShortcut(action: ShortcutAction): void {
       break;
     case "open_focus":
       app.setPage("focus");
+      break;
+    case "open_news":
+      app.setPage("news");
+      break;
+    case "refresh_news":
+      app.setPage("news");
+      void useNewsStore.getState().refresh();
       break;
     case "open_settings":
       app.setPage("settings");

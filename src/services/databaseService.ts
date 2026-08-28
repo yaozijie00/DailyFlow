@@ -1,5 +1,7 @@
 import { getDb, initDatabase } from "../db/db";
 import { CategoryRepository } from "../db/repositories/categoryRepository";
+import { NewsSourceRepository } from "../db/repositories/newsSourceRepository";
+import { DEFAULT_NEWS_SOURCES } from "../lib/newsSources";
 import { backupBeforeMigration } from "./backupService";
 
 export interface InitResult {
@@ -19,9 +21,13 @@ export const databaseService = {
         },
       });
       await new CategoryRepository(getDb()).seedDefaults();
+      await new NewsSourceRepository(getDb()).seedDefaults(DEFAULT_NEWS_SOURCES);
       return { ok: true, appliedMigrations };
     } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : String(e) };
+      // 优先暴露底层 SQLite 错误原因（drizzle 会包一层 "Failed query" 掩盖真实信息）
+      const cause = e instanceof Error ? (e as unknown as { cause?: unknown }).cause : undefined;
+      const causeMsg = cause instanceof Error ? cause.message : null;
+      return { ok: false, error: causeMsg ?? (e instanceof Error ? e.message : String(e)) };
     }
   },
 };

@@ -24,6 +24,7 @@ export default function TaskFormModal() {
   const [title, setTitle] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [estimatedMinutes, setEstimatedMinutes] = useState("");
+  const [notes, setNotes] = useState("");
 
   useEffect(() => {
     if (editingTask) {
@@ -35,16 +36,19 @@ export default function TaskFormModal() {
           ? String(editingTask.estimatedDuration / 60)
           : "",
       );
+      setNotes(editingTask.notes ?? "");
     } else if (hasDraft) {
       setTitle("");
       setCategoryId("");
       setEstimatedMinutes(
         String((createDraft.plannedEnd! - createDraft.plannedStart!) / 60000),
       );
+      setNotes("");
     } else {
       setTitle("");
       setCategoryId("");
       setEstimatedMinutes("");
+      setNotes("");
     }
   }, [editingTaskId, isCreateOpen, editingTask, createDraft, hasDraft]);
 
@@ -68,6 +72,7 @@ export default function TaskFormModal() {
         estimated == null || Number.isNaN(estimated) || estimated < 0
           ? null
           : Math.round(estimated * 60),
+      notes: notes.trim() === "" ? null : notes.trim(),
       ...(hasDraft
         ? {
             plannedStart: createDraft.plannedStart,
@@ -138,6 +143,16 @@ export default function TaskFormModal() {
               onChange={(e) => setEstimatedMinutes(e.target.value)}
               placeholder="例如：90"
               className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-neutral-600">备注</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="补充信息（可选）"
+              rows={3}
+              className="w-full resize-none rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
             />
           </div>
           <div className="flex justify-end gap-2 pt-2">
