@@ -12,7 +12,8 @@ export function validateStoragePaths(input: StoragePathsInput): Record<string, s
   for (const key of ["dataDir", "cacheDir", "backupDir"] as const) {
     const v = input[key].trim();
     if (v === "") continue;
-    const isWindowsAbsolute = /^[a-zA-Z]:[\\/]/.test(v) || v.startsWith("\\\\");
+    // 盘符绝对路径（C:\ 或 C:/）或 UNC 共享路径（\\server\share\...）
+    const isWindowsAbsolute = /^[a-zA-Z]:[\\/]/.test(v) || /^\\\\[^\\]+\\[^\\]+/.test(v);
     if (!isWindowsAbsolute) {
       errors[key] = "必须是绝对路径（如 C:\\Users\\...）";
     } else if (ILLEGAL_CHARS.test(v)) {
