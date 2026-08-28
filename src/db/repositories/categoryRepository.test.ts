@@ -65,4 +65,40 @@ describe("CategoryRepository", () => {
       "其他",
     ]);
   });
+
+  describe("排序与重排", () => {
+    it("findAll 按 sort_order 升序", async () => {
+      await repo.create("B");
+      await repo.create("A");
+      const all = await repo.findAll();
+      expect(all.map((c) => c.name)).toEqual(["B", "A"]); // 创建顺序即 sort_order
+      await repo.reorder(all.map((c) => c.id).reverse());
+      const re = await repo.findAll();
+      expect(re.map((c) => c.name)).toEqual(["A", "B"]);
+    });
+
+    it("新增分类 sort_order = MAX+1", async () => {
+      const c1 = await repo.create("X");
+      const c2 = await repo.create("Y");
+      expect(c2.sortOrder).toBe(c1.sortOrder + 1);
+    });
+  });
+
+  describe("删除分类任务置空", () => {
+    it("删除分类后任务 category_id 为 NULL", async () => {
+      const cat = await repo.create("待删");
+      // 直接用 drizzle sql 模板插入任务（沿用 migrate.ts 的写法）
+      const { sql } = await import("drizzle-orm");
+      await db.run(
+        sql`INSERT INTO tasks (title, scheduled_date, created_at, updated_at, category_id) VALUES ('任务', '2026-08-28', 1, 1, ${cat.id})`,
+      );
+      await repo.delete(cat.id);
+      const { tasks } = await import("../schema");
+      const row = await db
+        .select({ categoryId: tasks.categoryId })
+        .from(tasks)
+        .get();
+      expect(row?.categoryId).toBeNull();
+    });
+  });
 });

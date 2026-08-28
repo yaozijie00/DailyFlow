@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { categories } from "../schema";
 
@@ -10,7 +10,11 @@ export class CategoryRepository {
   constructor(private readonly db: Db) {}
 
   async findAll(): Promise<Category[]> {
-    return this.db.select().from(categories).all();
+    return this.db
+      .select()
+      .from(categories)
+      .orderBy(categories.sortOrder, categories.id)
+      .all();
   }
 
   async findById(id: number): Promise<Category | null> {
@@ -34,10 +38,18 @@ export class CategoryRepository {
   async create(name: string): Promise<Category> {
     const rows = await this.db
       .insert(categories)
-      .values({ name, createdAt: Date.now() })
+      .values({ name, createdAt: Date.now(), sortOrder: await this.nextSortOrder() })
       .returning()
       .all();
     return rows[0];
+  }
+
+  private async nextSortOrder(): Promise<number> {
+    const row = await this.db
+      .select({ max: sql<number>`COALESCE(MAX(${categories.sortOrder}), 0) + 1` })
+      .from(categories)
+      .get();
+    return Number(row?.max ?? 1);
   }
 
   async update(id: number, name: string): Promise<Category | null> {
@@ -57,6 +69,17 @@ export class CategoryRepository {
       .returning()
       .all();
     return rows.length > 0;
+  }
+
+  /** 按传入 id 顺序整体重排（sort_order = 下标）。 */
+  async reorder(orderedIds: number[]): Promise<void> {
+    for (let i = 0; i < orderedIds.length; i++) {
+      await this.db
+        .update(categories)
+        .set({ sortOrder: i })
+        .where(eq(categories.id, orderedIds[i]))
+        .run();
+    }
   }
 
   async seedDefaults(): Promise<Category[]> {
