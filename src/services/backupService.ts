@@ -123,7 +123,10 @@ export async function validateBackupSchema(
  */
 export async function restoreBackup(backupName: string): Promise<void> {
   // 1. 校验备份（临时连接；只关闭该连接，不影响主库连接池）
-  const backupClient = await Database.load(`sqlite:backups/${backupName}`);
+  // 备份文件在 backups_dir（绝对路径）；插件 path_mapper 对绝对路径整体替换，
+  // 直接传绝对路径可避免「sqlite:backups/...」被错误解析到 app_config_dir（Roaming）。
+  const dir = await getBackupsDir();
+  const backupClient = await Database.load(`sqlite:${dir}\\${backupName}`);
   let result: { ok: boolean; error?: string };
   try {
     const backupDb = makeDb(async () => backupClient);

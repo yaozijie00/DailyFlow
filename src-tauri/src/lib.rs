@@ -285,14 +285,15 @@ fn data_dir(app: tauri::AppHandle) -> Result<String, String> {
     dailyflow_data_dir(&app).map(|p| p.to_string_lossy().into_owned())
 }
 
-/// 返回数据库相对路径（相对 app 配置目录，供 sqlite 插件解析到
-/// %LOCALAPPDATA%\DailyFlow\dailyflow.db）。
+/// 返回数据库相对路径（相对 app 配置目录，供 sqlite 插件解析到数据目录）。
+/// 同盘时返回相对路径（..\..\...）；跨盘符/UNC 时 relative_path 无法上溯，
+/// 回退绝对路径（插件 path_mapper 的 PathBuf::push 遇绝对路径会整体替换，可正确解析）。
 #[tauri::command]
 fn db_relative_path(app: tauri::AppHandle) -> Result<String, String> {
     let app_config = app.path().app_config_dir().map_err(|e| e.to_string())?;
     let db_file = dailyflow_data_dir(&app)?.join("dailyflow.db");
-    let rel = relative_path(&app_config, &db_file).ok_or("无法计算数据库相对路径")?;
-    Ok(rel.to_string_lossy().into_owned())
+    let path = relative_path(&app_config, &db_file).unwrap_or(db_file);
+    Ok(path.to_string_lossy().into_owned())
 }
 
 /// 校验备份文件名为安全：仅允许 DailyFlow_Backup_*.db 且不含路径分隔符。
@@ -547,5 +548,12 @@ mod tests {
     fn validate_dir_rejects_relative() {
         let p = std::path::Path::new("DailyFlow");
         assert!(!p.is_absolute());
+    }
+
+    #[test]
+    fn relative_path_cross_drive_returns_none() {
+        let from = std::path::Path::new("C:\\Users\\me\\AppData\\Roaming\\com.dailyflow.desktop");
+        let to = std::path::Path::new("D:\\Data\\dailyflow.db");
+        assert!(super::relative_path(from, to).is_none());
     }
 }

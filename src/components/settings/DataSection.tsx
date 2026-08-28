@@ -34,7 +34,7 @@ export default function DataSection() {
       setDataMsg({ type: "ok", text: `备份成功：${path}` });
       await refreshBackups();
     } catch (e) {
-      setDataMsg({ type: "error", text: `备份失败：${(e as Error).message}` });
+      setDataMsg({ type: "error", text: `备份失败：${String(e)}` });
     } finally {
       setBusy(false);
     }
@@ -47,7 +47,7 @@ export default function DataSection() {
       // 成功后会重载应用，此后的代码不会执行
       await restoreBackup(selectedBackup);
     } catch (e) {
-      setDataMsg({ type: "error", text: `恢复失败：${(e as Error).message}` });
+      setDataMsg({ type: "error", text: `恢复失败：${String(e)}` });
       setBusy(false);
       setConfirming(false);
     }

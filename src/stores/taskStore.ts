@@ -125,7 +125,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       await taskService.changeCategory(id, categoryId);
       await get().load();
     } catch {
-      fail("修改类别失败");
+      fail("修改分类失败");
     }
   },
 

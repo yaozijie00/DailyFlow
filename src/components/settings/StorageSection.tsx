@@ -43,7 +43,7 @@ export default function StorageSection() {
       });
       setMsg({ type: "ok", text: "新的数据位置将在重新启动DailyFlow后生效" });
     } catch (e) {
-      setMsg({ type: "error", text: `保存失败：${(e as Error).message}` });
+      setMsg({ type: "error", text: `保存失败：${String(e)}` });
     }
   };
 
