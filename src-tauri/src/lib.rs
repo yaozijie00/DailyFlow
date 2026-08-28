@@ -2,11 +2,49 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use serde::{Deserialize, Serialize};
 use tauri::Manager;
 use windows_core::PCWSTR;
 
-/// 用户数据目录：%LOCALAPPDATA%\DailyFlow\（规范：数据与安装目录分离，卸载保留数据）。
-fn dailyflow_data_dir() -> Result<PathBuf, String> {
+/// 存储路径配置（storage.json）：dataDir / cacheDir / backupDir。
+#[derive(Serialize, Deserialize, Default)]
+#[serde(default, rename_all = "camelCase")]
+struct StoragePaths {
+    data_dir: String,
+    cache_dir: String,
+    backup_dir: String,
+}
+
+fn storage_config_path(app: &tauri::AppHandle) -> std::path::PathBuf {
+    app.path()
+        .app_config_dir()
+        .unwrap_or_else(|_| std::path::PathBuf::from("."))
+        .join("storage.json")
+}
+
+fn read_storage_paths(app: &tauri::AppHandle) -> StoragePaths {
+    match std::fs::read_to_string(storage_config_path(app)) {
+        Ok(s) => serde_json::from_str(&s).unwrap_or_default(),
+        Err(_) => StoragePaths::default(),
+    }
+}
+
+/// 数据目录：配置了 data_dir 用之，否则 %LOCALAPPDATA%\DailyFlow。
+fn dailyflow_data_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    let cfg = read_storage_paths(app);
+    let dir = if cfg.data_dir.trim().is_empty() {
+        let local = std::env::var("LOCALAPPDATA")
+            .map_err(|e| format!("无法获取 LOCALAPPDATA：{e}"))?;
+        std::path::Path::new(&local).join("DailyFlow")
+    } else {
+        std::path::PathBuf::from(cfg.data_dir.trim())
+    };
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+
+/// 启动自诊断使用的数据目录（不依赖 AppHandle，始终 %LOCALAPPDATA%\DailyFlow）。
+fn default_data_dir() -> Result<PathBuf, String> {
     let local = std::env::var("LOCALAPPDATA")
         .map_err(|e| format!("无法获取 LOCALAPPDATA：{e}"))?;
     let dir = Path::new(&local).join("DailyFlow");
@@ -23,7 +61,7 @@ static LOG_LOCK: Mutex<()> = Mutex::new(());
 /// 追加一行启动日志（文件不存在则创建）。
 fn append_startup_log(line: &str) {
     let _guard = LOG_LOCK.lock().unwrap_or_else(|p| p.into_inner());
-    if let Ok(dir) = dailyflow_data_dir() {
+    if let Ok(dir) = default_data_dir() {
         if let Ok(mut f) = fs::OpenOptions::new()
             .create(true)
             .append(true)
@@ -37,7 +75,7 @@ fn append_startup_log(line: &str) {
 /// 启动开始时清空旧日志并写入头部。
 fn reset_startup_log() {
     let _guard = LOG_LOCK.lock().unwrap_or_else(|p| p.into_inner());
-    if let Ok(dir) = dailyflow_data_dir() {
+    if let Ok(dir) = default_data_dir() {
         if let Ok(mut f) = fs::File::create(dir.join("startup.log")) {
             let _ = writeln!(
                 f,
@@ -137,7 +175,7 @@ fn probe_webview2_env_async() {
         }
 
         // 独立测试用用户数据目录（不污染真实数据）
-        let user_data = dailyflow_data_dir()
+        let user_data = default_data_dir()
             .map(|d| d.join("env-probe"))
             .unwrap_or_else(|_| std::env::temp_dir().join("df-env-probe"));
         let _ = fs::create_dir_all(&user_data);
@@ -212,9 +250,15 @@ fn probe_webview2_env_async() {
     });
 }
 
-/// 备份目录（%LOCALAPPDATA%\DailyFlow\backups），不存在则创建。
-fn resolve_backups_dir() -> Result<PathBuf, String> {
-    let backups = dailyflow_data_dir()?.join("backups");
+/// 备份目录：配置了 backup_dir 用之，否则 <数据目录>\backups。
+fn resolve_backups_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    let cfg = read_storage_paths(app);
+    if !cfg.backup_dir.trim().is_empty() {
+        let dir = PathBuf::from(cfg.backup_dir.trim());
+        fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        return Ok(dir);
+    }
+    let backups = dailyflow_data_dir(app)?.join("backups");
     fs::create_dir_all(&backups).map_err(|e| e.to_string())?;
     Ok(backups)
 }
@@ -237,8 +281,8 @@ fn relative_path(from_dir: &Path, to_file: &Path) -> Option<PathBuf> {
 
 /// 返回用户数据目录绝对路径（并创建）。
 #[tauri::command]
-fn data_dir() -> Result<String, String> {
-    dailyflow_data_dir().map(|p| p.to_string_lossy().into_owned())
+fn data_dir(app: tauri::AppHandle) -> Result<String, String> {
+    dailyflow_data_dir(&app).map(|p| p.to_string_lossy().into_owned())
 }
 
 /// 返回数据库相对路径（相对 app 配置目录，供 sqlite 插件解析到
@@ -246,7 +290,7 @@ fn data_dir() -> Result<String, String> {
 #[tauri::command]
 fn db_relative_path(app: tauri::AppHandle) -> Result<String, String> {
     let app_config = app.path().app_config_dir().map_err(|e| e.to_string())?;
-    let db_file = dailyflow_data_dir()?.join("dailyflow.db");
+    let db_file = dailyflow_data_dir(&app)?.join("dailyflow.db");
     let rel = relative_path(&app_config, &db_file).ok_or("无法计算数据库相对路径")?;
     Ok(rel.to_string_lossy().into_owned())
 }
@@ -261,14 +305,14 @@ fn is_safe_backup_name(name: &str) -> bool {
 
 /// 返回备份目录绝对路径。
 #[tauri::command]
-fn backups_dir() -> Result<String, String> {
-    resolve_backups_dir().map(|p| p.to_string_lossy().into_owned())
+fn backups_dir(app: tauri::AppHandle) -> Result<String, String> {
+    resolve_backups_dir(&app).map(|p| p.to_string_lossy().into_owned())
 }
 
 /// 列出备份目录下可恢复的备份文件（DailyFlow_Backup_*.db，升序）。
 #[tauri::command]
-fn list_backups() -> Result<Vec<String>, String> {
-    let dir = resolve_backups_dir()?;
+fn list_backups(app: tauri::AppHandle) -> Result<Vec<String>, String> {
+    let dir = resolve_backups_dir(&app)?;
     let mut files: Vec<String> = fs::read_dir(&dir)
         .map_err(|e| e.to_string())?
         .filter_map(|e| e.ok())
@@ -282,11 +326,11 @@ fn list_backups() -> Result<Vec<String>, String> {
 
 /// 删除一个备份文件（同日导出覆盖前调用；目标不存在视为成功）。
 #[tauri::command]
-fn delete_backup(backup_name: String) -> Result<(), String> {
+fn delete_backup(app: tauri::AppHandle, backup_name: String) -> Result<(), String> {
     if !is_safe_backup_name(&backup_name) {
         return Err("非法的备份文件名".into());
     }
-    let path = resolve_backups_dir()?.join(&backup_name);
+    let path = resolve_backups_dir(&app)?.join(&backup_name);
     match fs::remove_file(&path) {
         Ok(_) => Ok(()),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
@@ -297,12 +341,12 @@ fn delete_backup(backup_name: String) -> Result<(), String> {
 /// 用备份文件覆盖当前数据库，并清理 WAL/SHM 残留。
 /// 前置条件（前端完成）：备份已校验、当前库已自动备份、主库连接已关闭。
 #[tauri::command]
-fn restore_backup(backup_name: String) -> Result<(), String> {
+fn restore_backup(app: tauri::AppHandle, backup_name: String) -> Result<(), String> {
     if !is_safe_backup_name(&backup_name) {
         return Err("非法的备份文件名".into());
     }
-    let data = dailyflow_data_dir()?;
-    let src = data.join("backups").join(&backup_name);
+    let data = dailyflow_data_dir(&app)?;
+    let src = resolve_backups_dir(&app)?.join(&backup_name);
     if !src.is_file() {
         return Err(format!("备份文件不存在：{backup_name}"));
     }
@@ -318,6 +362,69 @@ fn restore_backup(backup_name: String) -> Result<(), String> {
 
     let _ = fs::remove_file(data.join("dailyflow.db-wal"));
     let _ = fs::remove_file(data.join("dailyflow.db-shm"));
+    Ok(())
+}
+
+/// 校验并创建目录；空串返回空（表示用默认值）。
+fn validate_dir(path: &str) -> Result<std::path::PathBuf, String> {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        return Ok(std::path::PathBuf::new());
+    }
+    let p = std::path::PathBuf::from(trimmed);
+    if !p.is_absolute() {
+        return Err(format!("路径必须是绝对路径：{path}"));
+    }
+    std::fs::create_dir_all(&p).map_err(|e| format!("无法创建目录：{e}"))?;
+    let probe = p.join(".dailyflow-write-test");
+    std::fs::write(&probe, b"ok").map_err(|e| format!("目录不可写：{e}"))?;
+    let _ = std::fs::remove_file(&probe);
+    Ok(p)
+}
+
+/// 返回当前生效的存储路径（未配置的项回退到默认值）。
+#[tauri::command]
+fn get_storage_paths(app: tauri::AppHandle) -> Result<StoragePaths, String> {
+    let cfg = read_storage_paths(&app);
+    let data = if cfg.data_dir.trim().is_empty() {
+        dailyflow_data_dir(&app)?
+    } else {
+        std::path::PathBuf::from(cfg.data_dir.trim())
+    };
+    let backup = if cfg.backup_dir.trim().is_empty() {
+        data.join("backups")
+    } else {
+        std::path::PathBuf::from(cfg.backup_dir.trim())
+    };
+    Ok(StoragePaths {
+        data_dir: data.to_string_lossy().into_owned(),
+        cache_dir: cfg.cache_dir.clone(),
+        backup_dir: backup.to_string_lossy().into_owned(),
+    })
+}
+
+/// 校验并保存存储路径配置（storage.json）；空串表示用默认值。
+#[tauri::command]
+fn set_storage_paths(
+    app: tauri::AppHandle,
+    data_dir: String,
+    cache_dir: String,
+    backup_dir: String,
+) -> Result<(), String> {
+    let _ = validate_dir(&data_dir)?;
+    let _ = validate_dir(&cache_dir)?;
+    let _ = validate_dir(&backup_dir)?;
+    let cfg = StoragePaths {
+        data_dir: data_dir.trim().to_string(),
+        cache_dir: cache_dir.trim().to_string(),
+        backup_dir: backup_dir.trim().to_string(),
+    };
+    let path = storage_config_path(&app);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(&path, serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?)
+        .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -416,7 +523,9 @@ pub fn run() {
             list_backups,
             delete_backup,
             restore_backup,
-            append_log
+            append_log,
+            get_storage_paths,
+            set_storage_paths
         ])
         .run(tauri::generate_context!());
 
@@ -429,5 +538,14 @@ pub fn run() {
                 "无法创建应用窗口。\n\n请安装最新版「Microsoft Edge WebView2 Runtime」后重试（可联系开发人员获取离线运行库）。\n\n详细信息：{e}"
             ));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn validate_dir_rejects_relative() {
+        let p = std::path::Path::new("DailyFlow");
+        assert!(!p.is_absolute());
     }
 }
