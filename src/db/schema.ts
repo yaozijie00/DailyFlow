@@ -11,9 +11,11 @@ import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
  *   tasks     1 ── * focus_sessions（task_id，删除任务时级联删除）
  */
 
+// sort_order：用户自定义的类别排序权重（迁移 0001 新增并回填默认值）
 export const categories = sqliteTable("categories", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   name: text("name").notNull().unique(),
+  sortOrder: integer("sort_order").notNull().default(0),
   createdAt: integer("created_at").notNull(),
 });
 
