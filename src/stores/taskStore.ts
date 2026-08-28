@@ -31,6 +31,10 @@ interface TaskState {
   cancelTask: (id: number) => Promise<void>;
   changeCategory: (id: number, categoryId: number | null) => Promise<void>;
   changeEstimatedDuration: (id: number, seconds: number | null) => Promise<void>;
+  createCategory: (name: string) => Promise<void>;
+  renameCategory: (id: number, name: string) => Promise<void>;
+  deleteCategory: (id: number) => Promise<void>;
+  moveCategory: (id: number, direction: -1 | 1) => Promise<void>;
 
   selectTask: (id: number | null) => void;
   openCreate: (draft?: CreateDraft | null) => void;
@@ -131,6 +135,45 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       await get().load();
     } catch {
       fail("修改预计时长失败");
+    }
+  },
+
+  createCategory: async (name) => {
+    try {
+      await categoryService.create(name);
+      await get().load();
+    } catch {
+      fail("创建分类失败");
+    }
+  },
+  renameCategory: async (id, name) => {
+    try {
+      await categoryService.rename(id, name);
+      await get().load();
+    } catch {
+      fail("修改分类失败");
+    }
+  },
+  deleteCategory: async (id) => {
+    try {
+      await categoryService.delete(id);
+      await get().load();
+    } catch {
+      fail("删除分类失败");
+    }
+  },
+  moveCategory: async (id, direction: -1 | 1) => {
+    try {
+      const cats = get().categories;
+      const idx = cats.findIndex((c) => c.id === id);
+      const target = idx + direction;
+      if (idx < 0 || target < 0 || target >= cats.length) return;
+      const ordered = cats.map((c) => c.id);
+      [ordered[idx], ordered[target]] = [ordered[target], ordered[idx]];
+      await categoryService.reorder(ordered);
+      await get().load();
+    } catch {
+      fail("调整分类顺序失败");
     }
   },
 
