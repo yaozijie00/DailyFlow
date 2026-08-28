@@ -4,6 +4,12 @@ import { SettingsRepository } from "../db/repositories/settingsRepository";
 export interface AppSettings {
   /** 番茄钟默认时长（分钟） */
   pomodoroDurationMinutes: number;
+  /** 番茄钟短休息时长（分钟） */
+  shortBreakMinutes: number;
+  /** 番茄钟长休息时长（分钟） */
+  longBreakMinutes: number;
+  /** 长休息间隔（番茄钟次数） */
+  longBreakInterval: number;
   /** 时间轴开始（当天分钟数） */
   timelineStartMinutes: number;
   /** 时间轴结束（当天分钟数） */
@@ -14,13 +20,19 @@ export interface AppSettings {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   pomodoroDurationMinutes: 25,
+  shortBreakMinutes: 5,
+  longBreakMinutes: 15,
+  longBreakInterval: 4,
   timelineStartMinutes: 8 * 60, // 08:00
   timelineEndMinutes: 24 * 60, // 24:00
   timelineSnapMinutes: 15,
 };
 
-/** settings 表键名（存储格式：时长用秒、时间用 "HH:mm"、粒度用分钟）。 */
+/** settings 表键名（存储格式：时长用秒或分钟、时间用 "HH:mm"、粒度用分钟）。 */
 const KEY_POMODORO_DURATION = "pomodoro_duration";
+const KEY_SHORT_BREAK = "short_break_minutes";
+const KEY_LONG_BREAK = "long_break_minutes";
+const KEY_LONG_BREAK_INTERVAL = "long_break_interval";
 const KEY_TIMELINE_START = "timeline_start";
 const KEY_TIMELINE_END = "timeline_end";
 const KEY_TIMELINE_SNAP = "timeline_snap";
@@ -78,6 +90,11 @@ export class SettingsService {
       pomodoroDurationMinutes: Math.round(
         parseIntSafe(stored[KEY_POMODORO_DURATION], 1500) / 60,
       ),
+      shortBreakMinutes: Math.round(parseIntSafe(stored[KEY_SHORT_BREAK], 5)),
+      longBreakMinutes: Math.round(parseIntSafe(stored[KEY_LONG_BREAK], 15)),
+      longBreakInterval: Math.round(
+        parseIntSafe(stored[KEY_LONG_BREAK_INTERVAL], 4),
+      ),
       timelineStartMinutes:
         parseHHMMToMinutes(stored[KEY_TIMELINE_START] ?? "") ??
         DEFAULT_SETTINGS.timelineStartMinutes,
@@ -100,6 +117,15 @@ export class SettingsService {
     if (partial.pomodoroDurationMinutes !== undefined) {
       const m = clamp(Math.round(partial.pomodoroDurationMinutes), 1, 180);
       writes.push([KEY_POMODORO_DURATION, String(m * 60)]);
+    }
+    if (partial.shortBreakMinutes !== undefined) {
+      writes.push([KEY_SHORT_BREAK, String(clamp(Math.round(partial.shortBreakMinutes), 1, 30))]);
+    }
+    if (partial.longBreakMinutes !== undefined) {
+      writes.push([KEY_LONG_BREAK, String(clamp(Math.round(partial.longBreakMinutes), 1, 60))]);
+    }
+    if (partial.longBreakInterval !== undefined) {
+      writes.push([KEY_LONG_BREAK_INTERVAL, String(clamp(Math.round(partial.longBreakInterval), 2, 10))]);
     }
     if (partial.timelineStartMinutes !== undefined) {
       writes.push([KEY_TIMELINE_START, minutesToHHMM(range.start)]);

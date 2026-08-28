@@ -23,6 +23,9 @@ describe("SettingsService", () => {
   it("默认值：番茄 25 分钟、时间轴 08:00-24:00、吸附 15 分钟", async () => {
     expect(DEFAULT_SETTINGS).toEqual({
       pomodoroDurationMinutes: 25,
+      shortBreakMinutes: 5,
+      longBreakMinutes: 15,
+      longBreakInterval: 4,
       timelineStartMinutes: 8 * 60,
       timelineEndMinutes: 24 * 60,
       timelineSnapMinutes: 15,
@@ -59,6 +62,9 @@ describe("SettingsService", () => {
     const s = await restarted.getSettings();
     expect(s).toEqual({
       pomodoroDurationMinutes: 45,
+      shortBreakMinutes: 5,
+      longBreakMinutes: 15,
+      longBreakInterval: 4,
       timelineStartMinutes: 9 * 60,
       timelineEndMinutes: 21 * 60,
       timelineSnapMinutes: 30,
@@ -92,5 +98,27 @@ describe("SettingsService", () => {
     const s2 = await service.getSettings();
     expect(s2.pomodoroDurationMinutes).toBe(180);
     expect(s2.timelineSnapMinutes).toBe(60);
+  });
+
+  describe("番茄钟休息设置", () => {
+    it("默认值：短休5 / 长休15 / 间隔4", async () => {
+      const s = await service.getSettings();
+      expect(s.shortBreakMinutes).toBe(5);
+      expect(s.longBreakMinutes).toBe(15);
+      expect(s.longBreakInterval).toBe(4);
+    });
+
+    it("update 保存并 clamp：短休1-30 / 长休1-60 / 间隔2-10", async () => {
+      await service.update({
+        shortBreakMinutes: 99,
+        longBreakMinutes: 0,
+        longBreakInterval: 1,
+      });
+      const s = await service.getSettings();
+      expect(s.shortBreakMinutes).toBe(30);
+      expect(s.longBreakMinutes).toBe(1);
+      expect(s.longBreakInterval).toBe(2);
+      await service.update({ shortBreakMinutes: 5, longBreakMinutes: 15, longBreakInterval: 4 });
+    });
   });
 });
