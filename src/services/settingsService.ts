@@ -1,5 +1,9 @@
 import { SettingsRepository } from "../db/repositories/settingsRepository";
-import { DEFAULT_SHORTCUTS, type ShortcutMap } from "../lib/shortcuts";
+import {
+  DEFAULT_SHORTCUTS,
+  SHORTCUT_ACTIONS,
+  type ShortcutMap,
+} from "../lib/shortcuts";
 
 /** 应用设置（内存模型，分钟单位）。 */
 export interface AppSettings {
@@ -144,13 +148,24 @@ export class SettingsService {
     }
   }
 
-  /** 读取快捷键映射；未配置或 JSON 损坏时回退默认值。 */
+  /** 读取快捷键映射；未配置或 JSON 损坏/形状非法时回退默认值。 */
   async getShortcuts(): Promise<ShortcutMap> {
     const raw = await this.repo.get(KEY_SHORTCUTS);
     if (!raw) return { ...DEFAULT_SHORTCUTS };
     try {
-      const parsed = JSON.parse(raw) as Partial<ShortcutMap>;
-      return { ...DEFAULT_SHORTCUTS, ...parsed };
+      const parsed: unknown = JSON.parse(raw);
+      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+        return { ...DEFAULT_SHORTCUTS };
+      }
+      // 逐动作校验：仅接受字符串值，非字符串（如 {"open_today": 42}）按默认值处理，
+      // 避免非字符串组合键混入导致快捷键静默失效。
+      const candidate = parsed as Record<string, unknown>;
+      const merged: ShortcutMap = { ...DEFAULT_SHORTCUTS };
+      for (const action of SHORTCUT_ACTIONS) {
+        const value = candidate[action];
+        if (typeof value === "string") merged[action] = value;
+      }
+      return merged;
     } catch {
       return { ...DEFAULT_SHORTCUTS };
     }

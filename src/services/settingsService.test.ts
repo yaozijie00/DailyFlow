@@ -140,5 +140,17 @@ describe("SettingsService", () => {
       const s = await service.getShortcuts();
       expect(s).toEqual(DEFAULT_SHORTCUTS);
     });
+
+    test("存量 JSON 形状非法（非字符串值）时回退默认值", async () => {
+      await repo.set("shortcuts", '{"open_today": 42}');
+      const s = await service.getShortcuts();
+      expect(s).toEqual(DEFAULT_SHORTCUTS);
+    });
+
+    test("部分保存的 JSON 与默认值合并，缺失动作回退默认", async () => {
+      await repo.set("shortcuts", '{"open_today":"Ctrl+9"}');
+      const s = await service.getShortcuts();
+      expect(s).toEqual({ ...DEFAULT_SHORTCUTS, open_today: "Ctrl+9" });
+    });
   });
 });
