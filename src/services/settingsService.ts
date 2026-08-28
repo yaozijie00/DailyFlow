@@ -1,4 +1,5 @@
 import { SettingsRepository } from "../db/repositories/settingsRepository";
+import { DEFAULT_SHORTCUTS, type ShortcutMap } from "../lib/shortcuts";
 
 /** 应用设置（内存模型，分钟单位）。 */
 export interface AppSettings {
@@ -36,6 +37,7 @@ const KEY_LONG_BREAK_INTERVAL = "long_break_interval";
 const KEY_TIMELINE_START = "timeline_start";
 const KEY_TIMELINE_END = "timeline_end";
 const KEY_TIMELINE_SNAP = "timeline_snap";
+const KEY_SHORTCUTS = "shortcuts";
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
@@ -140,5 +142,21 @@ export class SettingsService {
     for (const [k, v] of writes) {
       await this.repo.set(k, v);
     }
+  }
+
+  /** 读取快捷键映射；未配置或 JSON 损坏时回退默认值。 */
+  async getShortcuts(): Promise<ShortcutMap> {
+    const raw = await this.repo.get(KEY_SHORTCUTS);
+    if (!raw) return { ...DEFAULT_SHORTCUTS };
+    try {
+      const parsed = JSON.parse(raw) as Partial<ShortcutMap>;
+      return { ...DEFAULT_SHORTCUTS, ...parsed };
+    } catch {
+      return { ...DEFAULT_SHORTCUTS };
+    }
+  }
+
+  async saveShortcuts(map: ShortcutMap): Promise<void> {
+    await this.repo.set(KEY_SHORTCUTS, JSON.stringify(map));
   }
 }

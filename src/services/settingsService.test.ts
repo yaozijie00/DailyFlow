@@ -1,8 +1,9 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, test, expect, beforeEach, afterEach } from "vitest";
 import { createTestDb } from "../db/test-helpers";
 import type { Db } from "../db/db";
 import { SettingsRepository } from "../db/repositories/settingsRepository";
 import { SettingsService, DEFAULT_SETTINGS } from "./settingsService";
+import { DEFAULT_SHORTCUTS } from "../lib/shortcuts";
 
 describe("SettingsService", () => {
   let db: Db;
@@ -119,6 +120,25 @@ describe("SettingsService", () => {
       expect(s.longBreakMinutes).toBe(1);
       expect(s.longBreakInterval).toBe(2);
       await service.update({ shortBreakMinutes: 5, longBreakMinutes: 15, longBreakInterval: 4 });
+    });
+  });
+
+  describe("快捷键设置", () => {
+    test("默认返回 DEFAULT_SHORTCUTS", async () => {
+      const s = await service.getShortcuts();
+      expect(s).toEqual(DEFAULT_SHORTCUTS);
+    });
+
+    test("save 后读回", async () => {
+      await service.saveShortcuts({ ...DEFAULT_SHORTCUTS, open_today: "Ctrl+9" });
+      const s = await service.getShortcuts();
+      expect(s.open_today).toBe("Ctrl+9");
+    });
+
+    test("存量 JSON 损坏时回退默认值", async () => {
+      await repo.set("shortcuts", "{ not valid json");
+      const s = await service.getShortcuts();
+      expect(s).toEqual(DEFAULT_SHORTCUTS);
     });
   });
 });
