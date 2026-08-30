@@ -25,10 +25,12 @@ export class FocusService {
     private readonly now: () => number = Date.now,
   ) {}
 
-  /** 开始专注：写入进行中会话并记录 active_focus。 */
+  /** 开始专注：写入进行中会话（快照任务类别）并记录 active_focus。 */
   async start(taskId: number, plannedDurationSeconds: number): Promise<FocusSession> {
+    const task = await this.tasks.findById(taskId);
     const session = await this.sessions.create({
       taskId,
+      categoryId: task?.categoryId ?? null,
       plannedDuration: plannedDurationSeconds,
       startedAt: this.now(),
     });
@@ -71,11 +73,14 @@ export class FocusService {
         completed,
         actualDuration: actualDurationSeconds,
       });
-      const task = await this.tasks.findById(session.taskId);
-      if (task) {
-        await this.tasks.update(task.id, {
-          actualDuration: (task.actualDuration ?? 0) + actualDurationSeconds,
-        });
+      // task_id 可空（任务可能已被删除）；仅在任务存在时累加其实际时长
+      if (session.taskId != null) {
+        const task = await this.tasks.findById(session.taskId);
+        if (task) {
+          await this.tasks.update(task.id, {
+            actualDuration: (task.actualDuration ?? 0) + actualDurationSeconds,
+          });
+        }
       }
     }
     await this.settings.delete(ACTIVE_FOCUS_KEY);

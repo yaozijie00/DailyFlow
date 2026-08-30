@@ -44,6 +44,12 @@ export function dispatchShortcut(action: ShortcutAction): void {
       app.setPage("news");
       void useNewsStore.getState().refresh();
       break;
+    case "open_statistics":
+      app.setPage("statistics");
+      break;
+    case "open_achievements":
+      app.setPage("achievements");
+      break;
     case "open_settings":
       app.setPage("settings");
       break;

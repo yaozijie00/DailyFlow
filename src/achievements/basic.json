@@ -1,0 +1,42 @@
+[
+  {
+    "id": "first_pomodoro",
+    "name": "第一步",
+    "description": "完成第一个番茄钟",
+    "icon": "Flag",
+    "category": "basic",
+    "chainId": "pomodoro_count",
+    "order": 1,
+    "condition": { "type": "event_count", "target": 1 }
+  },
+  {
+    "id": "ten_pomodoros",
+    "name": "渐入佳境",
+    "description": "累计完成 10 个番茄钟",
+    "icon": "Timer",
+    "category": "basic",
+    "chainId": "pomodoro_count",
+    "order": 2,
+    "condition": { "type": "event_count", "target": 10 }
+  },
+  {
+    "id": "pomodoro_50",
+    "name": "专注之星",
+    "description": "累计完成 50 个番茄钟",
+    "icon": "Target",
+    "category": "basic",
+    "chainId": "pomodoro_count",
+    "order": 3,
+    "condition": { "type": "event_count", "target": 50 }
+  },
+  {
+    "id": "hundred_pomodoros",
+    "name": "百炼成钢",
+    "description": "累计完成 100 个番茄钟",
+    "icon": "Trophy",
+    "category": "basic",
+    "chainId": "pomodoro_count",
+    "order": 4,
+    "condition": { "type": "event_count", "target": 100 }
+  }
+]

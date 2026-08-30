@@ -7,6 +7,8 @@ export type ShortcutAction =
   | "open_focus"
   | "open_news"
   | "refresh_news"
+  | "open_statistics"
+  | "open_achievements"
   | "open_settings";
 
 export type ShortcutMap = Record<ShortcutAction, string>;
@@ -20,6 +22,8 @@ export const SHORTCUT_ACTIONS: ShortcutAction[] = [
   "open_focus",
   "open_news",
   "refresh_news",
+  "open_statistics",
+  "open_achievements",
   "open_settings",
 ];
 
@@ -32,6 +36,8 @@ export const SHORTCUT_ACTION_LABELS: Record<ShortcutAction, string> = {
   open_focus: "打开专注",
   open_news: "打开新闻",
   refresh_news: "刷新新闻",
+  open_statistics: "打开统计",
+  open_achievements: "打开成就",
   open_settings: "打开设置",
 };
 
@@ -44,6 +50,8 @@ export const DEFAULT_SHORTCUTS: ShortcutMap = {
   open_focus: "Ctrl+2",
   open_news: "Ctrl+3",
   refresh_news: "Ctrl+Shift+R",
+  open_statistics: "Ctrl+5",
+  open_achievements: "Ctrl+6",
   open_settings: "Ctrl+4",
 };
 

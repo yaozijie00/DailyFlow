@@ -22,7 +22,7 @@ import {
   type TimeRange,
   type TimeSpan,
 } from "../../lib/timeline";
-import { startOfToday } from "../../lib/date";
+import { startOfToday, todayString } from "../../lib/date";
 import { NO_CATEGORY_COLOR } from "../../lib/categoryColors";
 
 /** 横向滚动触发阈值：栏位使块宽低于该值（px）时内容加宽并横向滚动。 */
@@ -42,6 +42,7 @@ interface BlockPreview {
 export default function Timeline() {
   const tasks = useTaskStore((s) => s.tasks);
   const categories = useTaskStore((s) => s.categories);
+  const selectedDate = useTaskStore((s) => s.selectedDate);
   const openCreate = useTaskStore((s) => s.openCreate);
   const updateTask = useTaskStore((s) => s.updateTask);
   const taskDrag = useTaskStore((s) => s.taskDrag);
@@ -419,7 +420,9 @@ export default function Timeline() {
   const todayStart = startOfToday();
   const timelineStartTs = todayStart + effStart * 60 * 1000;
   const timelineEndTs = todayStart + effEnd * 60 * 1000;
-  const showNowLine = now >= timelineStartTs && now < timelineEndTs;
+  // 红色「当前时间线」仅今天显示；查看历史/未来日期时隐藏
+  const showNowLine =
+    selectedDate === todayString() && now >= timelineStartTs && now < timelineEndTs;
 
   const nowDate = new Date(now);
   const nowLabel = `${String(nowDate.getHours()).padStart(2, "0")}:${String(

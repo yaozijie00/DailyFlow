@@ -4,6 +4,7 @@ import { TaskRepository, type Task, type UpdateTaskInput } from "../db/repositor
 import { CategoryRepository, type Category } from "../db/repositories/categoryRepository";
 import { TaskService, type TaskCreateInput } from "../services/taskService";
 import { CategoryService } from "../services/categoryService";
+import { todayString } from "../lib/date";
 import { useAppStore } from "./appStore";
 
 const taskService = new TaskService(new TaskRepository(getDb()));
@@ -18,6 +19,8 @@ interface TaskState {
   tasks: Task[];
   categories: Category[];
   loading: boolean;
+  /** 当前查看的日期（YYYY-MM-DD），今日页据此加载任务/时间轴 */
+  selectedDate: string;
   selectedTaskId: number | null;
   isCreateOpen: boolean;
   editingTaskId: number | null;
@@ -26,6 +29,10 @@ interface TaskState {
   taskDrag: { taskId: number } | null;
 
   load: () => Promise<void>;
+  /** 加载「今天」任务（专注页使用，始终今天） */
+  loadToday: () => Promise<void>;
+  setSelectedDate: (date: string) => void;
+  goToToday: () => void;
   createTask: (input: TaskCreateInput) => Promise<void>;
   updateTask: (id: number, input: UpdateTaskInput) => Promise<void>;
   deleteTask: (id: number) => Promise<void>;
@@ -57,6 +64,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   tasks: [],
   categories: [],
   loading: false,
+  selectedDate: todayString(),
   selectedTaskId: null,
   isCreateOpen: false,
   editingTaskId: null,
@@ -67,7 +75,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     set({ loading: true });
     try {
       const [tasks, categories] = await Promise.all([
-        taskService.getTodayTasks(),
+        taskService.getTasksByDate(get().selectedDate),
         categoryService.findAll(),
       ]);
       set({ tasks, categories });
@@ -78,9 +86,25 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     }
   },
 
+  loadToday: async () => {
+    set({ selectedDate: todayString() });
+    await get().load();
+  },
+
+  setSelectedDate: (date) => {
+    if (!date || date === get().selectedDate) return;
+    set({ selectedDate: date, selectedTaskId: null });
+    void get().load();
+  },
+
+  goToToday: () => {
+    set({ selectedDate: todayString(), selectedTaskId: null });
+    void get().load();
+  },
+
   createTask: async (input) => {
     try {
-      await taskService.createTask(input);
+      await taskService.createTask({ ...input, scheduledDate: get().selectedDate });
       set({ isCreateOpen: false });
       await get().load();
     } catch {

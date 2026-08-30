@@ -4,6 +4,7 @@ import type { Db } from "../db/db";
 import { FocusSessionRepository } from "../db/repositories/focusSessionRepository";
 import { SettingsRepository } from "../db/repositories/settingsRepository";
 import { TaskRepository } from "../db/repositories/taskRepository";
+import { CategoryRepository } from "../db/repositories/categoryRepository";
 import { FocusService } from "./focusService";
 
 describe("FocusService（专注持久化）", () => {
@@ -49,6 +50,24 @@ describe("FocusService（专注持久化）", () => {
       pausedAt: null,
       accumulatedPauseMs: 0,
     });
+  });
+
+  it("start 快照任务的 categoryId", async () => {
+    const cats = new CategoryRepository(db);
+    const cat = await cats.create("开发");
+    const task = await tasks.create({
+      title: "A",
+      scheduledDate: "2026-08-27",
+      categoryId: cat.id,
+    });
+    const s = await service.start(task.id, 1500);
+    expect(s.categoryId).toBe(cat.id);
+  });
+
+  it("start 时任务无类别则 categoryId 为 null", async () => {
+    const task = await makeTask();
+    const s = await service.start(task.id, 1500);
+    expect(s.categoryId).toBeNull();
   });
 
   it("pause 记录 pausedAt；resume 累计暂停时长", async () => {

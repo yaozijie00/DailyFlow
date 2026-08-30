@@ -6,13 +6,13 @@ import PomodoroPanel from "../components/pomodoro/PomodoroPanel";
 
 export default function Focus() {
   const dbStatus = useAppStore((s) => s.dbStatus);
-  const load = useTaskStore((s) => s.load);
+  const loadToday = useTaskStore((s) => s.loadToday);
 
   useEffect(() => {
     if (dbStatus === "ready") {
-      load();
+      loadToday();
     }
-  }, [dbStatus, load]);
+  }, [dbStatus, loadToday]);
 
   return (
     <div>

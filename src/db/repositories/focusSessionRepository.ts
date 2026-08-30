@@ -1,11 +1,21 @@
-import { and, count, eq, gte, isNull, lt, sql, sum } from "drizzle-orm";
+import { and, count, eq, gte, isNull, lt, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { focusSessions } from "../schema";
 
 export type FocusSession = typeof focusSessions.$inferSelect;
 
+/** 统计/成就聚合用的轻量投影（避免加载整行）。 */
+export interface FocusSessionAggregate {
+  categoryId: number | null;
+  actualDuration: number;
+  completed: boolean;
+  startedAt: number;
+}
+
 export interface CreateFocusSessionInput {
   taskId: number;
+  /** 专注开始时刻任务所属类别的快照（可空，类别已删/未分类） */
+  categoryId?: number | null;
   plannedDuration: number;
   startedAt: number;
   actualDuration?: number;
@@ -23,6 +33,7 @@ export class FocusSessionRepository {
       .insert(focusSessions)
       .values({
         taskId: input.taskId,
+        categoryId: input.categoryId ?? null,
         plannedDuration: input.plannedDuration,
         actualDuration: input.actualDuration ?? 0,
         startedAt: input.startedAt,
@@ -84,21 +95,6 @@ export class FocusSessionRepository {
     return rows.length > 0;
   }
 
-  /** 统计 [from, to) 时间段内开始的会话的实际时长总和（秒）。 */
-  async getTotalActualDuration(from: number, to: number): Promise<number> {
-    const rows = await this.db
-      .select({ total: sum(focusSessions.actualDuration) })
-      .from(focusSessions)
-      .where(
-        and(
-          gte(focusSessions.startedAt, from),
-          lt(focusSessions.startedAt, to),
-        ),
-      )
-      .all();
-    return Number(rows[0]?.total ?? 0);
-  }
-
   /** 统计 [from, to) 内开始会话的总实际时长（秒）与次数，单条 SQL 实时聚合。 */
   async getTodayStats(from: number, to: number): Promise<{ totalSeconds: number; count: number }> {
     const rows = await this.db
@@ -118,5 +114,37 @@ export class FocusSessionRepository {
       totalSeconds: Number(rows[0]?.totalSeconds ?? 0),
       count: rows[0]?.count ?? 0,
     };
+  }
+
+  /** 列出 [from, to) 内开始的所有会话（轻量投影），供统计/成就统一聚合。 */
+  async listInRange(from: number, to: number): Promise<FocusSessionAggregate[]> {
+    return this.db
+      .select({
+        categoryId: focusSessions.categoryId,
+        actualDuration: focusSessions.actualDuration,
+        completed: focusSessions.completed,
+        startedAt: focusSessions.startedAt,
+      })
+      .from(focusSessions)
+      .where(
+        and(
+          gte(focusSessions.startedAt, from),
+          lt(focusSessions.startedAt, to),
+        ),
+      )
+      .all();
+  }
+
+  /** 列出全部会话（轻量投影），供成就上下文构建（累计口径需全历史）。 */
+  async listAll(): Promise<FocusSessionAggregate[]> {
+    return this.db
+      .select({
+        categoryId: focusSessions.categoryId,
+        actualDuration: focusSessions.actualDuration,
+        completed: focusSessions.completed,
+        startedAt: focusSessions.startedAt,
+      })
+      .from(focusSessions)
+      .all();
   }
 }

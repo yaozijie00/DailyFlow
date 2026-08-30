@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 export interface PageHeaderProps {
-  title: string;
+  title: ReactNode;
   /** 可选的说明文字（可包含多行/次要信息）。 */
   description?: ReactNode;
   /** 右侧操作区（按钮等）。 */

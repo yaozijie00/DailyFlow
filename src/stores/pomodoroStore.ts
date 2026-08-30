@@ -4,7 +4,11 @@ import { getDb } from "../db/db";
 import { FocusSessionRepository } from "../db/repositories/focusSessionRepository";
 import { SettingsRepository } from "../db/repositories/settingsRepository";
 import { TaskRepository } from "../db/repositories/taskRepository";
+import { CategoryRepository } from "../db/repositories/categoryRepository";
+import { AchievementProgressRepository } from "../db/repositories/achievementProgressRepository";
 import { FocusService } from "../services/focusService";
+import { AchievementService } from "../services/achievementService";
+import { loadAchievementDefinitions } from "../achievements/definitions";
 import { useAppStore } from "./appStore";
 import { useSettingsStore } from "./settingsStore";
 
@@ -55,6 +59,14 @@ const defaultFocusService = new FocusService(
   taskRepo,
 );
 
+/** 成就服务（模块级单例）：专注落库后评估，失败静默不影响专注。 */
+const achievementService = new AchievementService(
+  loadAchievementDefinitions(),
+  new AchievementProgressRepository(getDb()),
+  new FocusSessionRepository(getDb()),
+  new CategoryRepository(getDb()),
+);
+
 function persistFail(): void {
   useAppStore.getState().pushToast("error", "专注记录保存失败");
 }
@@ -80,7 +92,18 @@ export function createPomodoroStore(
       const actualSeconds = Math.round(snap.elapsedMs / 1000);
       void focus
         .finish(completed, actualSeconds)
-        .then(() => set((s) => ({ focusVersion: s.focusVersion + 1, sessionId: null })))
+        .then(() => {
+          set((s) => ({ focusVersion: s.focusVersion + 1, sessionId: null }));
+          // 专注落库成功后评估成就（异步；失败静默，不影响专注记录）
+          void achievementService
+            .evaluate()
+            .then((newly) => {
+              for (const a of newly) {
+                useAppStore.getState().pushAchievement(a.name, a.description);
+              }
+            })
+            .catch(() => {});
+        })
         .catch(persistFail);
       if (completed) {
         set((s) => ({ completedFocusCount: s.completedFocusCount + 1 }));
@@ -205,11 +228,13 @@ export function createPomodoroStore(
           totalPausedDurationMs: active.accumulatedPauseMs,
           pausedAt: active.pausedAt,
         });
-        // 恢复任务名（可能不属于今日任务，taskStore 查不到，这里直接查库兜底）
+        // 恢复任务名（可能不属于今日任务，taskStore 查不到，这里直接查库兜底；task_id 可空）
         let taskTitle: string | null = null;
         try {
-          const task = await taskRepo.findById(active.session.taskId);
-          taskTitle = task?.title ?? null;
+          if (active.session.taskId != null) {
+            const task = await taskRepo.findById(active.session.taskId);
+            taskTitle = task?.title ?? null;
+          }
         } catch {
           taskTitle = null;
         }

@@ -1,0 +1,70 @@
+[
+  {
+    "id": "total_1h",
+    "name": "初窥门径",
+    "description": "累计投入 1 小时",
+    "icon": "Zap",
+    "category": "productivity",
+    "chainId": "total_duration",
+    "order": 1,
+    "condition": { "type": "total_duration", "target": 60 }
+  },
+  {
+    "id": "total_10h",
+    "name": "深耕者",
+    "description": "累计投入 10 小时",
+    "icon": "Gauge",
+    "category": "productivity",
+    "chainId": "total_duration",
+    "order": 2,
+    "condition": { "type": "total_duration", "target": 600 }
+  },
+  {
+    "id": "total_50h",
+    "name": "时间的主人",
+    "description": "累计投入 50 小时",
+    "icon": "Star",
+    "category": "productivity",
+    "chainId": "total_duration",
+    "order": 3,
+    "condition": { "type": "total_duration", "target": 3000 }
+  },
+  {
+    "id": "daily_4h",
+    "name": "全天候",
+    "description": "单日投入达到 4 小时",
+    "icon": "Sun",
+    "category": "productivity",
+    "condition": { "type": "daily_duration", "target": 240 }
+  },
+  {
+    "id": "streak_3",
+    "name": "持之以恒",
+    "description": "连续 3 天完成番茄钟",
+    "icon": "Flame",
+    "category": "productivity",
+    "chainId": "streak",
+    "order": 1,
+    "condition": { "type": "streak_days", "target": 3 }
+  },
+  {
+    "id": "streak_7",
+    "name": "习惯养成",
+    "description": "连续 7 天完成番茄钟",
+    "icon": "CalendarCheck",
+    "category": "productivity",
+    "chainId": "streak",
+    "order": 2,
+    "condition": { "type": "streak_days", "target": 7 }
+  },
+  {
+    "id": "streak_30",
+    "name": "月度达人",
+    "description": "连续 30 天完成番茄钟",
+    "icon": "Medal",
+    "category": "productivity",
+    "chainId": "streak",
+    "order": 3,
+    "condition": { "type": "streak_days", "target": 30 }
+  }
+]

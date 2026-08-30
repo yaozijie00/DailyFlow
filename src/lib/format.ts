@@ -15,3 +15,28 @@ export function formatTimer(ms: number): string {
   const seconds = totalSeconds % 60;
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
+
+/** 把「秒」格式化为紧凑时长，如 25m / 1h 20m / 3h（统计图表用）。 */
+export function formatDurationCompact(seconds: number): string {
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+}
+
+/** 格式化成就进度「current / target」，按单位选择展示（分钟→紧凑时长、天→天、其他→整数）。 */
+export function formatProgress(
+  current: number,
+  target: number,
+  unit: "count" | "minutes" | "days",
+): string {
+  switch (unit) {
+    case "minutes":
+      return `${formatDurationCompact(current * 60)} / ${formatDurationCompact(target * 60)}`;
+    case "days":
+      return `${Math.round(current)} / ${target} 天`;
+    default:
+      return `${Math.round(current)} / ${target}`;
+  }
+}

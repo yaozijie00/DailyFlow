@@ -3,6 +3,8 @@ import {
   CalendarDays,
   Timer,
   Newspaper,
+  BarChart3,
+  Trophy,
   Settings as SettingsIcon,
   Database,
 } from "lucide-react";
@@ -13,6 +15,8 @@ const navItems: { page: Page; label: string; icon: typeof CalendarDays }[] = [
   { page: "today", label: "今日", icon: CalendarDays },
   { page: "focus", label: "专注", icon: Timer },
   { page: "news", label: "新闻", icon: Newspaper },
+  { page: "statistics", label: "统计", icon: BarChart3 },
+  { page: "achievements", label: "成就", icon: Trophy },
   { page: "settings", label: "设置", icon: SettingsIcon },
 ];
 

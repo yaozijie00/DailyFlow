@@ -40,6 +40,16 @@ describe("TaskService", () => {
     expect(tasks.map((t) => t.title)).toEqual(["今天"]);
   });
 
+  it("getTasksByDate 按指定日期查询，不串日期", async () => {
+    await service.createTask({ title: "A", scheduledDate: "2026-08-25" });
+    await service.createTask({ title: "B", scheduledDate: "2026-08-25" });
+    await service.createTask({ title: "C", scheduledDate: "2026-08-26" });
+    const aug25 = await service.getTasksByDate("2026-08-25");
+    expect(aug25.map((t) => t.title).sort()).toEqual(["A", "B"]);
+    const aug26 = await service.getTasksByDate("2026-08-26");
+    expect(aug26.map((t) => t.title)).toEqual(["C"]);
+  });
+
   it("updates a task", async () => {
     const task = await service.createTask({ title: "写代码" });
     const updated = await service.updateTask(task.id, { title: "改标题" });

@@ -40,9 +40,10 @@ export const tasks = sqliteTable("tasks", {
 
 export const focusSessions = sqliteTable("focus_sessions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  taskId: integer("task_id")
-    .notNull()
-    .references(() => tasks.id, { onDelete: "cascade" }),
+  // task_id 可空 + ON DELETE SET NULL：删除任务不再级联删除历史专注记录（统计保留）
+  taskId: integer("task_id").references(() => tasks.id, { onDelete: "set null" }),
+  // 专注开始时刻任务所属类别的快照（无 FK；类别删除后 JOIN 不到 → 归入「已删除类别」）
+  categoryId: integer("category_id"),
   plannedDuration: integer("planned_duration").notNull(),
   actualDuration: integer("actual_duration").notNull().default(0),
   startedAt: integer("started_at").notNull(),
@@ -79,4 +80,10 @@ export const newsSources = sqliteTable("news_sources", {
   enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: integer("created_at").notNull(),
+});
+
+export const achievementProgress = sqliteTable("achievement_progress", {
+  achievementId: text("achievement_id").primaryKey(),
+  unlocked: integer("unlocked", { mode: "boolean" }).notNull().default(false),
+  unlockedAt: integer("unlocked_at"),
 });

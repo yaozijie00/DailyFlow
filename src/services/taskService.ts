@@ -18,7 +18,12 @@ export class TaskService {
   constructor(private readonly tasks: TaskRepository) {}
 
   async getTodayTasks(): Promise<Task[]> {
-    return this.tasks.findByDate(todayString());
+    return this.getTasksByDate(todayString());
+  }
+
+  /** 按指定日期（YYYY-MM-DD）查询任务。 */
+  async getTasksByDate(date: string): Promise<Task[]> {
+    return this.tasks.findByDate(date);
   }
 
   async createTask(input: TaskCreateInput): Promise<Task> {

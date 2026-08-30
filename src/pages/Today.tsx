@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Plus, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { useAppStore } from "../stores/appStore";
 import { useTaskStore } from "../stores/taskStore";
-import { todayString, weekdayLabel } from "../lib/date";
+import { todayString, weekdayLabel, formatDateLabel } from "../lib/date";
 import { PageHeader } from "../components/ui/PageHeader";
 import { IconButton } from "../components/ui/IconButton";
 import { useWindowDrag } from "../hooks/useWindowDrag";
@@ -13,6 +13,7 @@ import TaskFormModal from "../components/tasks/TaskFormModal";
 import Timeline from "../components/timeline/Timeline";
 import TodaySummary from "../components/today/TodaySummary";
 import TodayFestival from "../components/today/TodayFestival";
+import CalendarPopover from "../components/today/CalendarPopover";
 
 // 布局固定尺寸（与 className 保持一致）
 const TASK_LIST_WIDTH = 256; // w-64
@@ -39,6 +40,8 @@ export default function Today() {
   const loading = useTaskStore((s) => s.loading);
   const openCreate = useTaskStore((s) => s.openCreate);
   const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
+  const selectedDate = useTaskStore((s) => s.selectedDate);
+  const setSelectedDate = useTaskStore((s) => s.setSelectedDate);
   const [showDetail, setShowDetail] = useState(true);
   const loadedDateRef = useRef(todayString());
 
@@ -91,17 +94,19 @@ export default function Today() {
     }
   }, [load, dbStatus]);
 
-  // 跨午夜自动刷新今日任务（B10）
+  // 跨午夜自动刷新：停留在「今天」时跳到新的一天；查看历史日期则不动
   useEffect(() => {
     const id = window.setInterval(() => {
       const today = todayString();
-      if (today !== loadedDateRef.current) {
-        loadedDateRef.current = today;
-        load();
+      if (today === loadedDateRef.current) return;
+      const wasOnToday = useTaskStore.getState().selectedDate === loadedDateRef.current;
+      loadedDateRef.current = today;
+      if (wasOnToday) {
+        useTaskStore.getState().goToToday();
       }
     }, 60_000);
     return () => window.clearInterval(id);
-  }, [load]);
+  }, []);
 
   function startResize(e: React.MouseEvent) {
     if (e.button !== 0) return;
@@ -135,8 +140,20 @@ export default function Today() {
   return (
     <div className="flex h-full flex-col gap-4">
       <PageHeader
-        title="今日"
-        description={`${todayString()} · ${weekdayLabel()}`}
+        title={
+          <CalendarPopover
+            selectedDate={selectedDate}
+            onSelect={setSelectedDate}
+            label={
+              selectedDate === todayString() ? "今日" : formatDateLabel(selectedDate)
+            }
+          />
+        }
+        description={
+          selectedDate === todayString()
+            ? `${selectedDate} · ${weekdayLabel()}`
+            : selectedDate
+        }
         actions={
           <IconButton
             label={showDetail ? "隐藏详情" : "显示详情"}
@@ -149,7 +166,7 @@ export default function Today() {
 
       {/* 今日信息行：左侧 节日，右侧 完成情况（星期已显示在标题日期旁） */}
       <div className="flex items-center justify-between gap-4">
-        <TodayFestival />
+        <TodayFestival date={selectedDate} />
         <TodaySummary />
       </div>
 

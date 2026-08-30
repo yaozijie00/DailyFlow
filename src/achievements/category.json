@@ -1,0 +1,38 @@
+[
+  {
+    "id": "category_count_3",
+    "name": "多面手",
+    "description": "在 3 个不同类别完成过工作",
+    "icon": "Layers",
+    "category": "category",
+    "chainId": "category_count",
+    "order": 1,
+    "condition": { "type": "category_count", "target": 3 }
+  },
+  {
+    "id": "category_count_5",
+    "name": "全能选手",
+    "description": "在 5 个不同类别完成过工作",
+    "icon": "Award",
+    "category": "category",
+    "chainId": "category_count",
+    "order": 2,
+    "condition": { "type": "category_count", "target": 5 }
+  },
+  {
+    "id": "dev_10h",
+    "name": "代码工匠",
+    "description": "在「开发」类别累计投入 10 小时",
+    "icon": "Code",
+    "category": "category",
+    "condition": { "type": "category_duration", "categoryName": "开发", "target": 600 }
+  },
+  {
+    "id": "learn_5h",
+    "name": "学无止境",
+    "description": "在「学习」类别累计投入 5 小时",
+    "icon": "BookOpen",
+    "category": "category",
+    "condition": { "type": "category_duration", "categoryName": "学习", "target": 300 }
+  }
+]

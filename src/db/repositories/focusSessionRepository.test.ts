@@ -76,29 +76,17 @@ describe("FocusSessionRepository", () => {
     ).rejects.toThrow();
   });
 
-  it("sums actual duration in a time range", async () => {
+  it("删除任务后 focus_session 保留且 task_id 置空（不再级联删除）", async () => {
     const task = await makeTask();
-    const t0 = Date.now();
-    await sessions.create({
+    const session = await sessions.create({
       taskId: task.id,
       plannedDuration: 1500,
-      startedAt: t0,
-      actualDuration: 100,
+      startedAt: Date.now(),
     });
-    await sessions.create({
-      taskId: task.id,
-      plannedDuration: 1500,
-      startedAt: t0 + 10,
-      actualDuration: 200,
-    });
-    await sessions.create({
-      taskId: task.id,
-      plannedDuration: 1500,
-      startedAt: t0 - 100000,
-      actualDuration: 999,
-    });
-    const total = await sessions.getTotalActualDuration(t0 - 1000, t0 + 1000);
-    expect(total).toBe(300);
+    await tasks.delete(task.id);
+    const kept = await sessions.findById(session.id);
+    expect(kept).not.toBeNull();
+    expect(kept?.taskId).toBeNull();
   });
 
   describe("getTodayStats", () => {

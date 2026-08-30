@@ -33,11 +33,6 @@ export const FULL_DAY_MINUTES = 24 * 60;
 /** 任务块最小渲染高度（px），避免超短任务不可见。 */
 export const MIN_BLOCK_HEIGHT = 8;
 
-/** 默认配置下的开始/结束/吸附常量（兼容旧引用）。 */
-export const TIMELINE_START_MINUTES = DEFAULT_TIMELINE_CONFIG.startMinutes;
-export const TIMELINE_END_MINUTES = DEFAULT_TIMELINE_CONFIG.endMinutes;
-export const SNAP_MINUTES = DEFAULT_TIMELINE_CONFIG.snapMinutes;
-
 /** 全天总高度（默认缩放）。 */
 export const TIMELINE_TOTAL_HEIGHT = FULL_DAY_MINUTES * PX_PER_MINUTE; // 2160px
 
@@ -218,22 +213,6 @@ export interface TimeSpan {
   id: number;
   startMs: number;
   endMs: number;
-}
-
-/** 检测重叠：返回所有与其他任务时间重叠的任务 id 集合（相邻不算重叠）。 */
-export function findOverlappingIds(spans: TimeSpan[]): Set<number> {
-  const overlapping = new Set<number>();
-  for (let i = 0; i < spans.length; i++) {
-    for (let j = i + 1; j < spans.length; j++) {
-      const a = spans[i];
-      const b = spans[j];
-      if (a.startMs < b.endMs && b.startMs < a.endMs) {
-        overlapping.add(a.id);
-        overlapping.add(b.id);
-      }
-    }
-  }
-  return overlapping;
 }
 
 export interface LaneLayout {

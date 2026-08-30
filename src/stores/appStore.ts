@@ -1,6 +1,12 @@
 import { create } from "zustand";
 
-export type Page = "today" | "focus" | "news" | "settings";
+export type Page =
+  | "today"
+  | "focus"
+  | "news"
+  | "settings"
+  | "statistics"
+  | "achievements";
 export type DbStatus = "idle" | "ready" | "error";
 
 export type ToastType = "info" | "success" | "warning" | "error";
@@ -9,6 +15,12 @@ export interface Toast {
   id: number;
   type: ToastType;
   text: string;
+}
+
+export interface AchievementToast {
+  id: number;
+  name: string;
+  description: string;
 }
 
 interface AppState {
@@ -22,6 +34,11 @@ interface AppState {
   toasts: Toast[];
   pushToast: (type: ToastType, text: string) => void;
   removeToast: (id: number) => void;
+
+  /** 成就解锁提示（5 秒自动消失） */
+  achievementToasts: AchievementToast[];
+  pushAchievement: (name: string, description: string) => void;
+  removeAchievementToast: (id: number) => void;
 }
 
 let toastId = 0;
@@ -42,4 +59,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     }, 3500);
   },
   removeToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+
+  achievementToasts: [],
+  pushAchievement: (name, description) => {
+    const id = ++toastId;
+    set({ achievementToasts: [...get().achievementToasts, { id, name, description }] });
+    setTimeout(() => {
+      set((s) => ({ achievementToasts: s.achievementToasts.filter((t) => t.id !== id) }));
+    }, 5000);
+  },
+  removeAchievementToast: (id) =>
+    set((s) => ({ achievementToasts: s.achievementToasts.filter((t) => t.id !== id) })),
 }));

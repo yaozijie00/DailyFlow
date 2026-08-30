@@ -14,7 +14,6 @@ import {
   resizeStartTo,
   resizeEndTo,
   moveTaskBy,
-  findOverlappingIds,
   computeLanes,
   clampBlockY,
   type TimeSpan,
@@ -197,54 +196,6 @@ describe("timeline move（拖动任务块整体移动）", () => {
     const r = moveTaskBy(tsAt(23, 0), tsAt(23, 30), 120 * PX_PER_MINUTE);
     expect(new Date(r.startMs).getHours()).toBe(23);
     expect(new Date(r.startMs).getMinutes()).toBe(30);
-  });
-});
-
-describe("timeline 重叠检测", () => {
-  const d = new Date();
-  function tsAt(h: number, m = 0): number {
-    return new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m).getTime();
-  }
-
-  it("不重叠 → 空集合", () => {
-    const ids = findOverlappingIds([
-      { id: 1, startMs: tsAt(9, 0), endMs: tsAt(10, 0) },
-      { id: 2, startMs: tsAt(10, 30), endMs: tsAt(11, 30) },
-    ]);
-    expect([...ids]).toEqual([]);
-  });
-
-  it("相邻（10:00-11:00 与 11:00-12:00）不视为重叠", () => {
-    const ids = findOverlappingIds([
-      { id: 1, startMs: tsAt(10, 0), endMs: tsAt(11, 0) },
-      { id: 2, startMs: tsAt(11, 0), endMs: tsAt(12, 0) },
-    ]);
-    expect([...ids]).toEqual([]);
-  });
-
-  it("部分重叠 → 两个 id 都标记", () => {
-    const ids = findOverlappingIds([
-      { id: 1, startMs: tsAt(10, 0), endMs: tsAt(11, 0) },
-      { id: 2, startMs: tsAt(10, 30), endMs: tsAt(11, 30) },
-    ]);
-    expect([...ids].sort((a, b) => a - b)).toEqual([1, 2]);
-  });
-
-  it("完全包含 → 两个 id 都标记", () => {
-    const ids = findOverlappingIds([
-      { id: 1, startMs: tsAt(10, 0), endMs: tsAt(12, 0) },
-      { id: 2, startMs: tsAt(10, 30), endMs: tsAt(11, 0) },
-    ]);
-    expect([...ids].sort((a, b) => a - b)).toEqual([1, 2]);
-  });
-
-  it("三个任务只有两个重叠", () => {
-    const ids = findOverlappingIds([
-      { id: 1, startMs: tsAt(10, 0), endMs: tsAt(11, 0) },
-      { id: 2, startMs: tsAt(10, 30), endMs: tsAt(11, 30) },
-      { id: 3, startMs: tsAt(14, 0), endMs: tsAt(15, 0) },
-    ]);
-    expect([...ids].sort((a, b) => a - b)).toEqual([1, 2]);
   });
 });
 
