@@ -86,42 +86,12 @@ fn reset_startup_log() {
         if let Ok(mut f) = fs::File::create(dir.join("startup.log")) {
             let _ = writeln!(
                 f,
-                "=== DailyFlow 启动日志 v1.0.0（{}） ===",
-                chrono_like_now()
+                "=== DailyFlow 启动日志 v{}（{}） ===",
+                env!("CARGO_PKG_VERSION"),
+                chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
             );
         }
     }
-}
-
-/// 简易本地时间戳（不引第三方依赖）。
-fn chrono_like_now() -> String {
-    let d = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs() as i64;
-    let days = d / 86_400;
-    let (y, m, day) = civil_from_days(days);
-    let secs = d % 86_400;
-    format!(
-        "{y:04}-{m:02}-{day:02} {:02}:{:02}:{:02}",
-        secs / 3600,
-        (secs % 3600) / 60,
-        secs % 60
-    )
-}
-
-/// 儒略日数 → (年,月,日)。Howard Hinnant 算法。
-fn civil_from_days(z: i64) -> (i64, i64, i64) {
-    let z = z + 719_468;
-    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
-    let doe = (z - era * 146_097) as u64;
-    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
-    let y = yoe as i64 + era * 400;
-    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
-    let mp = (5 * doy + 2) / 153;
-    let d = doy - (153 * mp + 2) / 5 + 1;
-    let m = if mp < 10 { mp + 3 } else { mp - 9 } as i64;
-    (if m <= 2 { y + 1 } else { y }, m, d as i64)
 }
 
 /// 前端追加日志命令（main.tsx 调用）。

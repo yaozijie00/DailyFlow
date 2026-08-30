@@ -9,8 +9,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "db:generate": "drizzle-kit generate"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
@@ -31,7 +30,6 @@
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
     "better-sqlite3": "^13.0.3",
-    "drizzle-kit": "^0.31.10",
     "jsdom": "^30.0.1",
     "tailwindcss": "^4.3.3",
     "typescript": "~5.8.3",

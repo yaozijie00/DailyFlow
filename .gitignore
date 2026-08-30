@@ -30,6 +30,9 @@ coverage
 .npmrc
 .npm-cache
 
+# Internal development documents (AI prompts / requirements), not for public repo
+Document/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -22,6 +22,7 @@ tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-sql = { version = "2", features = ["sqlite"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+chrono = "0.4"
 windows-sys = { version = "0.59", features = ["Win32_UI_WindowsAndMessaging", "Win32_System_Com"] }
 # 新闻源抓取（RSS，阻塞调用在 spawn_blocking 中执行）与系统浏览器打开外链
 ureq = "2"

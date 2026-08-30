@@ -4,32 +4,38 @@
 
 ### Features
 
-* 设置页分组（General / Pomodoro / Shortcuts / Categories / Storage / Data）
-* 可自定义应用内快捷键（防重复绑定、冲突提示、恢复默认、输入框内不触发）
-* 任务分类管理（增/改/删/排序；删除分类任务自动置空，不丢失）
-* 存储位置设置（数据/缓存/备份目录；路径校验、自动建目录、重启生效、不自动迁移）
-* 番茄钟设置扩展（专注/短休息/长休息/长休间隔）
+- 新闻中心：RSS 订阅 + SQLite 缓存 + 图片缓存，离线可读（源可自定义、中国网络友好默认源）
+- 统计系统：今日/本周/本月/自定义范围投入时长、类别分布、今日工作轨迹
+- 成就系统：数据驱动的渐进式成就（完成番茄钟解锁、进度显示、未来成就隐藏）
+- 今日日历导航：点击标题切换任意日期，历史/未来日期可查看与编辑
+- 今日节日/节气显示
+- 快速创建任务
+- 分类颜色自定义
+- 时间轴交互优化：重叠分栏（甘特式）、实时重排、换栏、拖拽预览
+- 任务备注字段
+- 设置页分组（General / Pomodoro / Shortcuts / Categories / News / Storage / Data）
+- 可自定义应用内快捷键
+- 存储位置设置（数据/缓存/备份目录）
+- 新应用图标
 
 ### Technical
 
-* categories 新增 sort_order 列（迁移 0001，回填按 id）
-* 存储路径存库外 storage.json（Rust 启动读取）
-* 新增测试：shortcuts / storagePaths / categoryService / categoryRepository 扩展
+- WorkEvent 统一数据源（focus_sessions + category_id 快照）
+- 任务删除不再级联删除历史专注记录（task_id SET NULL）
+- 成就条件引擎（event_count / total_duration / category_duration / daily_duration / streak_days / category_count）
+- 迁移 0001-0007（sort_order / news / category color / notes / focus_sessions rework / achievement_progress）
+- 新增大量单元测试（302 项）
 
 ## DailyFlow 1.0.0
 
 ### Features
 
-* Daily Task Management
-* Timeline Planning
-* Pomodoro Focus
-* Statistics
-* Local SQLite Storage
-* Backup
+- 每日任务管理
+- 时间轴规划
+- 番茄钟专注
+- 本地 SQLite 存储
+- 数据备份/恢复
 
 ### Technical
 
-* React
-* Tauri
-* SQLite
-* Drizzle ORM
+- React + Tauri + SQLite + Drizzle ORM
