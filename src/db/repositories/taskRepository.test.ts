@@ -95,4 +95,35 @@ describe("TaskRepository", () => {
       expect(stats).toEqual({ total: 0, completed: 0 });
     });
   });
+
+  describe("排序（sort_order）", () => {
+    it("findByDate 按 sort_order 升序返回", async () => {
+      const a = await tasks.create({ title: "A", scheduledDate: "2026-08-27" });
+      const b = await tasks.create({ title: "B", scheduledDate: "2026-08-27" });
+      await tasks.update(a.id, { sortOrder: 5 });
+      await tasks.update(b.id, { sortOrder: 1 });
+      const list = await tasks.findByDate("2026-08-27");
+      expect(list.map((t) => t.title)).toEqual(["B", "A"]);
+    });
+
+    it("reorder 按传入 id 顺序重写 sort_order", async () => {
+      const a = await tasks.create({ title: "A", scheduledDate: "2026-08-27" });
+      const b = await tasks.create({ title: "B", scheduledDate: "2026-08-27" });
+      await tasks.reorder([b.id, a.id]);
+      const list = await tasks.findByDate("2026-08-27");
+      expect(list.map((t) => t.title)).toEqual(["B", "A"]);
+    });
+
+    it("reorderByTime：有计划时间的在前（升序），无时间的按创建顺序在后", async () => {
+      const d = new Date();
+      const t9 = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 9, 0).getTime();
+      const t11 = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 11, 0).getTime();
+      await tasks.create({ title: "无时间", scheduledDate: "2026-08-27" });
+      await tasks.create({ title: "11点", scheduledDate: "2026-08-27", plannedStart: t11, plannedEnd: t11 + 600000 });
+      await tasks.create({ title: "9点", scheduledDate: "2026-08-27", plannedStart: t9, plannedEnd: t9 + 600000 });
+      await tasks.reorderByTime("2026-08-27");
+      const list = await tasks.findByDate("2026-08-27");
+      expect(list.map((t) => t.title)).toEqual(["9点", "11点", "无时间"]);
+    });
+  });
 });

@@ -26,6 +26,7 @@ const task: Task = {
   updatedAt: 0,
   completedAt: null,
   notes: null,
+  sortOrder: 0,
 };
 
 beforeEach(() => {

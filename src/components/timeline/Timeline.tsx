@@ -27,6 +27,7 @@ import {
   type TimeSpan,
 } from "../../lib/timeline";
 import { startOfToday, todayString } from "../../lib/date";
+import { plannedDurationMs } from "../../lib/focusConstraint";
 import { NO_CATEGORY_COLOR } from "../../lib/categoryColors";
 
 /** 横向滚动触发阈值：栏位使块宽低于该值（px）时内容加宽并横向滚动。 */
@@ -217,9 +218,21 @@ export default function Timeline() {
 
   /**
    * 双击任务块：进入该 Task 的 Focus 上下文（跳转专注页并预选该任务）。
-   * 若当前已有其他 Focus 在运行：只切换待选上下文，不停止、不破坏当前 Focus Session。
+   * 若任务有规划时长：按「任务时长 ÷ 当前专注时长」自动规划番茄数；
+   * 若结果为 1 个番茄，本次专注时长自动设为任务时长（仅本次，不改全局设置）。
+   * 当前已有其他 Focus 在运行：只切换待选上下文，不停止、不破坏当前 Focus Session。
    */
   function handleTaskDoubleClick(task: Task) {
+    const T = plannedDurationMs(task);
+    if (T != null) {
+      const D = useSettingsStore.getState().settings.pomodoroDurationMinutes * 60_000;
+      const count = Math.max(1, Math.ceil(T / D));
+      const durationMinutes =
+        count === 1
+          ? Math.max(15, Math.round(T / 60_000))
+          : useSettingsStore.getState().settings.pomodoroDurationMinutes;
+      usePomodoroStore.getState().setPlannedContext({ durationMinutes, count });
+    }
     useAppStore.getState().setPage("focus");
     usePomodoroStore.getState().setPendingTaskId(task.id);
   }

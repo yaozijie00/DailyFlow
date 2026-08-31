@@ -1,5 +1,5 @@
-import { useRef } from "react";
-import { Check, Circle } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { Check, Circle, GripVertical } from "lucide-react";
 import { useTaskStore } from "../../stores/taskStore";
 import { useWindowDrag } from "../../hooks/useWindowDrag";
 import type { Task } from "../../db/repositories/taskRepository";
@@ -7,16 +7,28 @@ import { formatDuration } from "../../lib/format";
 import { TASK_STATUS_LABEL } from "../../lib/taskLabels";
 import { NO_CATEGORY_COLOR } from "../../lib/categoryColors";
 
+type StatusFilter = "all" | "todo" | "active" | "done";
+
+const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
+  { key: "all", label: "全部" },
+  { key: "todo", label: "待办" },
+  { key: "active", label: "执行中" },
+  { key: "done", label: "已完成" },
+];
+
 export default function TaskList() {
   const tasks = useTaskStore((s) => s.tasks);
   const categories = useTaskStore((s) => s.categories);
   const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
   const toggleComplete = useTaskStore((s) => s.toggleComplete);
   const selectTask = useTaskStore((s) => s.selectTask);
+  const reorderTasks = useTaskStore((s) => s.reorderTasks);
   const startTaskDrag = useTaskStore((s) => s.startTaskDrag);
   const endTaskDrag = useTaskStore((s) => s.endTaskDrag);
   const { start: startWindowDrag } = useWindowDrag();
   const didDragRef = useRef(false);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [categoryFilter, setCategoryFilter] = useState("");
 
   /** 行内按下：位移超过阈值进入「拖入时间轴」拖拽；否则保持点击选择。 */
   function beginDrag(e: React.MouseEvent, task: Task) {
@@ -47,8 +59,31 @@ export default function TaskList() {
     );
   }
 
+  /** 上下拖动：把 fromId 移到 beforeId 之前（按当前筛选后的显示顺序重排）。 */
+  function moveTask(fromId: number, beforeId: number) {
+    const ids = filteredTasks.map((t) => t.id);
+    const from = ids.indexOf(fromId);
+    const to = ids.indexOf(beforeId);
+    if (from < 0 || to < 0 || from === to) return;
+    ids.splice(from, 1);
+    const target = ids.indexOf(beforeId);
+    ids.splice(target, 0, fromId);
+    void reorderTasks(ids);
+  }
+
   const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
   const colorMap = new Map(categories.map((c) => [c.id, c.color ?? NO_CATEGORY_COLOR]));
+
+  const filteredTasks = useMemo(() => {
+    let list = tasks;
+    if (statusFilter === "todo") list = list.filter((t) => t.status === "TODO");
+    else if (statusFilter === "active") list = list.filter((t) => t.status === "IN_PROGRESS");
+    else if (statusFilter === "done") list = list.filter((t) => t.status === "COMPLETED");
+    if (categoryFilter !== "") {
+      list = list.filter((t) => t.categoryId === Number(categoryFilter));
+    }
+    return list;
+  }, [tasks, statusFilter, categoryFilter]);
 
   if (tasks.length === 0) {
     return (
@@ -59,80 +94,141 @@ export default function TaskList() {
   }
 
   return (
-    <ul className="space-y-1">
-      {tasks.map((task) => {
-        const done = task.status === "COMPLETED";
-        const cancelled = task.status === "CANCELLED";
-        const selected = task.id === selectedTaskId;
-        return (
-          <li key={task.id}>
-            <div
-              onMouseDown={(e) => beginDrag(e, task)}
-              onClick={() => {
-                if (didDragRef.current) {
-                  didDragRef.current = false; // 拖拽后的 click 不触发选择
-                  return;
-                }
-                selectTask(task.id);
-              }}
-              className={`flex cursor-pointer select-none items-center gap-3 rounded-md border px-3 py-2 ${
-                selected
-                  ? "border-neutral-900 bg-neutral-50"
-                  : "border-transparent hover:bg-neutral-100"
+    <div className="space-y-1.5">
+      {/* 筛选栏：状态 + 分类 */}
+      <div className="space-y-1.5">
+        <div className="flex gap-1">
+          {STATUS_FILTERS.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setStatusFilter(f.key)}
+              className={`rounded px-2 py-1 text-xs transition-colors ${
+                statusFilter === f.key
+                  ? "bg-neutral-900 text-white"
+                  : "text-neutral-500 hover:bg-neutral-100"
               }`}
             >
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (!cancelled) toggleComplete(task.id);
-                }}
-                className="text-neutral-400 hover:text-green-600"
-                aria-label={done ? "恢复为未完成" : "完成任务"}
-                title={done ? "恢复为未完成" : "完成任务"}
-              >
-                {done ? (
-                  <Check size={18} className="text-green-600" />
-                ) : (
-                  <Circle size={18} />
-                )}
-              </button>
-              <span className="flex-1">
-                <span className="flex items-center gap-1.5">
-                  <span
-                    className="h-2 w-2 shrink-0 rounded-full"
-                    style={{
-                      background:
-                        task.categoryId != null
-                          ? (colorMap.get(task.categoryId) ?? NO_CATEGORY_COLOR)
-                          : NO_CATEGORY_COLOR,
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <select
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          className="w-full rounded-md border border-neutral-300 px-2 py-1 text-xs text-neutral-600"
+        >
+          <option value="">全部分类</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {filteredTasks.length === 0 ? (
+        <p className="rounded-md border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-400">
+          无匹配的任务
+        </p>
+      ) : (
+        <ul className="space-y-1">
+          {filteredTasks.map((task) => {
+            const done = task.status === "COMPLETED";
+            const cancelled = task.status === "CANCELLED";
+            const selected = task.id === selectedTaskId;
+            return (
+              <li key={task.id}>
+                <div
+                  onMouseDown={(e) => beginDrag(e, task)}
+                  onClick={() => {
+                    if (didDragRef.current) {
+                      didDragRef.current = false; // 拖拽后的 click 不触发选择
+                      return;
+                    }
+                    selectTask(task.id);
+                  }}
+                  className={`flex cursor-pointer select-none items-center gap-3 rounded-md border px-3 py-2 ${
+                    selected
+                      ? "border-neutral-900 bg-neutral-50"
+                      : "border-transparent hover:bg-neutral-100"
+                  }`}
+                >
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!cancelled) toggleComplete(task.id);
                     }}
-                  />
-                  <span
-                    className={`block text-sm ${
-                      done || cancelled
-                        ? "text-neutral-400 line-through"
-                        : "text-neutral-900"
-                    }`}
+                    className="text-neutral-400 hover:text-green-600"
+                    aria-label={done ? "恢复为未完成" : "完成任务"}
+                    title={done ? "恢复为未完成" : "完成任务"}
                   >
-                    {task.title}
+                    {done ? (
+                      <Check size={18} className="text-green-600" />
+                    ) : (
+                      <Circle size={18} />
+                    )}
+                  </button>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5">
+                      <span
+                        className="h-2 w-2 shrink-0 rounded-full"
+                        style={{
+                          background:
+                            task.categoryId != null
+                              ? (colorMap.get(task.categoryId) ?? NO_CATEGORY_COLOR)
+                              : NO_CATEGORY_COLOR,
+                        }}
+                      />
+                      <span
+                        className={`block truncate text-sm ${
+                          done || cancelled
+                            ? "text-neutral-400 line-through"
+                            : "text-neutral-900"
+                        }`}
+                      >
+                        {task.title}
+                      </span>
+                    </span>
+                    <span className="block truncate text-xs text-neutral-500">
+                      {task.categoryId != null
+                        ? (categoryMap.get(task.categoryId) ?? "")
+                        : ""}
+                      {task.estimatedDuration != null
+                        ? `${task.categoryId != null ? " · " : ""}${formatDuration(task.estimatedDuration)}`
+                        : ""}
+                    </span>
                   </span>
-                </span>
-                <span className="block text-xs text-neutral-500">
-                  {task.categoryId != null
-                    ? (categoryMap.get(task.categoryId) ?? "")
-                    : ""}
-                  {task.estimatedDuration != null
-                    ? `${task.categoryId != null ? " · " : ""}${formatDuration(task.estimatedDuration)}`
-                    : ""}
-                </span>
-              </span>
-              <span className="text-xs text-neutral-400">
-                {TASK_STATUS_LABEL[task.status] ?? task.status}
-              </span>
-            </div>
-          </li>
-        );
-      })}
-    </ul>
+                  <span className="shrink-0 text-xs text-neutral-400">
+                    {TASK_STATUS_LABEL[task.status] ?? task.status}
+                  </span>
+                  {/* 拖动排序手柄（与「拖入时间轴」互不干扰） */}
+                  <span
+                    draggable
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onDragStart={(e) => {
+                      e.dataTransfer.setData("text/plain", String(task.id));
+                      e.stopPropagation();
+                    }}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      const fromId = Number(e.dataTransfer.getData("text/plain"));
+                      if (Number.isFinite(fromId) && fromId !== task.id) {
+                        moveTask(fromId, task.id);
+                      }
+                    }}
+                    className="shrink-0 cursor-grab text-neutral-300 transition-colors hover:text-neutral-500"
+                    title="拖动调整顺序"
+                  >
+                    <GripVertical size={14} />
+                  </span>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
   );
 }

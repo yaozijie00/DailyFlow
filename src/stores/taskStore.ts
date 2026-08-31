@@ -43,6 +43,7 @@ interface TaskState {
   completeTask: (id: number) => Promise<void>;
   toggleComplete: (id: number) => Promise<void>;
   cancelTask: (id: number) => Promise<void>;
+  reorderTasks: (orderedIds: number[]) => Promise<void>;
   changeCategory: (id: number, categoryId: number | null) => Promise<void>;
   changeEstimatedDuration: (id: number, seconds: number | null) => Promise<void>;
   createCategory: (name: string) => Promise<void>;
@@ -161,6 +162,15 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       await get().load();
     } catch {
       fail("取消任务失败");
+    }
+  },
+
+  reorderTasks: async (orderedIds) => {
+    try {
+      await taskService.reorderTasks(orderedIds);
+      await get().load();
+    } catch {
+      fail("调整任务顺序失败");
     }
   },
 

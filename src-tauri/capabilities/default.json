@@ -6,7 +6,6 @@
   "permissions": [
     "core:default",
     "sql:default",
-    "sql:allow-execute",
-    "notification:default"
+    "sql:allow-execute"
   ]
 }

@@ -53,6 +53,14 @@ describe("TaskService", () => {
     expect(aug26.map((t) => t.title)).toEqual(["C"]);
   });
 
+  it("reorderTasks 重写顺序并持久化", async () => {
+    const a = await service.createTask({ title: "A", scheduledDate: "2026-08-27" });
+    const b = await service.createTask({ title: "B", scheduledDate: "2026-08-27" });
+    await service.reorderTasks([b.id, a.id]);
+    const list = await service.getTasksByDate("2026-08-27");
+    expect(list.map((t) => t.title)).toEqual(["B", "A"]);
+  });
+
   it("updates a task", async () => {
     const task = await service.createTask({ title: "写代码" });
     const updated = await service.updateTask(task.id, { title: "改标题" });

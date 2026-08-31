@@ -36,20 +36,28 @@ export default function QuickAddTask() {
         placeholder="快速添加任务，回车创建"
         className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
       />
-      <div className="flex gap-1.5">
+      <div className="flex items-center gap-1.5 text-xs text-neutral-500">
+        <label htmlFor="qa-category" className="shrink-0">
+          分类
+        </label>
         <select
+          id="qa-category"
           value={categoryId}
           onChange={(e) => setCategoryId(e.target.value)}
-          className="min-w-0 flex-1 rounded-md border border-neutral-300 px-2 py-1 text-xs"
+          className="min-w-0 flex-1 rounded-md border border-neutral-300 px-2 py-1 text-xs text-neutral-700"
         >
-          <option value="">无分类</option>
+          <option value="">未分类</option>
           {categories.map((c) => (
             <option key={c.id} value={c.id}>
               {c.name}
             </option>
           ))}
         </select>
+        <label htmlFor="qa-minutes" className="shrink-0">
+          时长
+        </label>
         <input
+          id="qa-minutes"
           type="number"
           min={0}
           value={minutes}
@@ -58,7 +66,7 @@ export default function QuickAddTask() {
             if (e.key === "Enter") void submit();
           }}
           placeholder="分钟"
-          className="w-16 rounded-md border border-neutral-300 px-2 py-1 text-xs"
+          className="w-16 rounded-md border border-neutral-300 px-2 py-1 text-xs text-neutral-700"
         />
         <button
           onClick={() => void submit()}

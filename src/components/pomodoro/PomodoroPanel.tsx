@@ -66,10 +66,16 @@ export default function PomodoroPanel() {
     durationMs: number;
   } | null>(null);
 
-  // 双击时间轴任务预选：回到 IDLE（当前专注结束/未开始）时自动选中
+  // 双击时间轴任务预选：回到 IDLE 时自动选中，并应用「本次规划」（时长/番茄数，仅本次）
   useEffect(() => {
     if (snapshot.state === "IDLE" && pendingTaskId != null) {
       setSelectedId(String(pendingTaskId));
+      const ctx = usePomodoroStore.getState().plannedContext;
+      if (ctx) {
+        setFocusCountGoal(ctx.count);
+        setSliderValue(ctx.durationMinutes);
+        usePomodoroStore.getState().setPlannedContext(null);
+      }
       setPendingTaskId(null);
     }
   }, [snapshot.state, pendingTaskId, setPendingTaskId]);
@@ -111,6 +117,7 @@ export default function PomodoroPanel() {
   const progressPercent = Math.round(snapshot.progress * 100);
   const completed = snapshot.elapsedMs >= snapshot.durationMs;
   const isBreak = phase !== "focus";
+  const idle = snapshot.state === "IDLE" && !isBreak;
 
   const handleFinishTask = async () => {
     if (taskId == null) return;
@@ -123,7 +130,7 @@ export default function PomodoroPanel() {
   /**
    * 开始专注前的约束检查：本次 Focus 若超过 Task 剩余规划时长，
    * 弹确认框（提供「调整为剩余」或「仍然开始」），不静默允许。
-   * 时长取滑块/输入的实时值（sliderValue），并同步写回 Settings。
+   * 时长取滑块/输入的实时值（sliderValue；滑块松手已写回 Settings）。
    */
   function handleStart() {
     const t = tasks.find((x) => x.id === Number(selectedId));
@@ -133,9 +140,6 @@ export default function PomodoroPanel() {
     if (remaining != null && remaining < durationMs) {
       setConstraint({ task: t, remainingMs: remaining, durationMs });
       return;
-    }
-    if (sliderValue !== pomodoroDurationMinutes) {
-      void updateSettings({ pomodoroDurationMinutes: sliderValue });
     }
     startFocus(t.id, durationMs);
   }
@@ -318,7 +322,8 @@ export default function PomodoroPanel() {
           {/* 剩余时间 + 进度 + 状态 */}
           <div className="mb-2 text-center">
             <div className="text-7xl font-semibold tabular-nums text-neutral-900">
-              {formatTimer(snapshot.remainingMs)}
+              {/* 未开始时跟随滑块实时显示；运行/暂停/休息用真实剩余时间 */}
+              {formatTimer(idle ? sliderValue * 60_000 : snapshot.remainingMs)}
             </div>
             <div className="mt-1 text-sm text-neutral-500">
               {stateLabel(snapshot.state, phase)}

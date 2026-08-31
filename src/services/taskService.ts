@@ -31,14 +31,27 @@ export class TaskService {
   }
 
   async createTask(input: TaskCreateInput): Promise<Task> {
-    return this.tasks.create({
+    const task = await this.tasks.create({
       ...input,
       scheduledDate: input.scheduledDate ?? todayString(),
     });
+    await this.tasks.reorderByTime(task.scheduledDate);
+    return task;
   }
 
   async updateTask(id: number, input: UpdateTaskInput): Promise<Task | null> {
-    return this.tasks.update(id, input);
+    const before = await this.tasks.findById(id);
+    const updated = await this.tasks.update(id, input);
+    if (updated) {
+      if (before?.scheduledDate) await this.tasks.reorderByTime(before.scheduledDate);
+      await this.tasks.reorderByTime(updated.scheduledDate);
+    }
+    return updated;
+  }
+
+  /** 手动调整任务顺序（上下拖动）：按传入 id 顺序重写该批任务的 sort_order。 */
+  async reorderTasks(orderedIds: number[]): Promise<void> {
+    await this.tasks.reorder(orderedIds);
   }
 
   /** 删除任务：先清理其全部专注记录（统计数据不再包含该任务），再删除任务。 */

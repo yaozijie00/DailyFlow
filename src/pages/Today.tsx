@@ -165,8 +165,8 @@ export default function Today() {
         }
       />
 
-      {/* 今日信息行：左侧 节日，右侧 完成情况（星期已显示在标题日期旁） */}
-      <div className="flex items-center justify-between gap-4">
+      {/* 今日信息行：左侧 节日 + 统计（左对齐，与时间轴窗口左缘一致） */}
+      <div className="flex items-center gap-4">
         <TodayFestival date={selectedDate} />
         <TodaySummary />
       </div>

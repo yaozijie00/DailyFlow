@@ -17,7 +17,7 @@ export interface CreateTaskInput {
   notes?: string | null;
 }
 
-export type UpdateTaskInput = Partial<CreateTaskInput>;
+export type UpdateTaskInput = Partial<CreateTaskInput> & { sortOrder?: number };
 
 export class TaskRepository {
   constructor(private readonly db: Db) {}
@@ -59,7 +59,41 @@ export class TaskRepository {
       .select()
       .from(tasks)
       .where(eq(tasks.scheduledDate, scheduledDate))
+      .orderBy(tasks.sortOrder, tasks.id)
       .all();
+  }
+
+  /** 按传入 id 顺序重写 sort_order（手动拖动排序）。 */
+  async reorder(orderedIds: number[]): Promise<void> {
+    for (let i = 0; i < orderedIds.length; i++) {
+      await this.db
+        .update(tasks)
+        .set({ sortOrder: i })
+        .where(eq(tasks.id, orderedIds[i]))
+        .run();
+    }
+  }
+
+  /** 按计划时间重排某日任务的 sort_order（有时间的升序在前，无时间按创建顺序在后）。 */
+  async reorderByTime(date: string): Promise<void> {
+    const rows = await this.db
+      .select({ id: tasks.id, plannedStart: tasks.plannedStart, createdAt: tasks.createdAt })
+      .from(tasks)
+      .where(eq(tasks.scheduledDate, date))
+      .all();
+    rows.sort((a, b) => {
+      const as = a.plannedStart ?? Number.MAX_SAFE_INTEGER;
+      const bs = b.plannedStart ?? Number.MAX_SAFE_INTEGER;
+      if (as !== bs) return as - bs;
+      return a.createdAt - b.createdAt;
+    });
+    for (let i = 0; i < rows.length; i++) {
+      await this.db
+        .update(tasks)
+        .set({ sortOrder: i })
+        .where(eq(tasks.id, rows[i].id))
+        .run();
+    }
   }
 
   async update(id: number, input: UpdateTaskInput): Promise<Task | null> {

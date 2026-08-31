@@ -36,6 +36,8 @@ export const tasks = sqliteTable("tasks", {
   updatedAt: integer("updated_at").notNull(),
   completedAt: integer("completed_at"),
   notes: text("notes"),
+  /** 任务列表自定义顺序（按时间重排 / 手动拖动调整） */
+  sortOrder: integer("sort_order").notNull().default(0),
 });
 
 export const focusSessions = sqliteTable("focus_sessions", {
