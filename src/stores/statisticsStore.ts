@@ -20,6 +20,9 @@ import {
 
 export type RangePreset = "today" | "week" | "month" | "custom";
 
+/** 「统计」页顶层 Tab：统计 / 成就（成就由快捷键与 Tab 切换进入）。 */
+export type StatsTab = "statistics" | "achievements";
+
 const statisticsService = new StatisticsService(
   new TaskRepository(getDb()),
   new FocusSessionRepository(getDb()),
@@ -56,6 +59,8 @@ export function computeRange(
 }
 
 interface StatisticsState {
+  /** 顶层 Tab（统计/成就） */
+  tab: StatsTab;
   range: RangePreset;
   customFrom: string;
   customTo: string;
@@ -63,12 +68,14 @@ interface StatisticsState {
   rangeStats: RangeStatistics | null;
   categoryStats: CategoryStatistic[];
   hourlyStats: HourlyStatistic[];
+  setTab: (t: StatsTab) => void;
   setRange: (r: RangePreset) => void;
   setCustomRange: (from: string, to: string) => void;
   load: () => Promise<void>;
 }
 
 export const useStatisticsStore = create<StatisticsState>((set, get) => ({
+  tab: "statistics",
   range: "today",
   customFrom: todayString(),
   customTo: todayString(),
@@ -76,6 +83,10 @@ export const useStatisticsStore = create<StatisticsState>((set, get) => ({
   rangeStats: null,
   categoryStats: [],
   hourlyStats: [],
+
+  setTab: (t) => {
+    set({ tab: t });
+  },
 
   setRange: (r) => {
     set({ range: r });

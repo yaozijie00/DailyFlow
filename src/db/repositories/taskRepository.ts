@@ -15,6 +15,8 @@ export interface CreateTaskInput {
   actualDuration?: number;
   completedAt?: number | null;
   notes?: string | null;
+  /** 关联的长期目标（可空） */
+  goalId?: number | null;
 }
 
 export type UpdateTaskInput = Partial<CreateTaskInput> & { sortOrder?: number };
@@ -39,6 +41,7 @@ export class TaskRepository {
         updatedAt: now,
         completedAt: input.completedAt ?? null,
         notes: input.notes ?? null,
+        goalId: input.goalId ?? null,
       })
       .returning()
       .all();

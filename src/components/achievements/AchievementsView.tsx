@@ -1,16 +1,15 @@
 import { useEffect, useState } from "react";
 import { Trophy } from "lucide-react";
-import { useAppStore } from "../stores/appStore";
+import { useAppStore } from "../../stores/appStore";
 import {
   useAchievementStore,
   type AchievementFilter,
-} from "../stores/achievementStore";
-import type { AchievementProgressView } from "../services/achievementService";
-import { PageHeader } from "../components/ui/PageHeader";
-import { Dialog } from "../components/ui/Dialog";
-import { EmptyState } from "../components/ui/EmptyState";
-import { AchievementIcon } from "../components/achievements/AchievementIcon";
-import { formatProgress, formatDurationCompact } from "../lib/format";
+} from "../../stores/achievementStore";
+import type { AchievementProgressView } from "../../services/achievementService";
+import { Dialog } from "../ui/Dialog";
+import { EmptyState } from "../ui/EmptyState";
+import { AchievementIcon } from "./AchievementIcon";
+import { formatProgress, formatDurationCompact } from "../../lib/format";
 
 const FILTERS: { key: AchievementFilter; label: string }[] = [
   { key: "all", label: "全部" },
@@ -88,7 +87,11 @@ function AchievementCard({
   );
 }
 
-export default function Achievements() {
+/**
+ * 成就视图（「统计」页的「成就」Tab 内容）：
+ * 渐进式可见成就卡片 + 全部/已解锁过滤 + 详情弹窗。
+ */
+export default function AchievementsView() {
   const dbStatus = useAppStore((s) => s.dbStatus);
   const items = useAchievementStore((s) => s.items);
   const loading = useAchievementStore((s) => s.loading);
@@ -102,17 +105,14 @@ export default function Achievements() {
     }
   }, [dbStatus]);
 
-  const unlockedCount = items.filter((i) => i.unlocked).length;
-  const visible = filter === "unlocked" ? items.filter((i) => i.unlocked) : items;
+  const visible =
+    filter === "unlocked"
+      ? items.filter((i) => i.unlocked)
+      : items.filter((i) => !i.unlocked);
   const selected = items.find((i) => i.id === selectedId) ?? null;
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-5">
-      <PageHeader
-        title="成就"
-        description={`已解锁 ${unlockedCount}`}
-      />
-
+    <>
       {/* 过滤 */}
       <div className="flex rounded-md border border-neutral-200 bg-white p-0.5 self-start">
         {FILTERS.map((f) => (
@@ -183,6 +183,6 @@ export default function Achievements() {
           </div>
         )}
       </Dialog>
-    </div>
+    </>
   );
 }

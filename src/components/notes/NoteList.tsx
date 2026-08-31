@@ -1,0 +1,197 @@
+import { useEffect, useState } from "react";
+import { StickyNote, Check, X, Plus } from "lucide-react";
+import { useNoteStore } from "../../stores/noteStore";
+import { useAppStore } from "../../stores/appStore";
+import { useWindowDrag } from "../../hooks/useWindowDrag";
+import {
+  noteDragSession,
+  noteDropCallbacks,
+  noteDropZoneAt,
+} from "../../lib/noteConvert";
+import type { Note } from "../../db/repositories/noteRepository";
+
+/** 便签项：hover 显示操作；双击文字进入编辑；按住拖动到任务列表/时间轴。 */
+function NoteItem({ note }: { note: Note }) {
+  const update = useNoteStore((s) => s.update);
+  const complete = useNoteStore((s) => s.complete);
+  const remove = useNoteStore((s) => s.remove);
+  const { start: startWindowDrag } = useWindowDrag();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(note.title);
+
+  const arranged = note.status === "arranged";
+
+  const saveEdit = () => {
+    const t = draft.trim();
+    if (t && t !== note.title) void update(note.id, { title: t });
+    setEditing(false);
+  };
+
+  /** 鼠标拖拽（与任务行 → 时间轴一致）：位移超过阈值开始，松手按落点投放区转换。 */
+  function beginNoteDrag(e: React.MouseEvent) {
+    if (arranged || editing || e.button !== 0) return;
+    e.preventDefault(); // 阻止拖拽过程中选中文字
+    const startX = e.clientX;
+    const startY = e.clientY;
+    let dragging = false;
+
+    const finish = () => {
+      noteDragSession.noteId = null;
+      noteDragSession.over = null;
+    };
+
+    startWindowDrag(
+      {
+        onMove: (ev) => {
+          if (!dragging) {
+            if (Math.hypot(ev.clientX - startX, ev.clientY - startY) <= 4) return;
+            dragging = true;
+            noteDragSession.noteId = note.id;
+          }
+          noteDragSession.over = noteDropZoneAt(ev.clientX, ev.clientY);
+        },
+        onUp: (ev) => {
+          if (!dragging) return;
+          const over = noteDropZoneAt(ev.clientX, ev.clientY);
+          if (over) noteDropCallbacks[over]?.(note.id, ev.clientX, ev.clientY);
+          finish();
+        },
+      },
+      finish,
+    );
+  }
+
+  return (
+    <li
+      onMouseDown={beginNoteDrag}
+      className={`group flex cursor-grab items-start gap-1.5 rounded-md border px-2 py-1.5 transition-colors ${
+        arranged
+          ? "border-dashed border-neutral-200 bg-neutral-50 opacity-70"
+          : "border-neutral-200 bg-white hover:border-neutral-300"
+      }`}
+      title={arranged ? "已安排到今日（不可再次拖拽）" : "按住拖动到今日任务列表或时间轴"}
+    >
+      <StickyNote
+        size={14}
+        className={`mt-0.5 shrink-0 ${arranged ? "text-neutral-400" : "text-amber-500"}`}
+      />
+      {editing ? (
+        <input
+          autoFocus
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") saveEdit();
+            else if (e.key === "Escape") {
+              setDraft(note.title);
+              setEditing(false);
+            }
+          }}
+          onBlur={saveEdit}
+          className="min-w-0 flex-1 rounded border border-neutral-300 px-1 py-0.5 text-sm"
+        />
+      ) : (
+        <button
+          onDoubleClick={() => {
+            setDraft(note.title);
+            setEditing(true);
+          }}
+          className={`min-w-0 flex-1 truncate text-left text-sm ${
+            arranged ? "text-neutral-500 line-through decoration-neutral-300" : "text-neutral-800"
+          }`}
+        >
+          {note.title}
+        </button>
+      )}
+      <span className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
+        {!arranged && (
+          <button
+            onClick={() => void complete(note.id)}
+            aria-label="完成便签"
+            title="完成（保留历史）"
+            className="rounded p-0.5 text-neutral-400 hover:bg-green-50 hover:text-green-600"
+          >
+            <Check size={14} />
+          </button>
+        )}
+        <button
+          onClick={() => void remove(note.id)}
+          aria-label="删除便签"
+          title="删除"
+          className="rounded p-0.5 text-neutral-400 hover:bg-red-50 hover:text-red-600"
+        >
+          <X size={14} />
+        </button>
+      </span>
+    </li>
+  );
+}
+
+/**
+ * 便签区（今日左栏持久区域）：
+ * 「暂时没安排时间，但不能忘记」的待办事项，独立于日期持久存在。
+ * 快速添加 + 双击编辑 + hover 完成/删除 + 空状态。
+ */
+export default function NoteList() {
+  const dbStatus = useAppStore((s) => s.dbStatus);
+  const notes = useNoteStore((s) => s.notes);
+  const create = useNoteStore((s) => s.create);
+  const load = useNoteStore((s) => s.load);
+  const [draft, setDraft] = useState("");
+
+  useEffect(() => {
+    if (dbStatus === "ready") {
+      void load();
+    }
+  }, [dbStatus, load]);
+
+  const canSubmit = draft.trim().length > 0;
+
+  const submit = async () => {
+    if (!canSubmit) return;
+    await create({ title: draft.trim() });
+    setDraft("");
+  };
+
+  return (
+    <div className="border-t border-neutral-200 pt-2">
+      <div className="mb-1.5 flex items-center gap-1 text-xs text-neutral-500">
+        <StickyNote size={12} className="text-amber-500" />
+        <span className="font-medium">便签</span>
+        <span className="truncate text-neutral-400">暂时没安排时间，但不能忘记</span>
+      </div>
+
+      <div className="mb-1.5 flex items-center gap-1.5">
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") void submit();
+          }}
+          placeholder="记下想法，回车保存"
+          className="min-w-0 flex-1 rounded-md border border-neutral-300 px-2 py-1 text-xs"
+        />
+        <button
+          onClick={() => void submit()}
+          disabled={!canSubmit}
+          className="flex shrink-0 items-center justify-center rounded-md bg-neutral-900 px-1.5 py-1 text-white hover:bg-neutral-700 disabled:bg-neutral-300"
+          aria-label="添加便签"
+        >
+          <Plus size={14} />
+        </button>
+      </div>
+
+      {notes.length === 0 ? (
+        <p className="rounded-md border border-dashed border-neutral-300 p-4 text-center text-xs text-neutral-400">
+          还没有便签，把想法记下来
+        </p>
+      ) : (
+        <ul className="space-y-1">
+          {notes.map((n) => (
+            <NoteItem key={n.id} note={n} />
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}

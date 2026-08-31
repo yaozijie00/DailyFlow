@@ -27,6 +27,7 @@ const task: Task = {
   completedAt: null,
   notes: null,
   sortOrder: 0,
+  goalId: null,
 };
 
 beforeEach(() => {

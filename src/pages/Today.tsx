@@ -13,7 +13,7 @@ import TaskFormModal from "../components/tasks/TaskFormModal";
 import Timeline from "../components/timeline/Timeline";
 import TodaySummary from "../components/today/TodaySummary";
 import TodayFestival from "../components/today/TodayFestival";
-import TodayFocusController from "../components/pomodoro/TodayFocusController";
+import NoteList from "../components/notes/NoteList";
 import CalendarPopover from "../components/today/CalendarPopover";
 
 // 布局固定尺寸（与 className 保持一致）
@@ -171,27 +171,30 @@ export default function Today() {
         <TodaySummary />
       </div>
 
-      {/* 全局 Focus Controller（复用 pomodoroStore 单一状态） */}
-      <TodayFocusController />
-
       <div className="flex min-h-0 flex-1" ref={containerRef}>
-        {/* 左：任务列表 */}
-        <aside className="w-64 shrink-0 overflow-y-auto pr-3">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-sm font-medium text-neutral-600">今日任务</h2>
-            <button
-              onClick={() => openCreate()}
-              className="flex items-center gap-1 rounded-md bg-neutral-900 px-2 py-1 text-xs text-white hover:bg-neutral-700"
-            >
-              <Plus size={14} /> 新建
-            </button>
+        {/* 左：任务列表 + 便签（持久区域） */}
+        <aside className="flex w-64 shrink-0 flex-col pr-3">
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-sm font-medium text-neutral-600">今日任务</h2>
+              <button
+                onClick={() => openCreate()}
+                className="flex items-center gap-1 rounded-md bg-neutral-900 px-2 py-1 text-xs text-white hover:bg-neutral-700"
+              >
+                <Plus size={14} /> 新建
+              </button>
+            </div>
+            <QuickAddTask />
+            {loading ? (
+              <div className="text-sm text-neutral-400">加载中…</div>
+            ) : (
+              <TaskList />
+            )}
           </div>
-          <QuickAddTask />
-          {loading ? (
-            <div className="text-sm text-neutral-400">加载中…</div>
-          ) : (
-            <TaskList />
-          )}
+          {/* 便签区：固定高度、独立滚动 */}
+          <div className="max-h-44 shrink-0 overflow-y-auto pt-1">
+            <NoteList />
+          </div>
         </aside>
 
         {/* 中：时间轴（自身负责滚动） */}

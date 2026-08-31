@@ -1,13 +1,14 @@
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 
 /**
- * 数据模型（4 张表）+ 外键关系
+ * 数据模型（9 张表）+ 外键关系
  * - 时长单位：秒
  * - 时间戳单位：Unix 毫秒
  * - 日期：本地 YYYY-MM-DD
  *
  * 关系：
  *   categories 1 ── * tasks（category_id，删除类别时置空）
+ *   goals      1 ── * tasks（goal_id，删除目标时任务保留并置空）
  *   tasks     1 ── * focus_sessions（task_id，删除任务时级联删除）
  */
 
@@ -38,6 +39,8 @@ export const tasks = sqliteTable("tasks", {
   notes: text("notes"),
   /** 任务列表自定义顺序（按时间重排 / 手动拖动调整） */
   sortOrder: integer("sort_order").notNull().default(0),
+  /** 关联的长期目标（删除目标时任务保留，goal_id 置空） */
+  goalId: integer("goal_id").references(() => goals.id, { onDelete: "set null" }),
 });
 
 export const focusSessions = sqliteTable("focus_sessions", {
@@ -88,4 +91,39 @@ export const achievementProgress = sqliteTable("achievement_progress", {
   achievementId: text("achievement_id").primaryKey(),
   unlocked: integer("unlocked", { mode: "boolean" }).notNull().default(false),
   unlockedAt: integer("unlocked_at"),
+});
+
+/**
+ * 便签：独立于日期的「待办事项」——有想法但暂无执行时间，也不能忘记。
+ * 状态：active（默认显示）/ arranged（已转为任务，折叠显示）/ completed（隐藏，可查看）。
+ */
+export const notes = sqliteTable("notes", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  title: text("title").notNull(),
+  categoryId: integer("category_id").references(() => categories.id, {
+    onDelete: "set null",
+  }),
+  status: text("status").notNull().default("active"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+  completedAt: integer("completed_at"),
+});
+
+/**
+ * 长期目标：独立于日期的阶段性方向（如「三个月内完成 App 重构」）。
+ * 状态：active（进行中）/ completed（已完成，保留历史）。
+ * 任务通过 tasks.goal_id 关联目标，用于进度统计。
+ */
+export const goals = sqliteTable("goals", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  title: text("title").notNull(),
+  description: text("description"),
+  /** 目标截止日期（本地 YYYY-MM-DD，可空） */
+  deadline: text("deadline"),
+  status: text("status").notNull().default("active"),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+  completedAt: integer("completed_at"),
 });

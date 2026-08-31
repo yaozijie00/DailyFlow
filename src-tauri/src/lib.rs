@@ -582,6 +582,7 @@ pub fn run() {
 
     let result = tauri::Builder::default()
         .plugin(tauri_plugin_sql::Builder::default().build())
+        .plugin(tauri_plugin_notification::init())
         .on_page_load(move |_webview, payload| {
             hook_flag.store(true, std::sync::atomic::Ordering::SeqCst);
             append_startup_log(&format!(

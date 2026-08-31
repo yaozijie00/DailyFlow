@@ -4,9 +4,9 @@ export type Page =
   | "today"
   | "focus"
   | "news"
-  | "settings"
+  | "goals"
   | "statistics"
-  | "achievements";
+  | "settings";
 export type DbStatus = "idle" | "ready" | "error";
 
 export type ToastType = "info" | "success" | "warning" | "error";

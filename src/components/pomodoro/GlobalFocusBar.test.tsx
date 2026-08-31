@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup } from "@testing-library/react";
 import GlobalFocusBar from "./GlobalFocusBar";
 import { usePomodoroStore } from "../../stores/pomodoroStore";
@@ -8,7 +8,10 @@ import { useAppStore } from "../../stores/appStore";
 import type { PomodoroSnapshot } from "../../lib/pomodoroTimer";
 import type { Task } from "../../db/repositories/taskRepository";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 function snap(partial: Partial<PomodoroSnapshot> = {}): PomodoroSnapshot {
   return {
@@ -41,9 +44,12 @@ const task: Task = {
   completedAt: null,
   notes: null,
   sortOrder: 0,
+  goalId: null,
 };
 
 beforeEach(() => {
+  // 浮条每秒轮询 refresh 会读真实引擎快照，覆盖注入的测试状态 → mock 为 no-op
+  vi.spyOn(usePomodoroStore.getState(), "refresh").mockImplementation(() => {});
   usePomodoroStore.setState({
     taskId: null,
     phase: "focus",

@@ -2,7 +2,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import TaskList from "./TaskList";
+import { convertNoteToTask } from "../../lib/noteConvert";
 import type { Task } from "../../db/repositories/taskRepository";
+import type { Note } from "../../db/repositories/noteRepository";
 
 afterEach(cleanup);
 
@@ -13,13 +15,36 @@ const mockState = vi.hoisted(() => ({
   toggleComplete: vi.fn(),
   selectTask: vi.fn(),
   reorderTasks: vi.fn(),
+  createTask: vi.fn(),
   startTaskDrag: vi.fn(),
   endTaskDrag: vi.fn(),
+}));
+
+const noteMockState = vi.hoisted(() => ({
+  notes: [] as Note[],
+  update: vi.fn(),
 }));
 
 vi.mock("../../stores/taskStore", () => ({
   useTaskStore: (selector: (s: unknown) => unknown) => selector(mockState),
 }));
+vi.mock("../../stores/noteStore", () => ({
+  useNoteStore: (selector: (s: unknown) => unknown) => selector(noteMockState),
+}));
+
+function makeNote(overrides: Partial<Note> = {}): Note {
+  return {
+    id: 1,
+    title: "设计背包 UI",
+    categoryId: null,
+    status: "active",
+    sortOrder: 0,
+    createdAt: 0,
+    updatedAt: 0,
+    completedAt: null,
+    ...overrides,
+  };
+}
 
 function makeTask(overrides: Partial<Task> = {}): Task {
   return {
@@ -37,6 +62,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     completedAt: null,
     notes: null,
     sortOrder: 0,
+    goalId: null,
     ...overrides,
   };
 }
@@ -46,6 +72,9 @@ describe("TaskList", () => {
     mockState.tasks = [];
     mockState.toggleComplete.mockClear();
     mockState.reorderTasks.mockClear();
+    mockState.createTask.mockClear();
+    noteMockState.notes = [];
+    noteMockState.update.mockClear();
   });
 
   it("渲染任务标题与状态筛选栏", () => {
@@ -57,7 +86,7 @@ describe("TaskList", () => {
     expect(screen.getByText("写代码")).toBeTruthy();
     expect(screen.getByText("读文档")).toBeTruthy();
     expect(screen.getByText("全部")).toBeTruthy();
-    expect(screen.getByText("执行中")).toBeTruthy();
+    expect(screen.getAllByText("待办").length).toBeGreaterThan(0);
   });
 
   it("点击圆圈完成任务（toggleComplete）", () => {
@@ -90,7 +119,7 @@ describe("TaskList", () => {
   it("筛选无匹配时显示空提示", () => {
     mockState.tasks = [makeTask({ id: 1, title: "写代码", status: "TODO" })];
     render(<TaskList />);
-    fireEvent.click(screen.getByText("执行中"));
+    fireEvent.click(screen.getByText("已完成"));
     expect(screen.getByText(/无匹配的任务/)).toBeTruthy();
   });
 
@@ -119,5 +148,60 @@ describe("TaskList", () => {
   it("无任务时显示空状态提示", () => {
     render(<TaskList />);
     expect(screen.getByText(/暂无任务/)).toBeTruthy();
+  });
+
+  describe("convertNoteToTask（便签 → 今日任务）", () => {
+    it("active 便签 → 创建任务并标记 arranged", async () => {
+      const notes = [makeNote({ id: 1, title: "设计背包 UI" })];
+      const createTask = vi.fn().mockResolvedValue(undefined);
+      const updateNote = vi.fn().mockResolvedValue(undefined);
+      const ok = await convertNoteToTask(1, notes, createTask, updateNote);
+      expect(ok).toBe(true);
+      expect(createTask).toHaveBeenCalledWith({
+        title: "设计背包 UI",
+        categoryId: null,
+        scheduledDate: undefined,
+        plannedStart: null,
+        plannedEnd: null,
+      });
+      expect(updateNote).toHaveBeenCalledWith(1, { status: "arranged" });
+    });
+
+    it("继承便签分类", async () => {
+      const notes = [makeNote({ id: 1, title: "A", categoryId: 5 })];
+      const createTask = vi.fn().mockResolvedValue(undefined);
+      await convertNoteToTask(1, notes, createTask, vi.fn());
+      expect(createTask).toHaveBeenCalledWith({
+        title: "A",
+        categoryId: 5,
+        scheduledDate: undefined,
+        plannedStart: null,
+        plannedEnd: null,
+      });
+    });
+
+    it("arranged 便签 → 不创建（防重复）", async () => {
+      const notes = [makeNote({ id: 1, title: "已安排", status: "arranged" })];
+      const createTask = vi.fn();
+      const updateNote = vi.fn();
+      const ok = await convertNoteToTask(1, notes, createTask, updateNote);
+      expect(ok).toBe(false);
+      expect(createTask).not.toHaveBeenCalled();
+      expect(updateNote).not.toHaveBeenCalled();
+    });
+
+    it("未知 id → 不创建", async () => {
+      const ok = await convertNoteToTask(999, [], vi.fn(), vi.fn());
+      expect(ok).toBe(false);
+    });
+
+    it("创建任务失败 → 便签不标记（状态一致）", async () => {
+      const notes = [makeNote({ id: 1 })];
+      const createTask = vi.fn().mockRejectedValue(new Error("db"));
+      const updateNote = vi.fn();
+      const ok = await convertNoteToTask(1, notes, createTask, updateNote);
+      expect(ok).toBe(false);
+      expect(updateNote).not.toHaveBeenCalled();
+    });
   });
 });

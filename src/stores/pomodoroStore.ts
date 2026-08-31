@@ -8,7 +8,7 @@ import { CategoryRepository } from "../db/repositories/categoryRepository";
 import { AchievementProgressRepository } from "../db/repositories/achievementProgressRepository";
 import { FocusService } from "../services/focusService";
 import { AchievementService } from "../services/achievementService";
-import { notifyFocus } from "../services/notificationService";
+import { notifyFocusStart, notifyFocusEnd } from "../services/notificationService";
 import { loadAchievementDefinitions } from "../achievements/definitions";
 import { useAppStore } from "./appStore";
 import { useSettingsStore } from "./settingsStore";
@@ -124,7 +124,7 @@ export function createPomodoroStore(
         if (tid != null) {
           void taskRepo
             .findById(tid)
-            .then((t) => notifyFocus("专注完成", t?.title ?? "未命名任务"))
+            .then((t) => notifyFocusEnd(t?.title ?? "未命名任务", true))
             .catch(() => {});
         }
       } else {
@@ -133,7 +133,7 @@ export function createPomodoroStore(
         if (tid != null) {
           void taskRepo
             .findById(tid)
-            .then((t) => notifyFocus("专注结束", t?.title ?? "未命名任务"))
+            .then((t) => notifyFocusEnd(t?.title ?? "未命名任务", false))
             .catch(() => {});
         }
       }
@@ -168,7 +168,7 @@ export function createPomodoroStore(
         // 开始提醒（异步查任务名；轻量；查询失败静默）
         void taskRepo
           .findById(taskId)
-          .then((t) => notifyFocus("开始专注", t?.title ?? "未命名任务"))
+          .then((t) => notifyFocusStart(t?.title ?? "未命名任务"))
           .catch(() => {});
         void focus
           .start(taskId, plannedSeconds)

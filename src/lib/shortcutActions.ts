@@ -3,6 +3,7 @@ import { useAppStore } from "../stores/appStore";
 import { usePomodoroStore } from "../stores/pomodoroStore";
 import { useTaskStore } from "../stores/taskStore";
 import { useNewsStore } from "../stores/newsStore";
+import { useStatisticsStore } from "../stores/statisticsStore";
 import type { ShortcutAction } from "./shortcuts";
 
 /** 执行快捷键动作（所有副作用走 store getState，便于测试）。 */
@@ -45,10 +46,13 @@ export function dispatchShortcut(action: ShortcutAction): void {
       void useNewsStore.getState().refresh();
       break;
     case "open_statistics":
+      useStatisticsStore.getState().setTab("statistics");
       app.setPage("statistics");
       break;
     case "open_achievements":
-      app.setPage("achievements");
+      // 成就已并入「统计」页的「成就」Tab
+      useStatisticsStore.getState().setTab("achievements");
+      app.setPage("statistics");
       break;
     case "open_settings":
       app.setPage("settings");

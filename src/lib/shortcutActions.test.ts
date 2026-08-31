@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   pause: vi.fn(),
   resume: vi.fn(),
   refreshNews: vi.fn(),
+  setTab: vi.fn(),
   show: vi.fn(),
   unminimize: vi.fn(),
   setFocus: vi.fn(),
@@ -47,6 +48,11 @@ vi.mock("../stores/newsStore", () => ({
     getState: () => ({ refresh: mocks.refreshNews }),
   },
 }));
+vi.mock("../stores/statisticsStore", () => ({
+  useStatisticsStore: {
+    getState: () => ({ setTab: mocks.setTab }),
+  },
+}));
 vi.mock("@tauri-apps/api/window", () => ({
   getCurrentWindow: () => ({
     show: mocks.show,
@@ -77,6 +83,15 @@ describe("dispatchShortcut", () => {
     dispatchShortcut("refresh_news");
     expect(mocks.setPage).toHaveBeenCalledWith("news");
     expect(mocks.refreshNews).toHaveBeenCalled();
+  });
+
+  test("open_statistics 切到统计 Tab，open_achievements 切到成就 Tab", () => {
+    dispatchShortcut("open_statistics");
+    expect(mocks.setTab).toHaveBeenCalledWith("statistics");
+    expect(mocks.setPage).toHaveBeenCalledWith("statistics");
+    dispatchShortcut("open_achievements");
+    expect(mocks.setTab).toHaveBeenCalledWith("achievements");
+    expect(mocks.setPage).toHaveBeenCalledWith("statistics");
   });
 
   test("create_task 切到今日并打开新建弹窗", () => {

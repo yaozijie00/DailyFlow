@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Timer, Pause, Play, Flag } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
 import { usePomodoroStore } from "../../stores/pomodoroStore";
@@ -6,7 +7,8 @@ import { formatTimer } from "../../lib/format";
 
 /**
  * 全局 Focus 迷你条（右下角浮动）：Pomodoro 运行/休息时在所有页面可见，
- * 可暂停/继续/结束，点击「去专注」回到 Today 的 Focus Controller。未运行时隐藏。
+ * 可暂停/继续/结束，点击「去专注」回到 Today。未运行时隐藏。
+ * 自带每秒刷新（不依赖专注页），保证切到任意页面倒计时仍走动。
  * 复用 pomodoroStore 单一状态，不做任何页面跳转外的逻辑。
  */
 export default function GlobalFocusBar() {
@@ -18,7 +20,15 @@ export default function GlobalFocusBar() {
   const pause = usePomodoroStore((s) => s.pause);
   const resume = usePomodoroStore((s) => s.resume);
   const endFocus = usePomodoroStore((s) => s.endFocus);
+  const refresh = usePomodoroStore((s) => s.refresh);
   const tasks = useTaskStore((s) => s.tasks);
+
+  // 每秒刷新引擎快照（只负责显示，不参与计时）：切到任意页面倒计时保持走动
+  useEffect(() => {
+    refresh();
+    const id = window.setInterval(refresh, 1000);
+    return () => window.clearInterval(id);
+  }, [refresh]);
 
   // 未运行（含 IDLE / 已取消）→ 不显示
   if (snapshot.state === "IDLE" || snapshot.state === "CANCELLED") return null;

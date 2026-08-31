@@ -3,6 +3,7 @@ import { useAppStore } from "../../stores/appStore";
 import { useTaskStore } from "../../stores/taskStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { usePomodoroStore } from "../../stores/pomodoroStore";
+import { useNoteStore } from "../../stores/noteStore";
 import { useWindowDrag } from "../../hooks/useWindowDrag";
 import type { Task } from "../../db/repositories/taskRepository";
 import {
@@ -28,10 +29,18 @@ import {
 } from "../../lib/timeline";
 import { startOfToday, todayString } from "../../lib/date";
 import { plannedDurationMs } from "../../lib/focusConstraint";
+import {
+  convertNoteToTask,
+  noteDragSession,
+  noteDropCallbacks,
+  noteDropZoneAt,
+} from "../../lib/noteConvert";
 import { NO_CATEGORY_COLOR } from "../../lib/categoryColors";
 
 /** 横向滚动触发阈值：栏位使块宽低于该值（px）时内容加宽并横向滚动。 */
 const MIN_LANE_WIDTH = 60;
+/** 便签拖入时间轴的默认时长（分钟）。 */
+const NOTE_DEFAULT_MINUTES = 60;
 /** 缩放范围（每像素分钟数）。 */
 const MIN_PX = 1;
 const MAX_PX = 3;
@@ -50,8 +59,11 @@ export default function Timeline() {
   const selectedDate = useTaskStore((s) => s.selectedDate);
   const openCreate = useTaskStore((s) => s.openCreate);
   const updateTask = useTaskStore((s) => s.updateTask);
+  const createTask = useTaskStore((s) => s.createTask);
   const taskDrag = useTaskStore((s) => s.taskDrag);
   const endTaskDrag = useTaskStore((s) => s.endTaskDrag);
+  const notes = useNoteStore((s) => s.notes);
+  const updateNote = useNoteStore((s) => s.update);
   const settings = useSettingsStore((s) => s.settings);
   const updateSettings = useSettingsStore((s) => s.update);
   const [now, setNow] = useState(() => Date.now());
@@ -61,6 +73,12 @@ export default function Timeline() {
   const [preview, setPreview] = useState<TimeRange | null>(null);
   const [blockPreview, setBlockPreview] = useState<BlockPreview | null>(null);
   const [dropPreview, setDropPreview] = useState<BlockPreview | null>(null);
+  /** 便签拖入时间轴的落点预览（title 用于 Ghost 显示便签名） */
+  const [notePreview, setNotePreview] = useState<{
+    startMs: number;
+    endMs: number;
+    title?: string;
+  } | null>(null);
   /** 横向换栏：被拖任务的目标栏（0-based，预览用） */
   const [dragLane, setDragLane] = useState<{ taskId: number; lane: number } | null>(null);
   const dragLaneRef = useRef<{ taskId: number; lane: number } | null>(null);
@@ -216,6 +234,51 @@ export default function Timeline() {
     return clientY - rect.top;
   }
 
+  /** 便签鼠标拖拽悬停时间轴：按落点计算时间并显示 Ghost 预览（WebView2 下 HTML5 DnD 不可靠）。 */
+  useEffect(() => {
+    const onMove = (ev: MouseEvent) => {
+      if (noteDragSession.noteId == null || !taskAreaRef.current) {
+        setNotePreview(null);
+        return;
+      }
+      if (noteDropZoneAt(ev.clientX, ev.clientY) !== "timeline") {
+        setNotePreview(null);
+        return;
+      }
+      const y = ev.clientY - taskAreaRef.current.getBoundingClientRect().top;
+      const startMs = dragRangeToTimes(y, y, config, pxPerMinute).startMs;
+      const note = notes.find((n) => n.id === noteDragSession.noteId);
+      setNotePreview({
+        startMs,
+        endMs: startMs + NOTE_DEFAULT_MINUTES * 60_000,
+        title: note?.title,
+      });
+    };
+    window.addEventListener("mousemove", onMove);
+    return () => window.removeEventListener("mousemove", onMove);
+  }, [notes, config, pxPerMinute]);
+
+  /** 便签投放回调：按落点 y 创建带时间块的 Task，原便签标记「已安排」。 */
+  useEffect(() => {
+    noteDropCallbacks.timeline = (noteId, _clientX, clientY) => {
+      setNotePreview(null);
+      if (!taskAreaRef.current) return;
+      const y = clientY - taskAreaRef.current.getBoundingClientRect().top;
+      const startMs = dragRangeToTimes(y, y, config, pxPerMinute).startMs;
+      const endMs = startMs + NOTE_DEFAULT_MINUTES * 60_000;
+      void convertNoteToTask(
+        noteId,
+        notes,
+        createTask,
+        updateNote,
+        { scheduledDate: selectedDate, plannedStart: startMs, plannedEnd: endMs },
+      );
+    };
+    return () => {
+      delete noteDropCallbacks.timeline;
+    };
+  }, [notes, createTask, updateNote, selectedDate, config, pxPerMinute]);
+
   /**
    * 双击任务块：进入该 Task 的 Focus 上下文（跳转专注页并预选该任务）。
    * 若任务有规划时长：按「任务时长 ÷ 当前专注时长」自动规划番茄数；
@@ -223,6 +286,8 @@ export default function Timeline() {
    * 当前已有其他 Focus 在运行：只切换待选上下文，不停止、不破坏当前 Focus Session。
    */
   function handleTaskDoubleClick(task: Task) {
+    // 已完成/已取消的任务不再进入专注
+    if (task.status === "COMPLETED" || task.status === "CANCELLED") return;
     const T = plannedDurationMs(task);
     if (T != null) {
       const D = useSettingsStore.getState().settings.pomodoroDurationMinutes * 60_000;
@@ -514,10 +579,11 @@ export default function Timeline() {
           ))}
         </div>
 
-        {/* 任务区（可拖拽创建 / 任务块可移动、调整 / 横向换栏） */}
+        {/* 任务区（可拖拽创建 / 任务块可移动、调整 / 横向换栏 / 便签拖入） */}
         <div
           ref={taskAreaRef}
           onMouseDown={handleMouseDown}
+          data-note-drop="timeline"
           className="relative flex-1 cursor-crosshair select-none"
         >
             {/* 范围外灰色（早于开始 / 晚于结束） */}
@@ -727,6 +793,31 @@ export default function Timeline() {
                     <span className="absolute left-0 -translate-y-full whitespace-nowrap bg-blue-500 px-1 text-[10px] text-white">
                       {tasks.find((t) => t.id === dropPreview.taskId)?.title} ·{" "}
                       {formatTimeRange(dropPreview.startMs, dropPreview.endMs)}
+                    </span>
+                  </div>
+                );
+              })()}
+
+            {/* 便签拖入：Ghost Preview（松手才创建 Task） */}
+            {notePreview &&
+              (() => {
+                return (
+                  <div
+                    className="pointer-events-none absolute z-20 rounded border-2 border-dashed border-amber-400 bg-amber-400/20"
+                    style={{
+                      top: timeToY(notePreview.startMs, pxPerMinute),
+                      height: Math.max(
+                        timeToY(notePreview.endMs, pxPerMinute) -
+                          timeToY(notePreview.startMs, pxPerMinute),
+                        MIN_BLOCK_HEIGHT,
+                      ),
+                      left: "0.25rem",
+                      right: "0.25rem",
+                    }}
+                  >
+                    <span className="absolute left-0 -translate-y-full whitespace-nowrap bg-amber-500 px-1 text-[10px] text-white">
+                      {notePreview.title ?? "便签"} ·{" "}
+                      {formatTimeRange(notePreview.startMs, notePreview.endMs)}
                     </span>
                   </div>
                 );

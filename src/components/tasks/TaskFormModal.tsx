@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { X } from "lucide-react";
 import { useTaskStore } from "../../stores/taskStore";
+import { useGoalStore } from "../../stores/goalStore";
 import { formatTimeRange } from "../../lib/timeline";
 
 export default function TaskFormModal() {
@@ -9,6 +10,7 @@ export default function TaskFormModal() {
   const createDraft = useTaskStore((s) => s.createDraft);
   const tasks = useTaskStore((s) => s.tasks);
   const categories = useTaskStore((s) => s.categories);
+  const goals = useGoalStore((s) => s.goals);
   const createTask = useTaskStore((s) => s.createTask);
   const updateTask = useTaskStore((s) => s.updateTask);
   const closeCreate = useTaskStore((s) => s.closeCreate);
@@ -23,6 +25,7 @@ export default function TaskFormModal() {
 
   const [title, setTitle] = useState("");
   const [categoryId, setCategoryId] = useState("");
+  const [goalId, setGoalId] = useState("");
   const [estimatedMinutes, setEstimatedMinutes] = useState("");
   const [notes, setNotes] = useState("");
 
@@ -30,6 +33,7 @@ export default function TaskFormModal() {
     if (editingTask) {
       setTitle(editingTask.title);
       setCategoryId(editingTask.categoryId != null ? String(editingTask.categoryId) : "");
+      setGoalId(editingTask.goalId != null ? String(editingTask.goalId) : "");
       // 用十进制分钟展示，避免子分钟精度丢失（如 90 秒 → "1.5"）
       setEstimatedMinutes(
         editingTask.estimatedDuration != null
@@ -40,6 +44,7 @@ export default function TaskFormModal() {
     } else if (hasDraft) {
       setTitle("");
       setCategoryId("");
+      setGoalId("");
       setEstimatedMinutes(
         String((createDraft.plannedEnd! - createDraft.plannedStart!) / 60000),
       );
@@ -47,6 +52,7 @@ export default function TaskFormModal() {
     } else {
       setTitle("");
       setCategoryId("");
+      setGoalId("");
       setEstimatedMinutes("");
       setNotes("");
     }
@@ -68,6 +74,7 @@ export default function TaskFormModal() {
     const payload = {
       title: trimmed,
       categoryId: categoryId === "" ? null : Number(categoryId),
+      goalId: goalId === "" ? null : Number(goalId),
       estimatedDuration:
         estimated == null || Number.isNaN(estimated) || estimated < 0
           ? null
@@ -130,6 +137,21 @@ export default function TaskFormModal() {
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-neutral-600">关联长期目标</label>
+            <select
+              value={goalId}
+              onChange={(e) => setGoalId(e.target.value)}
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
+            >
+              <option value="">无</option>
+              {goals.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.title}
                 </option>
               ))}
             </select>
