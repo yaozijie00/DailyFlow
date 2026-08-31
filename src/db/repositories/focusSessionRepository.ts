@@ -73,6 +73,14 @@ export class FocusSessionRepository {
       .all();
   }
 
+  /** 删除某任务的全部专注会话（删除任务时清理其统计数据）。 */
+  async deleteByTaskId(taskId: number): Promise<void> {
+    await this.db
+      .delete(focusSessions)
+      .where(eq(focusSessions.taskId, taskId))
+      .run();
+  }
+
   async update(
     id: number,
     input: UpdateFocusSessionInput,

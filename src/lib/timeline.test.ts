@@ -16,6 +16,8 @@ import {
   moveTaskBy,
   computeLanes,
   clampBlockY,
+  blockInfoLevel,
+  taskBlockState,
   type TimeSpan,
 } from "./timeline";
 function tsAt(hours: number, minutes = 0): number {
@@ -339,5 +341,42 @@ describe("computeLanes（重叠分栏）", () => {
     expect(lanes.get(1)?.lane).toBe(4); // 0-based 偏好 3 → 1-based 4
     expect(lanes.get(1)?.laneCount).toBe(4);
     expect(lanes.get(2)?.laneCount).toBe(4);
+  });
+});
+
+describe("blockInfoLevel（按块高分级显示）", () => {
+  it("高度不足 → 仅标题", () => {
+    expect(blockInfoLevel(10)).toEqual({ showTime: false, showNotes: false });
+    expect(blockInfoLevel(25)).toEqual({ showTime: false, showNotes: false });
+  });
+
+  it("中等高度 → 标题 + 时间", () => {
+    expect(blockInfoLevel(26)).toEqual({ showTime: true, showNotes: false });
+    expect(blockInfoLevel(40)).toEqual({ showTime: true, showNotes: false });
+  });
+
+  it("足够高 → 标题 + 时间 + 描述", () => {
+    expect(blockInfoLevel(52)).toEqual({ showTime: true, showNotes: true });
+    expect(blockInfoLevel(80)).toEqual({ showTime: true, showNotes: true });
+  });
+
+  it("临界值边界", () => {
+    expect(blockInfoLevel(25).showTime).toBe(false);
+    expect(blockInfoLevel(26).showTime).toBe(true);
+    expect(blockInfoLevel(51).showNotes).toBe(false);
+    expect(blockInfoLevel(52).showNotes).toBe(true);
+  });
+});
+
+describe("taskBlockState（Task 状态 → 块视觉状态）", () => {
+  it("TODO/IN_PROGRESS/COMPLETED/CANCELLED 映射", () => {
+    expect(taskBlockState("TODO")).toBe("normal");
+    expect(taskBlockState("IN_PROGRESS")).toBe("running");
+    expect(taskBlockState("COMPLETED")).toBe("completed");
+    expect(taskBlockState("CANCELLED")).toBe("cancelled");
+  });
+
+  it("未知状态回退 normal", () => {
+    expect(taskBlockState("WEIRD")).toBe("normal");
   });
 });

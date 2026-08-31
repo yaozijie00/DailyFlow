@@ -86,6 +86,14 @@ export class FocusService {
     await this.settings.delete(ACTIVE_FOCUS_KEY);
   }
 
+  /** 放弃当前专注（用户返回重新选择任务）：删除进行中会话 + 清空 active_focus，不产生记录。 */
+  async abandon(): Promise<void> {
+    const active = await this.getActiveState();
+    if (!active) return;
+    await this.sessions.delete(active.sessionId);
+    await this.settings.delete(ACTIVE_FOCUS_KEY);
+  }
+
   /** 读取当前 active_focus 状态（无则 null）。 */
   async getActiveState(): Promise<ActiveFocusState | null> {
     const raw = await this.settings.get(ACTIVE_FOCUS_KEY);

@@ -290,3 +290,42 @@ export function computeLanes(
   }
   return result;
 }
+
+// ---------------- Task Block 显示分级 ----------------
+
+/** 块高达到该值（px）时显示开始-结束时间。 */
+export const BLOCK_TIME_MIN = 26;
+/** 块高达到该值（px）时额外显示任务描述。 */
+export const BLOCK_NOTES_MIN = 52;
+
+export interface BlockInfoLevel {
+  showTime: boolean;
+  showNotes: boolean;
+}
+
+/**
+ * 按任务块可用高度决定显示哪些信息（由小到大：标题 → 时间 → 描述），
+ * 避免文字溢出。高度用「夹取后的渲染高度」。
+ */
+export function blockInfoLevel(height: number): BlockInfoLevel {
+  return {
+    showTime: height >= BLOCK_TIME_MIN,
+    showNotes: height >= BLOCK_NOTES_MIN,
+  };
+}
+
+/** 任务块视觉状态：normal / running / completed / cancelled（按 Task.status）。 */
+export type TaskBlockState = "normal" | "running" | "completed" | "cancelled";
+
+export function taskBlockState(status: string): TaskBlockState {
+  switch (status) {
+    case "IN_PROGRESS":
+      return "running";
+    case "COMPLETED":
+      return "completed";
+    case "CANCELLED":
+      return "cancelled";
+    default:
+      return "normal";
+  }
+}

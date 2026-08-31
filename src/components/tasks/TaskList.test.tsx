@@ -10,7 +10,7 @@ const mockState = vi.hoisted(() => ({
   tasks: [] as Task[],
   categories: [],
   selectedTaskId: null,
-  completeTask: vi.fn(),
+  toggleComplete: vi.fn(),
   selectTask: vi.fn(),
 }));
 
@@ -40,7 +40,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
 describe("TaskList", () => {
   beforeEach(() => {
     mockState.tasks = [];
-    mockState.completeTask.mockClear();
+    mockState.toggleComplete.mockClear();
   });
 
   it("渲染任务标题与状态标签", () => {
@@ -55,11 +55,20 @@ describe("TaskList", () => {
     expect(screen.getByText("已完成")).toBeTruthy();
   });
 
-  it("点击圆圈完成任务", () => {
+  it("点击圆圈完成任务（toggleComplete）", () => {
     mockState.tasks = [makeTask({ id: 7, title: "写代码" })];
     render(<TaskList />);
     fireEvent.click(screen.getByLabelText("完成任务"));
-    expect(mockState.completeTask).toHaveBeenCalledWith(7);
+    expect(mockState.toggleComplete).toHaveBeenCalledWith(7);
+  });
+
+  it("已完成任务点击圆圈可恢复为未完成", () => {
+    mockState.tasks = [
+      makeTask({ id: 7, title: "写代码", status: "COMPLETED", completedAt: 1 }),
+    ];
+    render(<TaskList />);
+    fireEvent.click(screen.getByLabelText("恢复为未完成"));
+    expect(mockState.toggleComplete).toHaveBeenCalledWith(7);
   });
 
   it("无任务时显示空状态提示", () => {

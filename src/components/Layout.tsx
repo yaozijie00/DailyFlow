@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useAppStore, type Page } from "../stores/appStore";
 import Toasts from "./Toasts";
+import GlobalFocusBar from "./pomodoro/GlobalFocusBar";
 
 const navItems: { page: Page; label: string; icon: typeof CalendarDays }[] = [
   { page: "today", label: "今日", icon: CalendarDays },
@@ -64,6 +65,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       </aside>
       <main className="flex-1 overflow-auto p-6">{children}</main>
       <Toasts />
+      <GlobalFocusBar />
     </div>
   );
 }

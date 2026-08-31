@@ -3,6 +3,7 @@ import { createTestDb } from "../db/test-helpers";
 import type { Db } from "../db/db";
 import { TaskRepository } from "../db/repositories/taskRepository";
 import { CategoryRepository } from "../db/repositories/categoryRepository";
+import { FocusSessionRepository } from "../db/repositories/focusSessionRepository";
 import { TaskService } from "./taskService";
 import { todayString } from "../lib/date";
 
@@ -11,12 +12,14 @@ describe("TaskService", () => {
   let close: () => void;
   let service: TaskService;
   let categories: CategoryRepository;
+  let sessions: FocusSessionRepository;
 
   beforeEach(async () => {
     const t = await createTestDb();
     db = t.db;
     close = t.close;
-    service = new TaskService(new TaskRepository(db));
+    sessions = new FocusSessionRepository(db);
+    service = new TaskService(new TaskRepository(db), sessions);
     categories = new CategoryRepository(db);
   });
 
@@ -63,9 +66,44 @@ describe("TaskService", () => {
     expect(tasks).toHaveLength(0);
   });
 
+  it("删除任务时清理其专注记录（统计数据不再包含该任务）", async () => {
+    const task = await service.createTask({ title: "写代码" });
+    await sessions.create({
+      taskId: task.id,
+      plannedDuration: 1500,
+      startedAt: Date.now(),
+      actualDuration: 900,
+      completed: true,
+    });
+    await sessions.create({
+      taskId: task.id,
+      plannedDuration: 1500,
+      startedAt: Date.now() + 1000,
+      actualDuration: 600,
+      completed: false,
+    });
+    await service.deleteTask(task.id);
+    expect(await sessions.findByTaskId(task.id)).toHaveLength(0);
+  });
+
   it("completes a task with completedAt timestamp", async () => {
     const task = await service.createTask({ title: "写代码" });
     const completed = await service.completeTask(task.id);
+    expect(completed?.status).toBe("COMPLETED");
+    expect(completed?.completedAt).not.toBeNull();
+  });
+
+  it("toggleComplete：已完成 → 恢复 TODO 并清空完成时间", async () => {
+    const task = await service.createTask({ title: "写代码" });
+    await service.completeTask(task.id);
+    const restored = await service.toggleComplete(task.id);
+    expect(restored?.status).toBe("TODO");
+    expect(restored?.completedAt).toBeNull();
+  });
+
+  it("toggleComplete：未完成 → 完成", async () => {
+    const task = await service.createTask({ title: "写代码" });
+    const completed = await service.toggleComplete(task.id);
     expect(completed?.status).toBe("COMPLETED");
     expect(completed?.completedAt).not.toBeNull();
   });

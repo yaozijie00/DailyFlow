@@ -19,6 +19,7 @@ interface FakeFocus {
   pause: ReturnType<typeof vi.fn>;
   resume: ReturnType<typeof vi.fn>;
   finish: ReturnType<typeof vi.fn>;
+  abandon: ReturnType<typeof vi.fn>;
   getActiveForRestore: ReturnType<typeof vi.fn>;
 }
 
@@ -29,6 +30,7 @@ function makeStore() {
     pause: vi.fn().mockResolvedValue(undefined),
     resume: vi.fn().mockResolvedValue(undefined),
     finish: vi.fn().mockResolvedValue(undefined),
+    abandon: vi.fn().mockResolvedValue(undefined),
     getActiveForRestore: vi.fn().mockResolvedValue(null),
   };
   const store = createPomodoroStore(clock.now, focus as unknown as FocusService);
@@ -311,5 +313,69 @@ describe("竞态守卫（B7：非法转换不再抛错）", () => {
     clock.advance(26 * MINUTE);
     expect(() => store.getState().endFocus()).not.toThrow();
     expect(store.getState().showResult).toBe(true);
+  });
+});
+
+describe("setFocusCountGoal（本轮番茄目标）", () => {
+  it("默认目标为 4，可增减", () => {
+    const { store } = makeStore();
+    expect(store.getState().focusCountGoal).toBe(4);
+    store.getState().setFocusCountGoal(6);
+    expect(store.getState().focusCountGoal).toBe(6);
+    store.getState().setFocusCountGoal(2);
+    expect(store.getState().focusCountGoal).toBe(2);
+  });
+
+  it("夹取到 1..12", () => {
+    const { store } = makeStore();
+    store.getState().setFocusCountGoal(0);
+    expect(store.getState().focusCountGoal).toBe(1);
+    store.getState().setFocusCountGoal(99);
+    expect(store.getState().focusCountGoal).toBe(12);
+  });
+
+  it("小数取整", () => {
+    const { store } = makeStore();
+    store.getState().setFocusCountGoal(4.6);
+    expect(store.getState().focusCountGoal).toBe(5);
+  });
+});
+
+describe("setPendingTaskId（双击任务预选，不中断当前专注）", () => {
+  it("设置与清空待选任务", () => {
+    const { store } = makeStore();
+    expect(store.getState().pendingTaskId).toBeNull();
+    store.getState().setPendingTaskId(7);
+    expect(store.getState().pendingTaskId).toBe(7);
+    store.getState().setPendingTaskId(null);
+    expect(store.getState().pendingTaskId).toBeNull();
+  });
+
+  it("专注运行中设置 pendingTaskId 不改变当前 taskId", () => {
+    const { store } = makeStore();
+    store.getState().startFocus(3);
+    store.getState().setPendingTaskId(9);
+    expect(store.getState().taskId).toBe(3); // 当前专注任务不变
+    expect(store.getState().pendingTaskId).toBe(9); // 仅记录待选
+  });
+});
+
+describe("abandonFocus（放弃并重新选择任务）", () => {
+  it("运行中放弃 → 回 IDLE、清空任务、调用 focus.abandon", () => {
+    const { store, focus } = makeStore();
+    store.getState().startFocus(7);
+    expect(store.getState().snapshot.state).toBe("RUNNING");
+    store.getState().abandonFocus();
+    expect(store.getState().snapshot.state).toBe("IDLE");
+    expect(store.getState().taskId).toBeNull();
+    expect(store.getState().sessionId).toBeNull();
+    expect(focus.abandon).toHaveBeenCalledTimes(1);
+  });
+
+  it("IDLE 下 abandonFocus 为 no-op", () => {
+    const { store, focus } = makeStore();
+    store.getState().abandonFocus();
+    expect(store.getState().snapshot.state).toBe("IDLE");
+    expect(focus.abandon).not.toHaveBeenCalled();
   });
 });

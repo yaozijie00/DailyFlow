@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useAppStore } from "../../stores/appStore";
 import { useTaskStore } from "../../stores/taskStore";
 import { useSettingsStore } from "../../stores/settingsStore";
+import { usePomodoroStore } from "../../stores/pomodoroStore";
 import { useWindowDrag } from "../../hooks/useWindowDrag";
 import type { Task } from "../../db/repositories/taskRepository";
 import {
@@ -18,6 +20,8 @@ import {
   moveTaskBy,
   computeLanes,
   clampBlockY,
+  blockInfoLevel,
+  taskBlockState,
   type TimelineConfig,
   type TimeRange,
   type TimeSpan,
@@ -87,6 +91,15 @@ export default function Timeline() {
   const hours = useMemo(() => {
     const list: number[] = [];
     for (let m = 0; m <= FULL_DAY_MINUTES; m += 60) list.push(m);
+    return list;
+  }, []);
+
+  // 非整点的 15 分钟刻度（辅助判断 09:15/09:30/09:45 等）
+  const quarterTicks = useMemo(() => {
+    const list: number[] = [];
+    for (let m = 15; m < FULL_DAY_MINUTES; m += 15) {
+      if (m % 60 !== 0) list.push(m);
+    }
     return list;
   }, []);
 
@@ -200,6 +213,15 @@ export default function Timeline() {
   function yFromClientY(clientY: number): number {
     const rect = taskAreaRef.current!.getBoundingClientRect();
     return clientY - rect.top;
+  }
+
+  /**
+   * 双击任务块：进入该 Task 的 Focus 上下文（跳转专注页并预选该任务）。
+   * 若当前已有其他 Focus 在运行：只切换待选上下文，不停止、不破坏当前 Focus Session。
+   */
+  function handleTaskDoubleClick(task: Task) {
+    useAppStore.getState().setPage("focus");
+    usePomodoroStore.getState().setPendingTaskId(task.id);
   }
 
   function handleMouseDown(e: React.MouseEvent) {
@@ -459,10 +481,19 @@ export default function Timeline() {
       >
         {/* 左侧时间刻度（sticky 固定左侧，不随横向滚动移走） */}
         <div className="sticky left-0 z-10 w-14 shrink-0 bg-white">
+          {/* 非整点 15 分钟刻度线（浅色，辅助判断非整点时刻） */}
+          {quarterTicks.map((m) => (
+            <div
+              key={m}
+              className="absolute right-0 h-2 w-3 border-t border-neutral-300/80"
+              style={{ top: minutesToY(m, pxPerMinute) }}
+            />
+          ))}
+          {/* 整点标签（明显层级） */}
           {hours.map((m) => (
             <span
               key={m}
-              className="absolute right-2 -translate-y-1/2 text-xs text-neutral-400"
+              className="absolute right-2 -translate-y-1/2 text-xs font-medium tabular-nums text-neutral-500"
               style={{ top: minutesToY(m, pxPerMinute) }}
             >
               {formatMinutes(m)}
@@ -562,14 +593,24 @@ export default function Timeline() {
                 task.categoryId != null
                   ? (categoryColorMap.get(task.categoryId) ?? NO_CATEGORY_COLOR)
                   : NO_CATEGORY_COLOR;
+              // 视觉状态（拖拽/调整中不套用状态样式，避免干扰）
+              const state = isPreviewing ? "normal" : taskBlockState(task.status);
+              const info = blockInfoLevel(height);
               return (
                 <div
                   key={task.id}
                   onMouseDown={(e) => startMove(e, task)}
+                  onDoubleClick={() => handleTaskDoubleClick(task)}
                   className={`absolute cursor-grab select-none overflow-hidden rounded text-xs active:cursor-grabbing ${
                     isRemoving
                       ? "bg-red-200 text-red-900 ring-2 ring-red-500"
-                      : "text-neutral-900 hover:brightness-95"
+                      : state === "running"
+                        ? "text-neutral-900 ring-2 ring-blue-400/80"
+                        : state === "completed"
+                          ? "text-neutral-900/80 opacity-75"
+                          : state === "cancelled"
+                            ? "opacity-40"
+                            : "text-neutral-900 hover:brightness-95"
                   } ${laneStyle ? "" : "left-1 right-1"}`}
                   style={{
                     top,
@@ -582,6 +623,7 @@ export default function Timeline() {
                   {/* 上边缘手柄（调整 plannedStart） */}
                   <div
                     onMouseDown={(e) => startResize(e, task, "start")}
+                    title="拖动调整开始时间"
                     className="absolute left-0 right-0 top-0 z-10 h-2 cursor-ns-resize"
                   />
                   <div className="px-2 py-1">
@@ -590,16 +632,48 @@ export default function Timeline() {
                         {categoryName}
                       </div>
                     )}
-                    <div className="truncate">{task.title}</div>
+                    {/* 标题行：状态标记 + 标题 */}
+                    <div className="flex items-center gap-1">
+                      {state === "running" && (
+                        <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-blue-500" />
+                      )}
+                      {state === "completed" && (
+                        <span className="shrink-0 text-[10px] font-medium text-green-600">✓</span>
+                      )}
+                      <span
+                        className={`truncate ${
+                          state === "completed" || state === "cancelled"
+                            ? "line-through decoration-neutral-400"
+                            : ""
+                        }`}
+                      >
+                        {task.title}
+                      </span>
+                    </div>
+                    {/* 时间行（块够高时显示开始-结束） */}
+                    {info.showTime && (
+                      <div className="mt-0.5 truncate text-[10px] leading-tight tabular-nums text-neutral-600">
+                        {formatTimeRange(startMs, endMs)}
+                      </div>
+                    )}
+                    {/* 描述行（块足够高且有备注时显示） */}
+                    {info.showNotes && task.notes && (
+                      <div className="mt-0.5 truncate text-[10px] leading-tight text-neutral-500">
+                        {task.notes}
+                      </div>
+                    )}
                   </div>
-                  {/* 下边缘手柄（调整 plannedEnd） */}
+                  {/* 下边缘手柄（调整 plannedEnd，hover 高亮） */}
                   <div
                     onMouseDown={(e) => startResize(e, task, "end")}
-                    className="absolute bottom-0 left-0 right-0 z-10 h-2 cursor-ns-resize"
-                  />
+                    title="拖动调整结束时间"
+                    className="group absolute bottom-0 left-0 right-0 z-10 h-2.5 cursor-ns-resize"
+                  >
+                    <div className="h-full w-full transition-colors group-hover:bg-blue-200/70" />
+                  </div>
                   {/* 实时时间（移动/resize 时显示） */}
                   {isPreviewing && !isRemoving && (
-                    <span className="absolute left-0 top-1/2 z-20 -translate-y-1/2 whitespace-nowrap bg-blue-500 px-1 text-[10px] text-white">
+                    <span className="absolute left-0 top-1/2 z-20 -translate-y-1/2 whitespace-nowrap rounded-sm bg-blue-500 px-1 text-[10px] text-white">
                       {formatTimeRange(startMs, endMs)}
                     </span>
                   )}
@@ -662,13 +736,13 @@ export default function Timeline() {
               </div>
             )}
 
-            {/* 当前时间线（实时） */}
+            {/* 当前时间线（实时；仅今天显示） */}
             {showNowLine && (
               <div
-                className="pointer-events-none absolute left-0 right-0 z-10 border-t-2 border-red-500"
+                className="pointer-events-none absolute left-0 right-0 z-10 border-t-2 border-red-400/70"
                 style={{ top: timeToY(now, pxPerMinute) }}
               >
-                <span className="absolute left-0 -translate-y-full bg-red-500 px-1 text-[10px] text-white">
+                <span className="absolute left-0 -translate-y-full rounded-sm bg-red-500/90 px-1 text-[10px] font-medium text-white">
                   {nowLabel}
                 </span>
               </div>

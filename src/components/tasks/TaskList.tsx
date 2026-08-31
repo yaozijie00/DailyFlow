@@ -11,7 +11,7 @@ export default function TaskList() {
   const tasks = useTaskStore((s) => s.tasks);
   const categories = useTaskStore((s) => s.categories);
   const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
-  const completeTask = useTaskStore((s) => s.completeTask);
+  const toggleComplete = useTaskStore((s) => s.toggleComplete);
   const selectTask = useTaskStore((s) => s.selectTask);
   const startTaskDrag = useTaskStore((s) => s.startTaskDrag);
   const endTaskDrag = useTaskStore((s) => s.endTaskDrag);
@@ -84,10 +84,11 @@ export default function TaskList() {
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (!done && !cancelled) completeTask(task.id);
+                  if (!cancelled) toggleComplete(task.id);
                 }}
                 className="text-neutral-400 hover:text-green-600"
-                aria-label="完成任务"
+                aria-label={done ? "恢复为未完成" : "完成任务"}
+                title={done ? "恢复为未完成" : "完成任务"}
               >
                 {done ? (
                   <Check size={18} className="text-green-600" />

@@ -40,3 +40,14 @@ export function formatProgress(
       return `${Math.round(current)} / ${target}`;
   }
 }
+
+/**
+ * 解析专注时长输入（分钟）：合法范围 15-120 返回整数（四舍五入），
+ * 非法（非数字 / 越界）返回 null（调用方保持原设置，不保存）。
+ */
+export function parseDurationMinutes(raw: string): number | null {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return null;
+  if (n < 15 || n > 120) return null;
+  return Math.round(n);
+}

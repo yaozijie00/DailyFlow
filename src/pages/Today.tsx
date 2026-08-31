@@ -13,6 +13,7 @@ import TaskFormModal from "../components/tasks/TaskFormModal";
 import Timeline from "../components/timeline/Timeline";
 import TodaySummary from "../components/today/TodaySummary";
 import TodayFestival from "../components/today/TodayFestival";
+import TodayFocusController from "../components/pomodoro/TodayFocusController";
 import CalendarPopover from "../components/today/CalendarPopover";
 
 // 布局固定尺寸（与 className 保持一致）
@@ -169,6 +170,9 @@ export default function Today() {
         <TodayFestival date={selectedDate} />
         <TodaySummary />
       </div>
+
+      {/* 全局 Focus Controller（复用 pomodoroStore 单一状态） */}
+      <TodayFocusController />
 
       <div className="flex min-h-0 flex-1" ref={containerRef}>
         {/* 左：任务列表 */}

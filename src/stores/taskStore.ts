@@ -2,12 +2,16 @@ import { create } from "zustand";
 import { getDb } from "../db/db";
 import { TaskRepository, type Task, type UpdateTaskInput } from "../db/repositories/taskRepository";
 import { CategoryRepository, type Category } from "../db/repositories/categoryRepository";
+import { FocusSessionRepository } from "../db/repositories/focusSessionRepository";
 import { TaskService, type TaskCreateInput } from "../services/taskService";
 import { CategoryService } from "../services/categoryService";
 import { todayString } from "../lib/date";
 import { useAppStore } from "./appStore";
 
-const taskService = new TaskService(new TaskRepository(getDb()));
+const taskService = new TaskService(
+  new TaskRepository(getDb()),
+  new FocusSessionRepository(getDb()),
+);
 const categoryService = new CategoryService(new CategoryRepository(getDb()));
 
 export interface CreateDraft {
@@ -37,6 +41,7 @@ interface TaskState {
   updateTask: (id: number, input: UpdateTaskInput) => Promise<void>;
   deleteTask: (id: number) => Promise<void>;
   completeTask: (id: number) => Promise<void>;
+  toggleComplete: (id: number) => Promise<void>;
   cancelTask: (id: number) => Promise<void>;
   changeCategory: (id: number, categoryId: number | null) => Promise<void>;
   changeEstimatedDuration: (id: number, seconds: number | null) => Promise<void>;
@@ -138,6 +143,15 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       await get().load();
     } catch {
       fail("完成任务失败");
+    }
+  },
+
+  toggleComplete: async (id) => {
+    try {
+      await taskService.toggleComplete(id);
+      await get().load();
+    } catch {
+      fail("切换任务状态失败");
     }
   },
 

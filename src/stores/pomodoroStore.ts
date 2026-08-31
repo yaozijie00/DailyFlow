@@ -8,6 +8,7 @@ import { CategoryRepository } from "../db/repositories/categoryRepository";
 import { AchievementProgressRepository } from "../db/repositories/achievementProgressRepository";
 import { FocusService } from "../services/focusService";
 import { AchievementService } from "../services/achievementService";
+import { notifyFocus } from "../services/notificationService";
 import { loadAchievementDefinitions } from "../achievements/definitions";
 import { useAppStore } from "./appStore";
 import { useSettingsStore } from "./settingsStore";
@@ -29,6 +30,8 @@ export interface PomodoroState {
   phase: PomodoroPhase;
   /** 本轮已完成的专注数（用于长休息间隔；应用重启后从 0 重新累计） */
   completedFocusCount: number;
+  /** 本轮番茄目标（内存、可调；仅用于进度显示，不影响长休息间隔） */
+  focusCountGoal: number;
   snapshot: PomodoroSnapshot;
   showResult: boolean;
   /** 当前进行中专注会话的 focus_sessions 行 id */
@@ -37,6 +40,8 @@ export interface PomodoroState {
   focusVersion: number;
   /** 专注任务名（重启恢复非今日任务时兜底显示） */
   taskTitle: string | null;
+  /** 待选任务（双击时间轴任务预选；IDLE 时自动选中，不中断进行中的专注） */
+  pendingTaskId: number | null;
 
   startFocus: (taskId: number, durationMs?: number) => void;
   startBreak: () => void;
@@ -45,6 +50,10 @@ export interface PomodoroState {
   resume: () => void;
   endFocus: () => void;
   finalizeFocus: () => void;
+  setFocusCountGoal: (n: number) => void;
+  setPendingTaskId: (id: number | null) => void;
+  /** 放弃本次专注并返回任务选择（不落库、不完成任务） */
+  abandonFocus: () => void;
   refresh: () => void;
   reset: () => void;
   /** 启动时从持久化状态恢复进行中的专注 */
@@ -107,6 +116,23 @@ export function createPomodoroStore(
         .catch(persistFail);
       if (completed) {
         set((s) => ({ completedFocusCount: s.completedFocusCount + 1 }));
+        // 走满完成提醒（异步查任务名；页面切到任意页也生效）
+        const tid = get().taskId;
+        if (tid != null) {
+          void taskRepo
+            .findById(tid)
+            .then((t) => notifyFocus("专注完成", t?.title ?? "未命名任务"))
+            .catch(() => {});
+        }
+      } else {
+        // 提前结束提醒
+        const tid = get().taskId;
+        if (tid != null) {
+          void taskRepo
+            .findById(tid)
+            .then((t) => notifyFocus("专注结束", t?.title ?? "未命名任务"))
+            .catch(() => {});
+        }
       }
     };
 
@@ -114,11 +140,13 @@ export function createPomodoroStore(
       taskId: null,
       phase: "focus",
       completedFocusCount: 0,
+      focusCountGoal: 4,
       snapshot: timer.getSnapshot(),
       showResult: false,
       sessionId: null,
       focusVersion: 0,
       taskTitle: null,
+      pendingTaskId: null,
 
       startFocus: (taskId, durationMs) => {
         const state = timer.getState();
@@ -133,6 +161,11 @@ export function createPomodoroStore(
         const snap = timer.getSnapshot();
         set({ taskId, phase: "focus", showResult: false, sessionId: null, taskTitle: null, snapshot: snap });
         const plannedSeconds = Math.round(snap.durationMs / 1000);
+        // 开始提醒（异步查任务名；轻量；查询失败静默）
+        void taskRepo
+          .findById(taskId)
+          .then((t) => notifyFocus("开始专注", t?.title ?? "未命名任务"))
+          .catch(() => {});
         void focus
           .start(taskId, plannedSeconds)
           .then((session) => {
@@ -197,6 +230,31 @@ export function createPomodoroStore(
 
       finalizeFocus: () => {
         finalizeCurrentSession();
+      },
+
+      setFocusCountGoal: (n) => {
+        const goal = Math.min(12, Math.max(1, Math.round(n)));
+        set({ focusCountGoal: goal });
+      },
+
+      setPendingTaskId: (id) => set({ pendingTaskId: id }),
+
+      abandonFocus: () => {
+        const state = timer.getState();
+        if (state !== "RUNNING" && state !== "PAUSED") return;
+        timer.cancel();
+        void focus.abandon().catch(persistFail);
+        // 重建 timer 回到 IDLE，可重新选择任务（不落库、不完成任务）
+        timer = new PomodoroTimer({ now });
+        set({
+          taskId: null,
+          phase: "focus",
+          sessionId: null,
+          showResult: false,
+          taskTitle: null,
+          pendingTaskId: null,
+          snapshot: timer.getSnapshot(),
+        });
       },
 
       refresh: () => {

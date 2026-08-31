@@ -5,6 +5,7 @@ import {
   type CreateTaskInput as RepoCreateInput,
   type UpdateTaskInput,
 } from "../db/repositories/taskRepository";
+import { FocusSessionRepository } from "../db/repositories/focusSessionRepository";
 
 export type TaskCreateInput = Omit<RepoCreateInput, "scheduledDate"> & {
   scheduledDate?: string;
@@ -15,7 +16,10 @@ export type TaskCreateInput = Omit<RepoCreateInput, "scheduledDate"> & {
  * UI 与 Store 不得直接操作 Repository。
  */
 export class TaskService {
-  constructor(private readonly tasks: TaskRepository) {}
+  constructor(
+    private readonly tasks: TaskRepository,
+    private readonly sessions: FocusSessionRepository,
+  ) {}
 
   async getTodayTasks(): Promise<Task[]> {
     return this.getTasksByDate(todayString());
@@ -37,7 +41,9 @@ export class TaskService {
     return this.tasks.update(id, input);
   }
 
+  /** 删除任务：先清理其全部专注记录（统计数据不再包含该任务），再删除任务。 */
   async deleteTask(id: number): Promise<boolean> {
+    await this.sessions.deleteByTaskId(id);
     return this.tasks.delete(id);
   }
 
@@ -46,6 +52,16 @@ export class TaskService {
       status: "COMPLETED",
       completedAt: Date.now(),
     });
+  }
+
+  /** 切换完成状态：已完成 → 恢复 TODO（清空完成时间）；否则 → 完成。 */
+  async toggleComplete(id: number): Promise<Task | null> {
+    const task = await this.tasks.findById(id);
+    if (!task) return null;
+    if (task.status === "COMPLETED") {
+      return this.tasks.update(id, { status: "TODO", completedAt: null });
+    }
+    return this.tasks.update(id, { status: "COMPLETED", completedAt: Date.now() });
   }
 
   async cancelTask(id: number): Promise<Task | null> {

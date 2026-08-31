@@ -106,6 +106,19 @@ describe("FocusService（专注持久化）", () => {
     expect(t2?.actualDuration).toBe(600);
   });
 
+  it("abandon 删除进行中会话并清空 active_focus（不产生记录）", async () => {
+    const task = await makeTask();
+    const s = await service.start(task.id, 1500);
+    await service.abandon();
+    expect(await sessions.findById(s.id)).toBeNull();
+    expect(await service.getActiveState()).toBeNull();
+  });
+
+  it("无进行中会话时 abandon 为 no-op", async () => {
+    await service.abandon();
+    expect(await service.getActiveState()).toBeNull();
+  });
+
   it("getActiveForRestore：进行中会话返回重建上下文，结束后返回 null", async () => {
     const task = await makeTask();
     const s = await service.start(task.id, 1500);
