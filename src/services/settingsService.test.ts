@@ -32,6 +32,7 @@ describe("SettingsService", () => {
       timelineSnapMinutes: 15,
       timelinePxPerMinute: 1.5,
       newsRefreshIntervalMinutes: 30,
+      notificationsEnabled: true,
     });
     const s = await service.getSettings();
     expect(s).toEqual(DEFAULT_SETTINGS);
@@ -73,6 +74,7 @@ describe("SettingsService", () => {
       timelineSnapMinutes: 30,
       timelinePxPerMinute: 1.5,
       newsRefreshIntervalMinutes: 30,
+      notificationsEnabled: true,
     });
   });
 

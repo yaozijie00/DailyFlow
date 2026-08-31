@@ -25,6 +25,8 @@ export interface AppSettings {
   timelinePxPerMinute: number;
   /** 新闻自动刷新间隔（分钟） */
   newsRefreshIntervalMinutes: number;
+  /** 专注开始/结束系统通知开关 */
+  notificationsEnabled: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -37,6 +39,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   timelineSnapMinutes: 15,
   timelinePxPerMinute: 1.5,
   newsRefreshIntervalMinutes: 30,
+  notificationsEnabled: true,
 };
 
 /** settings 表键名（存储格式：时长用秒或分钟、时间用 "HH:mm"、粒度用分钟）。 */
@@ -50,6 +53,7 @@ const KEY_TIMELINE_SNAP = "timeline_snap";
 const KEY_TIMELINE_PX_PER_MINUTE = "timeline_px_per_minute";
 const KEY_SHORTCUTS = "shortcuts";
 const KEY_NEWS_REFRESH_INTERVAL = "news_refresh_interval";
+const KEY_NOTIFICATIONS = "notifications_enabled";
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
@@ -126,6 +130,7 @@ export class SettingsService {
       newsRefreshIntervalMinutes: Math.round(
         parseIntSafe(stored[KEY_NEWS_REFRESH_INTERVAL], 30),
       ),
+      notificationsEnabled: stored[KEY_NOTIFICATIONS] !== "0",
     };
   }
 
@@ -170,6 +175,9 @@ export class SettingsService {
         KEY_NEWS_REFRESH_INTERVAL,
         String(clamp(Math.round(partial.newsRefreshIntervalMinutes), 5, 1440)),
       ]);
+    }
+    if (partial.notificationsEnabled !== undefined) {
+      writes.push([KEY_NOTIFICATIONS, partial.notificationsEnabled ? "1" : "0"]);
     }
     for (const [k, v] of writes) {
       await this.repo.set(k, v);

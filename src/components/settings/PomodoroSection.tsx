@@ -55,8 +55,17 @@ export default function PomodoroSection() {
           </div>
         </div>
       ))}
+      <div className="flex items-center justify-between gap-4">
+        <label className="text-sm text-neutral-700">专注通知（开始/完成提醒）</label>
+        <input
+          type="checkbox"
+          checked={settings.notificationsEnabled}
+          onChange={(e) => void update({ notificationsEnabled: e.target.checked })}
+          className="h-4 w-4 accent-neutral-900"
+        />
+      </div>
       <p className="text-xs text-neutral-400">
-        休息时长设置已保存；休息循环将在后续版本接入计时流程。
+        休息循环（短休息 / 长休息 / 长休息间隔）已接入计时流程。
       </p>
       <div className="flex items-center gap-3 pt-1">
         <button
