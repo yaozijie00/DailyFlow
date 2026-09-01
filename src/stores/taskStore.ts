@@ -3,11 +3,15 @@ import { getDb } from "../db/db";
 import { TaskRepository, type Task, type UpdateTaskInput } from "../db/repositories/taskRepository";
 import { CategoryRepository, type Category } from "../db/repositories/categoryRepository";
 import { FocusSessionRepository } from "../db/repositories/focusSessionRepository";
+import { NoteRepository } from "../db/repositories/noteRepository";
 import { TaskService, type TaskCreateInput } from "../services/taskService";
 import { CategoryService } from "../services/categoryService";
+import { NoteService } from "../services/noteService";
 import { evaluateAndNotify } from "../services/achievementRuntime";
+import { convertTaskToNote } from "../lib/noteConvert";
 import { todayString } from "../lib/date";
 import { useAppStore } from "./appStore";
+import { useNoteStore } from "./noteStore";
 
 const taskService = new TaskService(
   new TaskRepository(getDb()),
@@ -16,6 +20,7 @@ const taskService = new TaskService(
 /** 共享任务服务单例（详情面板等只读查询复用，避免重复实例化）。 */
 export { taskService };
 const categoryService = new CategoryService(new CategoryRepository(getDb()));
+const noteService = new NoteService(new NoteRepository(getDb()));
 
 export interface CreateDraft {
   plannedStart?: number;
@@ -43,6 +48,8 @@ interface TaskState {
   createTask: (input: TaskCreateInput) => Promise<void>;
   updateTask: (id: number, input: UpdateTaskInput) => Promise<void>;
   deleteTask: (id: number) => Promise<void>;
+  /** 任务 → 便签（反向拖拽）：转成 active 便签并删除任务行（保留专注历史） */
+  convertToNote: (id: number) => Promise<void>;
   completeTask: (id: number) => Promise<void>;
   toggleComplete: (id: number) => Promise<void>;
   cancelTask: (id: number) => Promise<void>;
@@ -138,6 +145,27 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       await get().load();
     } catch {
       fail("删除任务失败");
+    }
+  },
+
+  convertToNote: async (id) => {
+    try {
+      const ok = await convertTaskToNote(
+        id,
+        get().tasks,
+        (input) => noteService.create(input),
+        (taskId) => taskService.deleteTaskKeepSessions(taskId),
+        (noteId) => noteService.delete(noteId),
+      );
+      if (!ok) {
+        fail("转为便签失败");
+        return;
+      }
+      set({ selectedTaskId: null });
+      await get().load();
+      await useNoteStore.getState().load();
+    } catch {
+      fail("转为便签失败");
     }
   },
 

@@ -32,9 +32,50 @@ describe("GoalRepository", () => {
       title: "带说明的目标",
       description: "说明文字",
       deadline: "2026-12-31",
+      startDate: "2026-09-01",
+      priority: "high",
+      manualProgress: 40,
     });
     expect(full.description).toBe("说明文字");
     expect(full.deadline).toBe("2026-12-31");
+    expect(full.startDate).toBe("2026-09-01");
+    expect(full.priority).toBe("high");
+    expect(full.manualProgress).toBe(40);
+  });
+
+  it("默认 priority=medium、manualProgress=null（自动进度）", async () => {
+    const g = await goals.create({ title: "默认目标" });
+    expect(g.priority).toBe("medium");
+    expect(g.manualProgress).toBeNull();
+  });
+
+  it("进度：手动进度优先于任务完成率", async () => {
+    const g = await goals.create({ title: "手动", manualProgress: 25 });
+    const t = await tasks.create({ title: "A", scheduledDate: "2026-08-27", goalId: g.id });
+    await tasks.update(t.id, { status: "COMPLETED", completedAt: Date.now() });
+    const wp = await goals.listActiveWithProgress();
+    expect(wp[0].progressPercent).toBe(25);
+  });
+
+  it("进度：无手动进度时按任务完成率计算", async () => {
+    const g = await goals.create({ title: "自动" });
+    const t1 = await tasks.create({ title: "A", scheduledDate: "2026-08-27", goalId: g.id });
+    await tasks.update(t1.id, { status: "COMPLETED", completedAt: Date.now() });
+    await tasks.create({ title: "B", scheduledDate: "2026-08-27", goalId: g.id });
+    const wp = await goals.listActiveWithProgress();
+    expect(wp[0].progressPercent).toBe(50);
+  });
+
+  it("update 修改开始日期/优先级/手动进度", async () => {
+    const g = await goals.create({ title: "A" });
+    const updated = await goals.update(g.id, {
+      startDate: "2026-09-05",
+      priority: "low",
+      manualProgress: 80,
+    });
+    expect(updated?.startDate).toBe("2026-09-05");
+    expect(updated?.priority).toBe("low");
+    expect(updated?.manualProgress).toBe(80);
   });
 
   it("listActive 只返回进行中，listCompleted 只返回已完成", async () => {

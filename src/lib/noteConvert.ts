@@ -1,7 +1,8 @@
 import type { Note } from "../db/repositories/noteRepository";
+import type { Task } from "../db/repositories/taskRepository";
 
-/** 便签投放区（今日任务列表 / 时间轴）。 */
-export type NoteDropZone = "tasklist" | "timeline";
+/** 投放区：今日任务列表 / 时间轴 / 便签区（反向拖拽目标）。 */
+export type NoteDropZone = "tasklist" | "timeline" | "notelist";
 
 /**
  * 便签拖拽会话（鼠标拖拽，替代 HTML5 拖放：WebView2 下 HTML5 DnD 不可靠，
@@ -23,8 +24,18 @@ export function noteDropZoneAt(x: number, y: number): NoteDropZone | null {
   const el = document.elementFromPoint(x, y) as HTMLElement | null;
   const zone = el?.closest?.("[data-note-drop]") as HTMLElement | null;
   const kind = zone?.dataset.noteDrop;
-  return kind === "tasklist" || kind === "timeline" ? kind : null;
+  return kind === "tasklist" || kind === "timeline" || kind === "notelist" ? kind : null;
 }
+
+// ---------- 反向拖拽：任务 → 便签（V2 Phase 3） ----------
+
+/** 任务 → 便签 拖拽会话（任务列表行 / 时间轴块拖向便签区时写入 taskId）。 */
+export const taskToNoteDrag: { taskId: number | null } = { taskId: null };
+
+/** 便签区注册的 drop 回调（把拖入的任务转为便签）。 */
+export const taskToNoteDropCallbacks: {
+  notelist?: (taskId: number) => void;
+} = {};
 
 export interface NoteConvertOptions {
   /** 目标日期（默认今日由 TaskService 决定） */
@@ -66,6 +77,39 @@ export async function convertNoteToTask(
     await updateNote(note.id, { status: "arranged" });
     return true;
   } catch {
+    return false;
+  }
+}
+
+/**
+ * 任务转便签（反向拖拽，V2 Phase 3）：
+ * - 用任务标题/分类创建一条 active 便签；
+ * - 删除原任务行（仅删任务，focus_sessions 由 FK SET NULL 保留 → 统计不丢失投入时间）；
+ * - 不产生「任务 + 便签」重复对象，用户感知为「把同一件事拖回便签」。
+ * 防重复：仅存在的任务可转换；任一步失败则回滚（删掉刚建的便签），状态保持一致。
+ */
+export async function convertTaskToNote(
+  taskId: number,
+  tasks: Task[],
+  createNote: (input: { title: string; categoryId: number | null }) => Promise<{ id: number }>,
+  deleteTaskRow: (id: number) => Promise<unknown>,
+  deleteNote: (id: number) => Promise<unknown>,
+): Promise<boolean> {
+  const task = tasks.find((t) => t.id === taskId);
+  if (!task) return false;
+  let noteId: number | null = null;
+  try {
+    const note = await createNote({
+      title: task.title,
+      categoryId: task.categoryId ?? null,
+    });
+    noteId = note.id;
+    await deleteTaskRow(taskId);
+    return true;
+  } catch {
+    if (noteId != null) {
+      await deleteNote(noteId).catch(() => {});
+    }
     return false;
   }
 }

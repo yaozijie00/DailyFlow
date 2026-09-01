@@ -23,6 +23,10 @@ import {
   Rocket,
   CalendarRange,
   CalendarCheck2,
+  Fish,
+  Gamepad2,
+  Sparkles,
+  ListTodo,
   type LucideIcon,
 } from "lucide-react";
 
@@ -52,6 +56,10 @@ const ICONS: Record<string, LucideIcon> = {
   Rocket,
   CalendarRange,
   CalendarCheck2,
+  Fish,
+  Gamepad2,
+  Sparkles,
+  ListTodo,
 };
 
 export function AchievementIcon({ name, size = 22 }: { name: string; size?: number }) {

@@ -66,6 +66,16 @@ export class TaskRepository {
       .all();
   }
 
+  /** 按 scheduledDate 范围 [fromDate, toDate) 查询任务（统计「每日任务」用）。 */
+  async listInDateRange(fromDate: string, toDate: string): Promise<Task[]> {
+    return this.db
+      .select()
+      .from(tasks)
+      .where(and(gte(tasks.scheduledDate, fromDate), lt(tasks.scheduledDate, toDate)))
+      .orderBy(tasks.scheduledDate, tasks.sortOrder, tasks.id)
+      .all();
+  }
+
   /** 按传入 id 顺序重写 sort_order（手动拖动排序）。 */
   async reorder(orderedIds: number[]): Promise<void> {
     for (let i = 0; i < orderedIds.length; i++) {

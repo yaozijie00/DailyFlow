@@ -49,6 +49,7 @@ export default function Statistics() {
   const loading = useStatisticsStore((s) => s.loading);
   const hourlyStats = useStatisticsStore((s) => s.hourlyStats);
   const overview = useStatisticsStore((s) => s.overview);
+  const dailyTasks = useStatisticsStore((s) => s.dailyTasks);
   const setRange = useStatisticsStore((s) => s.setRange);
   const setCustomRange = useStatisticsStore((s) => s.setCustomRange);
 
@@ -192,6 +193,49 @@ export default function Statistics() {
                   </section>
                 )
               )}
+
+              {/* 每日任务（按 scheduledDate 分组；今日显示当天任务） */}
+              <section className="rounded-md border border-neutral-200 bg-white p-5">
+                <h2 className="mb-4 text-sm font-medium text-neutral-600">每日任务</h2>
+                {dailyTasks.length === 0 ? (
+                  <p className="text-sm text-neutral-400">该时间段内暂无任务</p>
+                ) : (
+                  <div className="space-y-4">
+                    {dailyTasks.map((g) => (
+                      <div key={g.date}>
+                        <div className="mb-1 text-xs text-neutral-400">{g.date}</div>
+                        <ul className="space-y-1">
+                          {g.tasks.map((t) => (
+                            <li
+                              key={t.id}
+                              className="flex items-center gap-2 text-sm text-neutral-700"
+                            >
+                              <span
+                                className={`h-2 w-2 shrink-0 rounded-full ${
+                                  t.status === "COMPLETED"
+                                    ? "bg-green-500"
+                                    : t.status === "CANCELLED"
+                                      ? "bg-neutral-300"
+                                      : "bg-neutral-900"
+                                }`}
+                              />
+                              <span
+                                className={`truncate ${
+                                  t.status === "COMPLETED" || t.status === "CANCELLED"
+                                    ? "text-neutral-400 line-through decoration-neutral-300"
+                                    : ""
+                                }`}
+                              >
+                                {t.title}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
 
               {/* 每日完成任务 */}
               {overview!.dailyCompletedTasks.length > 0 && (

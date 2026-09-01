@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { StickyNote, Check, X, Plus } from "lucide-react";
 import { useNoteStore } from "../../stores/noteStore";
+import { useTaskStore } from "../../stores/taskStore";
 import { useAppStore } from "../../stores/appStore";
 import { useWindowDrag } from "../../hooks/useWindowDrag";
 import {
   noteDragSession,
   noteDropCallbacks,
   noteDropZoneAt,
+  taskToNoteDrag,
+  taskToNoteDropCallbacks,
 } from "../../lib/noteConvert";
 import type { Note } from "../../db/repositories/noteRepository";
 
@@ -137,13 +140,36 @@ export default function NoteList() {
   const notes = useNoteStore((s) => s.notes);
   const create = useNoteStore((s) => s.create);
   const load = useNoteStore((s) => s.load);
+  const convertToNote = useTaskStore((s) => s.convertToNote);
   const [draft, setDraft] = useState("");
+  const [taskOver, setTaskOver] = useState(false);
 
   useEffect(() => {
     if (dbStatus === "ready") {
       void load();
     }
   }, [dbStatus, load]);
+
+  // 任务 → 便签 反向拖拽：注册 drop 回调 + 悬停高亮
+  useEffect(() => {
+    taskToNoteDropCallbacks.notelist = (taskId) => {
+      void convertToNote(taskId);
+    };
+    return () => {
+      delete taskToNoteDropCallbacks.notelist;
+    };
+  }, [convertToNote]);
+
+  useEffect(() => {
+    const onMove = (ev: MouseEvent) => {
+      setTaskOver(
+        taskToNoteDrag.taskId != null &&
+          noteDropZoneAt(ev.clientX, ev.clientY) === "notelist",
+      );
+    };
+    window.addEventListener("mousemove", onMove);
+    return () => window.removeEventListener("mousemove", onMove);
+  }, []);
 
   const canSubmit = draft.trim().length > 0;
 
@@ -154,7 +180,12 @@ export default function NoteList() {
   };
 
   return (
-    <div className="border-t border-neutral-200 pt-2">
+    <div
+      data-note-drop="notelist"
+      className={`rounded-md border-t border-neutral-200 pt-2 transition-shadow ${
+        taskOver ? "shadow-[inset_0_0_0_2px_#f59e0b66]" : ""
+      }`}
+    >
       <div className="mb-1.5 flex items-center gap-1 text-xs text-neutral-500">
         <StickyNote size={12} className="text-amber-500" />
         <span className="font-medium">便签</span>

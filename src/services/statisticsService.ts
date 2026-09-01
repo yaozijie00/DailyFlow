@@ -54,6 +54,19 @@ export interface HourlyStatistic {
   seconds: number;
 }
 
+/** 每日任务列表项（统计页「每日任务」用）。 */
+export interface DailyTaskItem {
+  id: number;
+  title: string;
+  status: string;
+}
+
+/** 按日期分组的任务列表。 */
+export interface DailyTasksByDate {
+  date: string;
+  tasks: DailyTaskItem[];
+}
+
 export interface OverviewStatistics {
   /** 总 Focus 时间（秒，含提前结束） */
   totalSeconds: number;
@@ -184,6 +197,25 @@ export class StatisticsService {
       buckets[new Date(r.startedAt).getHours()] += r.actualDuration;
     }
     return buckets.map((seconds, hour) => ({ hour, seconds }));
+  }
+
+  /**
+   * 每日任务（统计页「每日任务」）：按 scheduledDate 范围查询任务并按日期分组。
+   * 今日 → 当天任务；近7天/近30天/全部/自定义 → 按日期分组列表。
+   */
+  async getDailyTasks(from: number, to: number): Promise<DailyTasksByDate[]> {
+    const fromDate = dateStringOf(from);
+    const toDate = dateStringOf(to);
+    const rows = await this.tasks.listInDateRange(fromDate, toDate);
+    const map = new Map<string, DailyTaskItem[]>();
+    for (const t of rows) {
+      const arr = map.get(t.scheduledDate) ?? [];
+      arr.push({ id: t.id, title: t.title, status: t.status });
+      map.set(t.scheduledDate, arr);
+    }
+    return Array.from(map.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, tasks]) => ({ date, tasks }));
   }
 
   /**

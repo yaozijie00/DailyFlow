@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Circle, GripVertical } from "lucide-react";
+import { Check, Circle, GripVertical, StickyNote } from "lucide-react";
 import { useTaskStore } from "../../stores/taskStore";
 import { useNoteStore } from "../../stores/noteStore";
 import { useWindowDrag } from "../../hooks/useWindowDrag";
+import { useTaskToNoteDrag } from "../../hooks/useTaskToNoteDrag";
 import type { Task } from "../../db/repositories/taskRepository";
 import {
   convertNoteToTask,
@@ -35,6 +36,7 @@ export default function TaskList() {
   const startTaskDrag = useTaskStore((s) => s.startTaskDrag);
   const endTaskDrag = useTaskStore((s) => s.endTaskDrag);
   const { start: startWindowDrag } = useWindowDrag();
+  const startTaskToNoteDrag = useTaskToNoteDrag();
   const didDragRef = useRef(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -234,6 +236,15 @@ export default function TaskList() {
                       </span>
                       <span className="shrink-0 text-xs text-neutral-400">
                         {TASK_STATUS_LABEL[task.status] ?? task.status}
+                      </span>
+                      {/* 转为便签手柄（拖到便签区） */}
+                      <span
+                        onMouseDown={(e) => startTaskToNoteDrag(e, task.id)}
+                        className="shrink-0 cursor-grab text-neutral-300 transition-colors hover:text-amber-500"
+                        title="拖到便签区转为便签"
+                        aria-label="转为便签"
+                      >
+                        <StickyNote size={14} />
                       </span>
                       {/* 拖动排序手柄（与「拖入时间轴」互不干扰） */}
                       <span

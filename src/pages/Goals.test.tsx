@@ -31,9 +31,12 @@ vi.mock("../stores/appStore", () => ({
 function makeGoal(overrides: Partial<GoalWithProgress> = {}): GoalWithProgress {
   return {
     id: 1,
-    title: "三个月内完成 App 重构",
+    title: "完成 DailyFlow V2",
     description: null,
-    deadline: null,
+    deadline: "2026-09-20",
+    startDate: "2026-09-01",
+    priority: "medium",
+    manualProgress: null,
     status: "active",
     sortOrder: 0,
     createdAt: 0,
@@ -41,96 +44,79 @@ function makeGoal(overrides: Partial<GoalWithProgress> = {}): GoalWithProgress {
     completedAt: null,
     totalTasks: 0,
     completedTasks: 0,
+    progressPercent: 0,
+    focusSeconds: 0,
     ...overrides,
   };
 }
 
-describe("Goals 页面", () => {
+describe("Goals 页面（长期月视图）", () => {
   beforeEach(() => {
     mockState.goals = [];
     mockState.completedGoals = [];
     mockState.loading = false;
     mockState.create.mockClear();
+    mockState.update.mockClear();
     mockState.complete.mockClear();
     mockState.remove.mockClear();
-    mockState.update.mockClear();
   });
 
   it("无目标时显示空状态", () => {
     render(<Goals />);
-    expect(screen.getByText(/暂无进行中的目标/)).toBeTruthy();
+    expect(screen.getByText(/暂无长期任务/)).toBeTruthy();
   });
 
-  it("渲染进行中目标卡片与进度", () => {
-    mockState.goals = [
-      makeGoal({
-        id: 1,
-        title: "目标 A",
-        description: "说明",
-        deadline: "2026-12-31",
-        totalTasks: 4,
-        completedTasks: 1,
-      }),
-    ];
+  it("渲染带日期范围的长期任务块", () => {
+    mockState.goals = [makeGoal()];
     render(<Goals />);
-    expect(screen.getByText("目标 A")).toBeTruthy();
-    expect(screen.getByText("说明")).toBeTruthy();
-    expect(screen.getByText(/截止 2026-12-31/)).toBeTruthy();
-    expect(screen.getByText(/关联任务 1\/4/)).toBeTruthy();
-    expect(screen.getByText("25%")).toBeTruthy();
+    expect(screen.getAllByText("完成 DailyFlow V2").length).toBeGreaterThan(0);
   });
 
-  it("无关联任务显示『暂无任务』", () => {
-    mockState.goals = [makeGoal({ id: 1, title: "目标 A" })];
-    render(<Goals />);
-    expect(screen.getByText(/暂无任务/)).toBeTruthy();
-    expect(screen.getByText(/关联任务 0\/0/)).toBeTruthy();
-  });
-
-  it("新建目标：填写并提交调用 create，成功关闭表单", async () => {
+  it("新建：填写名称/日期/优先级/手动进度并提交", () => {
     mockState.create.mockResolvedValue(undefined);
     render(<Goals />);
-    fireEvent.click(screen.getByText("新建目标"));
-    fireEvent.change(screen.getByPlaceholderText(/目标名称/), {
-      target: { value: "新目标" },
-    });
-    fireEvent.change(screen.getByPlaceholderText(/补充说明/), {
-      target: { value: "新说明" },
-    });
+    fireEvent.click(screen.getByText("新建"));
+    fireEvent.change(screen.getByPlaceholderText(/名称/), { target: { value: "旅行计划" } });
+    fireEvent.change(screen.getByPlaceholderText(/进度%/), { target: { value: "40" } });
     fireEvent.click(screen.getByText("添加"));
-    expect(mockState.create).toHaveBeenCalledWith({
-      title: "新目标",
-      description: "新说明",
-      deadline: null,
-    });
+    expect(mockState.create).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "旅行计划", manualProgress: 40 }),
+    );
   });
 
-  it("完成/删除按钮调用对应 store 方法", () => {
-    mockState.goals = [makeGoal({ id: 7, title: "目标 A" })];
-    render(<Goals />);
-    fireEvent.click(screen.getByLabelText("完成目标"));
-    expect(mockState.complete).toHaveBeenCalledWith(7);
-    fireEvent.click(screen.getByLabelText("删除目标"));
-    expect(mockState.remove).toHaveBeenCalledWith(7);
-  });
-
-  it("编辑：进入编辑态并保存调用 update", async () => {
-    mockState.goals = [makeGoal({ id: 3, title: "旧标题" })];
+  it("点击任务块打开编辑弹窗，保存调用 update", () => {
+    mockState.goals = [makeGoal()];
     mockState.update.mockResolvedValue(undefined);
     render(<Goals />);
-    fireEvent.click(screen.getByLabelText("编辑目标"));
-    const input = screen.getByPlaceholderText("目标名称");
-    fireEvent.change(input, { target: { value: "新标题" } });
+    fireEvent.click(screen.getByLabelText("编辑长期任务"));
+    expect(screen.getByText("编辑长期任务")).toBeTruthy();
+    fireEvent.change(screen.getByDisplayValue("完成 DailyFlow V2"), { target: { value: "改名" } });
     fireEvent.click(screen.getByText("保存"));
-    expect(mockState.update).toHaveBeenCalledWith(3, {
-      title: "新标题",
-      description: null,
-      deadline: null,
-    });
+    expect(mockState.update).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ title: "改名" }),
+    );
+  });
+
+  it("编辑弹窗内完成/删除", () => {
+    mockState.goals = [makeGoal()];
+    render(<Goals />);
+    fireEvent.click(screen.getByLabelText("编辑长期任务"));
+    fireEvent.click(screen.getByText("完成"));
+    expect(mockState.complete).toHaveBeenCalledWith(1);
+  });
+
+  it("未安排日期的目标显示在「未安排日期」区", () => {
+    mockState.goals = [makeGoal({ startDate: null, deadline: null, title: "没有日期" })];
+    render(<Goals />);
+    expect(screen.getByText(/未安排日期/)).toBeTruthy();
+    expect(screen.getByText("没有日期")).toBeTruthy();
   });
 
   it("已完成目标折叠区可展开", () => {
-    mockState.completedGoals = [makeGoal({ id: 9, title: "已完成目标", status: "completed" })];
+    mockState.completedGoals = [
+      makeGoal({ id: 9, title: "已完成目标", status: "completed" }),
+    ];
     render(<Goals />);
     expect(screen.queryByText("已完成目标")).toBeNull();
     fireEvent.click(screen.getByText(/已完成（1）/));

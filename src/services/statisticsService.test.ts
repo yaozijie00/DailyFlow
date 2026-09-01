@@ -273,4 +273,32 @@ describe("StatisticsService", () => {
       expect(o.dailyCompletedTasks).toEqual([]);
     });
   });
+
+  describe("getDailyTasks（统计页每日任务）", () => {
+    const FROM = new Date(2026, 7, 27).getTime();
+    const TO = new Date(2026, 7, 28).getTime();
+
+    it("今日范围：返回当天任务", async () => {
+      await tasks.create({ title: "写代码", scheduledDate: "2026-08-27" });
+      await tasks.create({ title: "已完成", scheduledDate: "2026-08-27", status: "COMPLETED" });
+      await tasks.create({ title: "明天的", scheduledDate: "2026-08-28" });
+      const list = await service.getDailyTasks(FROM, TO);
+      expect(list).toHaveLength(1);
+      expect(list[0].date).toBe("2026-08-27");
+      expect(list[0].tasks.map((t) => t.title)).toEqual(["写代码", "已完成"]);
+    });
+
+    it("跨天范围：按日期分组、升序", async () => {
+      await tasks.create({ title: "A", scheduledDate: "2026-08-27" });
+      await tasks.create({ title: "B", scheduledDate: "2026-08-26" });
+      await tasks.create({ title: "C", scheduledDate: "2026-08-26" });
+      const list = await service.getDailyTasks(new Date(2026, 7, 26).getTime(), TO);
+      expect(list.map((g) => g.date)).toEqual(["2026-08-26", "2026-08-27"]);
+      expect(list[0].tasks.map((t) => t.title)).toEqual(["B", "C"]);
+    });
+
+    it("空数据：返回空数组", async () => {
+      expect(await service.getDailyTasks(FROM, TO)).toEqual([]);
+    });
+  });
 });

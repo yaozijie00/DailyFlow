@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import GlobalFocusBar from "./GlobalFocusBar";
 import { usePomodoroStore } from "../../stores/pomodoroStore";
 import { useTaskStore } from "../../stores/taskStore";
@@ -104,5 +104,54 @@ describe("GlobalFocusBar", () => {
     render(<GlobalFocusBar />);
     expect(screen.getByText("短休息")).toBeTruthy();
     expect(screen.getByText(/休息中/)).toBeTruthy();
+  });
+
+  it("点击「去专注」跳转「专注」页（Bug 4：之前错误跳 Today）", () => {
+    usePomodoroStore.setState({
+      taskId: 7,
+      phase: "focus",
+      snapshot: snap({ state: "RUNNING", remainingMs: 20 * 60_000 }),
+    });
+    useTaskStore.setState({ tasks: [task] });
+    render(<GlobalFocusBar />);
+    fireEvent.click(screen.getByText("去专注"));
+    expect(useAppStore.getState().currentPage).toBe("focus");
+  });
+
+  it("点击主体（任务名/倒计时）跳转「专注」页", () => {
+    usePomodoroStore.setState({
+      taskId: 7,
+      phase: "focus",
+      snapshot: snap({ state: "RUNNING", remainingMs: 20 * 60_000 }),
+    });
+    useTaskStore.setState({ tasks: [task] });
+    render(<GlobalFocusBar />);
+    fireEvent.click(screen.getByText("写代码"));
+    expect(useAppStore.getState().currentPage).toBe("focus");
+  });
+
+  it("点击暂停/结束按钮不触发跳转", () => {
+    usePomodoroStore.setState({
+      taskId: 7,
+      phase: "focus",
+      snapshot: snap({ state: "RUNNING", remainingMs: 20 * 60_000 }),
+    });
+    useTaskStore.setState({ tasks: [task] });
+    render(<GlobalFocusBar />);
+    useAppStore.setState({ currentPage: "today" });
+    fireEvent.click(screen.getByLabelText("暂停"));
+    expect(useAppStore.getState().currentPage).toBe("today"); // 未被跳转
+    fireEvent.click(screen.getByLabelText("结束专注"));
+    expect(useAppStore.getState().currentPage).toBe("today");
+  });
+
+  it("会话完成后（COMPLETED）悬浮条隐藏", () => {
+    usePomodoroStore.setState({
+      taskId: 7,
+      phase: "focus",
+      snapshot: snap({ state: "COMPLETED", remainingMs: 0 }),
+    });
+    const { container } = render(<GlobalFocusBar />);
+    expect(container.firstChild).toBeNull();
   });
 });

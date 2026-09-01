@@ -111,6 +111,14 @@ export class TaskService {
     return this.tasks.delete(id);
   }
 
+  /**
+   * 仅删除任务行（转为便签用）：保留 focus_sessions（FK SET NULL），
+   * 统计仍计入该任务的投入时间，不因「拖回便签」丢失专注历史。
+   */
+  async deleteTaskKeepSessions(id: number): Promise<boolean> {
+    return this.tasks.delete(id);
+  }
+
   async completeTask(id: number): Promise<Task | null> {
     const before = await this.tasks.findById(id);
     const updated = await this.tasks.update(id, {

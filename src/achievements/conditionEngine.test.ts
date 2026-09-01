@@ -18,6 +18,8 @@ function ctx(partial: Partial<AchievementContext> = {}): AchievementContext {
     maxDailyCompletedTasks: 0,
     plannedTasks: 0,
     completedPlannedTasks: 0,
+    categoryNames: [],
+    createdTasks: 0,
     ...partial,
   };
 }
@@ -97,6 +99,27 @@ describe("ConditionEngine", () => {
     expect(isValidCondition({ type: "planned_tasks", target: 1 })).toBe(true);
     expect(isValidCondition({ type: "planned_tasks_completed", target: 1 })).toBe(true);
     expect(isValidCondition({ type: "tasks_completed", target: 0 })).toBe(false);
+  });
+
+  it("category_named：类别名包含关键词（忽略大小写）", () => {
+    const c: Condition = { type: "category_named", keyword: "摸鱼" };
+    expect(ConditionEngine.evaluate(c, ctx({ categoryNames: ["工作", "摸鱼时间"] }))).toBe(true);
+    expect(ConditionEngine.evaluate(c, ctx({ categoryNames: ["工作", "学习"] }))).toBe(false);
+    const game: Condition = { type: "category_named", keyword: "GAME" };
+    expect(ConditionEngine.evaluate(game, ctx({ categoryNames: ["Game Dev"] }))).toBe(true);
+  });
+
+  it("tasks_created：累计创建任务数", () => {
+    const c: Condition = { type: "tasks_created", target: 1 };
+    expect(ConditionEngine.evaluate(c, ctx({ createdTasks: 1 }))).toBe(true);
+    expect(ConditionEngine.evaluate(c, ctx({ createdTasks: 0 }))).toBe(false);
+  });
+
+  it("彩蛋条件 isValidCondition 校验", () => {
+    expect(isValidCondition({ type: "category_named", keyword: "摸鱼" })).toBe(true);
+    expect(isValidCondition({ type: "category_named", keyword: "" })).toBe(false);
+    expect(isValidCondition({ type: "tasks_created", target: 1 })).toBe(true);
+    expect(isValidCondition({ type: "tasks_created", target: 0 })).toBe(false);
   });
 
   it("getProgress 返回 current/target/percentage/completed/unit", () => {

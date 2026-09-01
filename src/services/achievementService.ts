@@ -114,6 +114,8 @@ export class AchievementService {
       maxDailyCompletedTasks,
       plannedTasks,
       completedPlannedTasks,
+      categoryNames: cats.map((c) => c.name),
+      createdTasks: allTasks.length,
     };
   }
 

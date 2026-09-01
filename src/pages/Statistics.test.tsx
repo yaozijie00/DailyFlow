@@ -34,6 +34,7 @@ const statsState = vi.hoisted(() => ({
   loading: false,
   hourlyStats: [] as unknown[],
   overview: null as OverviewStatistics | null,
+  dailyTasks: [] as { date: string; tasks: { id: number; title: string; status: string }[] }[],
   setTab: vi.fn(),
   setRange: vi.fn(),
   setCustomRange: vi.fn(),
@@ -138,5 +139,22 @@ describe("Statistics 页面（统计 + 成就 Tab）", () => {
     expect(screen.getByText("完成率")).toBeTruthy();
     expect(screen.getByText("60%")).toBeTruthy(); // 完成率 0.6
     expect(screen.getByText("开发")).toBeTruthy(); // 最常类别
+  });
+
+  it("每日任务：显示当天任务标题（Bug 3 数据源）", () => {
+    statsState.overview = makeOverview();
+    statsState.dailyTasks = [
+      { date: "2026-08-27", tasks: [{ id: 1, title: "写代码", status: "TODO" }] },
+    ];
+    render(<Statistics />);
+    expect(screen.getByText("每日任务")).toBeTruthy();
+    expect(screen.getByText("写代码")).toBeTruthy();
+  });
+
+  it("每日任务：无任务显示空提示", () => {
+    statsState.overview = makeOverview();
+    statsState.dailyTasks = [];
+    render(<Statistics />);
+    expect(screen.getByText(/该时间段内暂无任务/)).toBeTruthy();
   });
 });

@@ -9,6 +9,7 @@ import {
   type CategoryStatistic,
   type HourlyStatistic,
   type OverviewStatistics,
+  type DailyTasksByDate,
 } from "../services/statisticsService";
 import {
   startOfToday,
@@ -69,6 +70,7 @@ interface StatisticsState {
   categoryStats: CategoryStatistic[];
   hourlyStats: HourlyStatistic[];
   overview: OverviewStatistics | null;
+  dailyTasks: DailyTasksByDate[];
   setTab: (t: StatsTab) => void;
   setRange: (r: RangePreset) => void;
   setCustomRange: (from: string, to: string) => void;
@@ -85,6 +87,7 @@ export const useStatisticsStore = create<StatisticsState>((set, get) => ({
   categoryStats: [],
   hourlyStats: [],
   overview: null,
+  dailyTasks: [],
 
   setTab: (t) => {
     set({ tab: t });
@@ -105,15 +108,16 @@ export const useStatisticsStore = create<StatisticsState>((set, get) => ({
     const { from, to } = computeRange(range, customFrom, customTo);
     set({ loading: true });
     try {
-      const [rangeStats, categoryStats, hourlyStats, overview] = await Promise.all([
+      const [rangeStats, categoryStats, hourlyStats, overview, dailyTasks] = await Promise.all([
         statisticsService.getRangeStatistics(from, to),
         statisticsService.getCategoryStatistics(from, to),
         range === "today"
           ? statisticsService.getHourlyStatistics(from, to)
           : Promise.resolve([] as HourlyStatistic[]),
         statisticsService.getOverview(from, to),
+        statisticsService.getDailyTasks(from, to),
       ]);
-      set({ rangeStats, categoryStats, hourlyStats, overview, loading: false });
+      set({ rangeStats, categoryStats, hourlyStats, overview, dailyTasks, loading: false });
     } catch {
       set({ loading: false });
     }

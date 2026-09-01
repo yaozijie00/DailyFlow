@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { StickyNote } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
 import { useTaskStore } from "../../stores/taskStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { usePomodoroStore } from "../../stores/pomodoroStore";
 import { useNoteStore } from "../../stores/noteStore";
 import { useWindowDrag } from "../../hooks/useWindowDrag";
+import { useTaskToNoteDrag } from "../../hooks/useTaskToNoteDrag";
 import type { Task } from "../../db/repositories/taskRepository";
 import {
   FULL_DAY_MINUTES,
@@ -94,6 +96,7 @@ export default function Timeline() {
     endMinutes: number;
   } | null>(null);
   const { start: startWindowDrag } = useWindowDrag();
+  const startTaskToNoteDrag = useTaskToNoteDrag();
 
   // 时间轴配置（来自设置页；start/end 仅用于视觉强调与分割线）
   const config: TimelineConfig = {
@@ -694,7 +697,7 @@ export default function Timeline() {
                     selectTask(task.id); // 单击任务块 → 右侧详情面板
                   }}
                   onDoubleClick={() => handleTaskDoubleClick(task)}
-                  className={`absolute cursor-grab select-none overflow-hidden rounded text-xs active:cursor-grabbing ${
+                  className={`group absolute cursor-grab select-none overflow-hidden rounded text-xs active:cursor-grabbing ${
                     isRemoving
                       ? "bg-red-200 text-red-900 ring-2 ring-red-500"
                       : state === "running"
@@ -729,7 +732,7 @@ export default function Timeline() {
                         {categoryName}
                       </div>
                     )}
-                    {/* 标题行：状态标记 + 标题 */}
+                    {/* 标题行：状态标记 + 标题 + 转便签手柄 */}
                     <div className="flex items-center gap-1">
                       {state === "running" && (
                         <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-blue-500" />
@@ -745,6 +748,14 @@ export default function Timeline() {
                         }`}
                       >
                         {task.title}
+                      </span>
+                      <span
+                        onMouseDown={(e) => startTaskToNoteDrag(e, task.id)}
+                        className="ml-auto shrink-0 cursor-grab text-neutral-400 opacity-0 transition-opacity hover:text-amber-600 group-hover:opacity-100"
+                        title="拖到便签区转为便签"
+                        aria-label="转为便签"
+                      >
+                        <StickyNote size={12} />
                       </span>
                     </div>
                     {/* 时间行（块够高时显示开始-结束） */}

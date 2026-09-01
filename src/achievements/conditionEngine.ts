@@ -50,6 +50,14 @@ export interface PlannedTasksCompletedCondition {
   type: "planned_tasks_completed";
   target: number;
 }
+export interface CategoryNamedCondition {
+  type: "category_named";
+  keyword: string;
+}
+export interface TasksCreatedCondition {
+  type: "tasks_created";
+  target: number;
+}
 export interface AndCondition {
   type: "and";
   conditions: Condition[];
@@ -74,6 +82,8 @@ export type Condition =
   | DailyTasksCompletedCondition
   | PlannedTasksCondition
   | PlannedTasksCompletedCondition
+  | CategoryNamedCondition
+  | TasksCreatedCondition
   | AndCondition
   | OrCondition
   | NotCondition;
@@ -110,6 +120,10 @@ export interface AchievementContext {
   plannedTasks: number;
   /** 完成且带计划时间的任务数 */
   completedPlannedTasks: number;
+  /** 全部类别名称（成就彩蛋：类别名匹配，与是否有专注无关） */
+  categoryNames: string[];
+  /** 累计创建任务数（含所有状态） */
+  createdTasks: number;
 }
 
 function pct(current: number, target: number): number {
@@ -135,6 +149,7 @@ export function isValidCondition(cond: unknown): boolean {
     case "daily_tasks_completed":
     case "planned_tasks":
     case "planned_tasks_completed":
+    case "tasks_created":
       return typeof c.target === "number" && Number.isFinite(c.target) && c.target > 0;
     case "category_duration":
       return (
@@ -144,6 +159,8 @@ export function isValidCondition(cond: unknown): boolean {
         Number.isFinite(c.target) &&
         c.target > 0
       );
+    case "category_named":
+      return typeof c.keyword === "string" && c.keyword.trim().length > 0;
     case "and":
     case "or":
       return Array.isArray(c.conditions) && c.conditions.every(isValidCondition);
@@ -178,6 +195,12 @@ export const ConditionEngine = {
         return ctx.plannedTasks >= condition.target;
       case "planned_tasks_completed":
         return ctx.completedPlannedTasks >= condition.target;
+      case "category_named":
+        return ctx.categoryNames.some((n) =>
+          n.toLowerCase().includes(condition.keyword.toLowerCase()),
+        );
+      case "tasks_created":
+        return ctx.createdTasks >= condition.target;
       case "and":
         return condition.conditions.every((c) => ConditionEngine.evaluate(c, ctx));
       case "or":
@@ -287,6 +310,28 @@ export const ConditionEngine = {
           target: condition.target,
           percentage: pct(current, condition.target),
           completed: current >= condition.target,
+          unit: "count",
+        };
+      }
+      case "tasks_created": {
+        const current = ctx.createdTasks;
+        return {
+          current,
+          target: condition.target,
+          percentage: pct(current, condition.target),
+          completed: current >= condition.target,
+          unit: "count",
+        };
+      }
+      case "category_named": {
+        const matched = ctx.categoryNames.some((n) =>
+          n.toLowerCase().includes(condition.keyword.toLowerCase()),
+        );
+        return {
+          current: matched ? 1 : 0,
+          target: 1,
+          percentage: matched ? 100 : 0,
+          completed: matched,
           unit: "count",
         };
       }

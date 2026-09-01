@@ -86,16 +86,24 @@ export const notes = sqliteTable("notes", {
 });
 
 /**
- * 长期目标：独立于日期的阶段性方向（如「三个月内完成 App 重构」）。
- * 状态：active（进行中）/ completed（已完成，保留历史）。
- * 任务通过 tasks.goal_id 关联目标，用于进度统计。
+ * 长期目标 / 长期任务块（V2 月视图）：
+ * - 独立于日期的阶段性方向；月视图中按 start_date ~ deadline 渲染成跨天任务块；
+ * - 状态：active（进行中）/ completed（已完成，保留历史）；
+ * - 进度：manual_progress 非空时用手动值，否则按关联任务（tasks.goal_id）自动计算；
+ * - 任务通过 tasks.goal_id 关联目标，用于进度统计。
  */
 export const goals = sqliteTable("goals", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   title: text("title").notNull(),
   description: text("description"),
-  /** 目标截止日期（本地 YYYY-MM-DD，可空） */
+  /** 结束日期（本地 YYYY-MM-DD，可空；月视图中作为结束日期） */
   deadline: text("deadline"),
+  /** 开始日期（本地 YYYY-MM-DD，可空；月视图中作为开始日期） */
+  startDate: text("start_date"),
+  /** 优先级：high / medium / low */
+  priority: text("priority").notNull().default("medium"),
+  /** 手动进度 0-100（可空；为 null 时按关联任务自动计算） */
+  manualProgress: integer("manual_progress"),
   status: text("status").notNull().default("active"),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: integer("created_at").notNull(),
