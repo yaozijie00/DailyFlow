@@ -31,11 +31,28 @@ describe("SettingsService", () => {
       timelineEndMinutes: 24 * 60,
       timelineSnapMinutes: 15,
       timelinePxPerMinute: 1.5,
-      newsRefreshIntervalMinutes: 30,
       notificationsEnabled: true,
+      closeBehavior: "exit",
+      closeBehaviorConfigured: false,
     });
     const s = await service.getSettings();
     expect(s).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it("关闭行为：旧库无键 → 默认 exit + 未配置（升级 V1.4.0→1.4.1 首次询问）", async () => {
+    const s = await service.getSettings();
+    expect(s.closeBehavior).toBe("exit");
+    expect(s.closeBehaviorConfigured).toBe(false);
+  });
+
+  it("关闭行为：保存/读取往返（tray + 已配置）", async () => {
+    await service.update({ closeBehavior: "tray", closeBehaviorConfigured: true });
+    const s = await service.getSettings();
+    expect(s.closeBehavior).toBe("tray");
+    expect(s.closeBehaviorConfigured).toBe(true);
+    // 非法值回退 exit
+    await service.update({ closeBehavior: "tray" });
+    expect((await service.getSettings()).closeBehavior).toBe("tray");
   });
 
   it("读取已保存的值（未保存的键保持默认）", async () => {
@@ -73,8 +90,9 @@ describe("SettingsService", () => {
       timelineEndMinutes: 21 * 60,
       timelineSnapMinutes: 30,
       timelinePxPerMinute: 1.5,
-      newsRefreshIntervalMinutes: 30,
       notificationsEnabled: true,
+      closeBehavior: "exit",
+      closeBehaviorConfigured: false,
     });
   });
 

@@ -1,13 +1,17 @@
 import { useState } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { useTaskStore } from "../../stores/taskStore";
-import { formatDuration } from "../../lib/format";
+import { useGoalStore } from "../../stores/goalStore";
+import { useTaskFocusStats } from "../../hooks/useTaskFocusStats";
+import { formatDuration, formatDateTime } from "../../lib/format";
+import { formatTimeRange } from "../../lib/timeline";
 import { TASK_STATUS_LABEL } from "../../lib/taskLabels";
 
 export default function TaskDetail() {
   const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
   const tasks = useTaskStore((s) => s.tasks);
   const categories = useTaskStore((s) => s.categories);
+  const goals = useGoalStore((s) => s.goals);
   const completeTask = useTaskStore((s) => s.completeTask);
   const cancelTask = useTaskStore((s) => s.cancelTask);
   const deleteTask = useTaskStore((s) => s.deleteTask);
@@ -18,11 +22,12 @@ export default function TaskDetail() {
   const [notesDraft, setNotesDraft] = useState("");
 
   const task = tasks.find((t) => t.id === selectedTaskId);
+  const focusStats = useTaskFocusStats(task?.id ?? null);
 
   if (!task) {
     return (
       <div className="rounded-md border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-400">
-        点击左侧任务查看详情
+        点击左侧任务或时间轴任务块查看详情
       </div>
     );
   }
@@ -37,6 +42,8 @@ export default function TaskDetail() {
     task.categoryId != null
       ? (categories.find((c) => c.id === task.categoryId)?.name ?? "无")
       : "无";
+  const goalName =
+    task.goalId != null ? (goals.find((g) => g.id === task.goalId)?.title ?? "无") : "无";
   const completed = task.status === "COMPLETED";
   const cancelled = task.status === "CANCELLED";
 
@@ -50,6 +57,18 @@ export default function TaskDetail() {
           <dd className="text-neutral-900">{categoryName}</dd>
         </div>
         <div className="flex justify-between">
+          <dt className="text-neutral-500">关联目标</dt>
+          <dd className="text-neutral-900">{goalName}</dd>
+        </div>
+        <div className="flex justify-between">
+          <dt className="text-neutral-500">计划时间</dt>
+          <dd className="text-neutral-900">
+            {task.plannedStart != null && task.plannedEnd != null
+              ? formatTimeRange(task.plannedStart, task.plannedEnd)
+              : "未设置"}
+          </dd>
+        </div>
+        <div className="flex justify-between">
           <dt className="text-neutral-500">预计</dt>
           <dd className="text-neutral-900">{formatDuration(task.estimatedDuration) || "未设置"}</dd>
         </div>
@@ -60,6 +79,24 @@ export default function TaskDetail() {
         <div className="flex justify-between">
           <dt className="text-neutral-500">状态</dt>
           <dd className="text-neutral-900">{TASK_STATUS_LABEL[task.status] ?? task.status}</dd>
+        </div>
+        <div className="flex justify-between">
+          <dt className="text-neutral-500">创建时间</dt>
+          <dd className="text-neutral-900">{formatDateTime(task.createdAt)}</dd>
+        </div>
+        <div className="flex justify-between">
+          <dt className="text-neutral-500">完成时间</dt>
+          <dd className="text-neutral-900">{formatDateTime(task.completedAt)}</dd>
+        </div>
+        <div className="flex justify-between">
+          <dt className="text-neutral-500">Focus 投入</dt>
+          <dd className="text-neutral-900">{formatDuration(focusStats.totalSeconds) || "0分钟"}</dd>
+        </div>
+        <div className="flex justify-between">
+          <dt className="text-neutral-500">专注次数</dt>
+          <dd className="text-neutral-900">
+            {focusStats.count} 次（完成 {focusStats.completedCount} 个番茄）
+          </dd>
         </div>
       </dl>
 

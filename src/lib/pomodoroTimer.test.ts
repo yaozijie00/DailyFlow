@@ -161,6 +161,47 @@ describe("complete() / 自动完成", () => {
     expect(timer.getState()).toBe("COMPLETED");
   });
 
+  it("PAUSED 直接 complete：不计暂停后空等的时间（只记暂停前实际时长）", () => {
+    const { timer, clock } = makeTimer();
+    timer.start(); // t=0
+    clock.advance(8 * MINUTE); // 运行 8 分钟
+    timer.pause(); // pausedAt=8min
+    clock.advance(60 * MINUTE); // 暂停后空等 1 小时再结束
+    timer.complete();
+    expect(timer.getState()).toBe("COMPLETED");
+    expect(timer.getElapsedMs()).toBe(8 * MINUTE); // 而非 68 分钟
+    expect(timer.getRemainingMs()).toBe(0);
+  });
+
+  it("PAUSED 直接 cancel：同样不计暂停后空等的时间", () => {
+    const { timer, clock } = makeTimer();
+    timer.start();
+    clock.advance(8 * MINUTE);
+    timer.pause();
+    clock.advance(60 * MINUTE);
+    timer.cancel();
+    expect(timer.getState()).toBe("CANCELLED");
+    expect(timer.getElapsedMs()).toBe(8 * MINUTE);
+  });
+
+  it("多次 暂停/恢复 后 PAUSED 结束：暂停段全部扣除，不重复计算", () => {
+    const { timer, clock } = makeTimer();
+    timer.start();
+    clock.advance(8 * MINUTE);
+    timer.pause(); // 暂停 2 分钟
+    clock.advance(2 * MINUTE);
+    timer.resume();
+    clock.advance(5 * MINUTE); // 再运行 5 分钟
+    timer.pause(); // 暂停 3 分钟
+    clock.advance(3 * MINUTE);
+    timer.resume();
+    clock.advance(4 * MINUTE); // 再运行 4 分钟
+    timer.pause(); // 暂停后空等 30 分钟再结束
+    clock.advance(30 * MINUTE);
+    timer.complete();
+    expect(timer.getElapsedMs()).toBe(17 * MINUTE); // 8+5+4，暂停段(2+3+30)全部扣除
+  });
+
   it("时间耗尽自动进入 COMPLETED（无需调用 complete()）", () => {
     const { timer, clock } = makeTimer();
     timer.start();

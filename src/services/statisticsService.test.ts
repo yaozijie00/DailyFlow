@@ -136,8 +136,8 @@ describe("StatisticsService", () => {
       await makeSession(dev.id, 300, false, FROM + 3000); // 开发 5min
       const stats = await service.getCategoryStatistics(FROM, TO);
       expect(stats).toHaveLength(2);
-      expect(stats[0]).toMatchObject({ categoryId: dev.id, name: "开发", seconds: 1500 });
-      expect(stats[1]).toMatchObject({ categoryId: art.id, name: "美术", seconds: 900 });
+      expect(stats[0]).toMatchObject({ categoryId: dev.id, name: "开发", seconds: 1500, count: 2 });
+      expect(stats[1]).toMatchObject({ categoryId: art.id, name: "美术", seconds: 900, count: 1 });
       expect(stats[0].color).toBeTruthy();
     });
 
@@ -187,6 +187,90 @@ describe("StatisticsService", () => {
       const s = await service.getRangeStatistics(FROM, TO);
       expect(s.totalSeconds).toBe(900);
       expect(s.eventCount).toBe(1);
+    });
+  });
+
+  describe("getOverview（统计总览）", () => {
+    const FROM = new Date(2026, 7, 27).getTime();
+    const TO = new Date(2026, 7, 28).getTime();
+
+    async function makeSession(
+      categoryId: number | null,
+      seconds: number,
+      completed: boolean,
+      startedAt: number,
+    ) {
+      const task = await tasks.create({
+        title: "T",
+        scheduledDate: todayString(),
+        categoryId,
+      });
+      return sessions.create({
+        taskId: task.id,
+        categoryId,
+        plannedDuration: seconds,
+        startedAt,
+        actualDuration: seconds,
+        endedAt: startedAt + seconds * 1000,
+        completed,
+      });
+    }
+
+    it("Focus 维度：总时长/次数/平均值/每日趋势/最常类别", async () => {
+      const dev = await categories.create("开发");
+      const art = await categories.create("美术");
+      await makeSession(dev.id, 1200, true, FROM + 1000);
+      await makeSession(art.id, 900, true, FROM + 2000);
+      await makeSession(dev.id, 300, false, FROM + 3000);
+      const o = await service.getOverview(FROM, TO);
+      expect(o.totalSeconds).toBe(2400);
+      expect(o.sessionCount).toBe(3);
+      expect(o.completedFocusCount).toBe(2);
+      expect(o.avgSessionSeconds).toBe(800); // 2400/3
+      expect(o.topCategory).toBe("开发");
+      expect(o.categoryStats[0]).toMatchObject({ name: "开发", seconds: 1500, count: 2 });
+      expect(o.dailyFocus).toEqual([
+        { date: "2026-08-27", seconds: 2400, completedCount: 2 },
+      ]);
+    });
+
+    it("任务维度：创建/完成/未完成/完成率", async () => {
+      const t1 = await tasks.create({ title: "A", scheduledDate: "2026-08-27" });
+      const t2 = await tasks.create({ title: "B", scheduledDate: "2026-08-27" });
+      await tasks.create({ title: "C", scheduledDate: "2026-08-27" });
+      await tasks.update(t1.id, { status: "COMPLETED", completedAt: FROM + 5000 });
+      await tasks.update(t2.id, { status: "COMPLETED", completedAt: FROM + 6000 });
+      await tasks.create({ title: "取消", scheduledDate: "2026-08-27", status: "CANCELLED" });
+      const o = await service.getOverview(FROM, TO);
+      expect(o.taskCreated).toBe(4); // 含已取消
+      expect(o.taskCompleted).toBe(2); // completedAt 落在区间
+      expect(o.taskIncomplete).toBe(1); // 创建未完成且未取消
+      expect(o.completionRate).toBeCloseTo(2 / 3, 5); // 创建 4 - 取消 1 = 3，完成 2
+      expect(o.dailyCompletedTasks).toEqual([{ date: "2026-08-27", count: 2 }]);
+    });
+
+    it("完成时间在区间外不计入完成数（completedAt 边界）", async () => {
+      const before = await tasks.create({ title: "昨日完成", scheduledDate: "2026-08-26" });
+      await tasks.update(before.id, {
+        status: "COMPLETED",
+        completedAt: new Date(2026, 7, 26, 23, 0).getTime(), // 昨日完成
+      });
+      const o = await service.getOverview(FROM, TO);
+      expect(o.taskCompleted).toBe(0); // completedAt 不在区间
+      expect(o.dailyCompletedTasks).toEqual([]);
+    });
+
+    it("空数据：各项为 0/空，不抛错", async () => {
+      const o = await service.getOverview(FROM, TO);
+      expect(o.totalSeconds).toBe(0);
+      expect(o.sessionCount).toBe(0);
+      expect(o.avgSessionSeconds).toBe(0);
+      expect(o.avgDailySeconds).toBe(0);
+      expect(o.topCategory).toBeNull();
+      expect(o.taskCreated).toBe(0);
+      expect(o.completionRate).toBe(0);
+      expect(o.dailyFocus).toEqual([]);
+      expect(o.dailyCompletedTasks).toEqual([]);
     });
   });
 });

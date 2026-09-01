@@ -14,6 +14,10 @@ function ctx(partial: Partial<AchievementContext> = {}): AchievementContext {
     maxDailyDurationSeconds: 0,
     streakDays: 0,
     distinctCategories: 0,
+    completedTasks: 0,
+    maxDailyCompletedTasks: 0,
+    plannedTasks: 0,
+    completedPlannedTasks: 0,
     ...partial,
   };
 }
@@ -65,6 +69,34 @@ describe("ConditionEngine", () => {
     const c: Condition = { type: "category_count", target: 5 };
     expect(ConditionEngine.evaluate(c, ctx({ distinctCategories: 5 }))).toBe(true);
     expect(ConditionEngine.evaluate(c, ctx({ distinctCategories: 4 }))).toBe(false);
+  });
+
+  it("tasks_completed：累计完成任务数", () => {
+    const c: Condition = { type: "tasks_completed", target: 10 };
+    expect(ConditionEngine.evaluate(c, ctx({ completedTasks: 10 }))).toBe(true);
+    expect(ConditionEngine.evaluate(c, ctx({ completedTasks: 9 }))).toBe(false);
+  });
+
+  it("daily_tasks_completed：单日完成任务数峰值", () => {
+    const c: Condition = { type: "daily_tasks_completed", target: 5 };
+    expect(ConditionEngine.evaluate(c, ctx({ maxDailyCompletedTasks: 5 }))).toBe(true);
+    expect(ConditionEngine.evaluate(c, ctx({ maxDailyCompletedTasks: 4 }))).toBe(false);
+  });
+
+  it("planned_tasks / planned_tasks_completed：时间轴规划与按计划完成", () => {
+    const planned: Condition = { type: "planned_tasks", target: 1 };
+    expect(ConditionEngine.evaluate(planned, ctx({ plannedTasks: 1 }))).toBe(true);
+    const plannedDone: Condition = { type: "planned_tasks_completed", target: 1 };
+    expect(ConditionEngine.evaluate(plannedDone, ctx({ completedPlannedTasks: 1 }))).toBe(true);
+    expect(ConditionEngine.evaluate(plannedDone, ctx({ plannedTasks: 5, completedPlannedTasks: 0 }))).toBe(false);
+  });
+
+  it("任务类条件 isValidCondition 校验", () => {
+    expect(isValidCondition({ type: "tasks_completed", target: 1 })).toBe(true);
+    expect(isValidCondition({ type: "daily_tasks_completed", target: 3 })).toBe(true);
+    expect(isValidCondition({ type: "planned_tasks", target: 1 })).toBe(true);
+    expect(isValidCondition({ type: "planned_tasks_completed", target: 1 })).toBe(true);
+    expect(isValidCondition({ type: "tasks_completed", target: 0 })).toBe(false);
   });
 
   it("getProgress 返回 current/target/percentage/completed/unit", () => {

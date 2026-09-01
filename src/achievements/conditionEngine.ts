@@ -34,6 +34,22 @@ export interface CategoryCountCondition {
   type: "category_count";
   target: number;
 }
+export interface TasksCompletedCondition {
+  type: "tasks_completed";
+  target: number;
+}
+export interface DailyTasksCompletedCondition {
+  type: "daily_tasks_completed";
+  target: number;
+}
+export interface PlannedTasksCondition {
+  type: "planned_tasks";
+  target: number;
+}
+export interface PlannedTasksCompletedCondition {
+  type: "planned_tasks_completed";
+  target: number;
+}
 export interface AndCondition {
   type: "and";
   conditions: Condition[];
@@ -54,6 +70,10 @@ export type Condition =
   | DailyDurationCondition
   | StreakDaysCondition
   | CategoryCountCondition
+  | TasksCompletedCondition
+  | DailyTasksCompletedCondition
+  | PlannedTasksCondition
+  | PlannedTasksCompletedCondition
   | AndCondition
   | OrCondition
   | NotCondition;
@@ -68,7 +88,7 @@ export interface Progress {
   unit: ProgressUnit;
 }
 
-/** 成就评估上下文：由 WorkEvent（focus_sessions）聚合而来。 */
+/** 成就评估上下文：由 WorkEvent（focus_sessions）+ 任务数据聚合而来。 */
 export interface AchievementContext {
   /** 累计走满番茄数 */
   completedCount: number;
@@ -82,6 +102,14 @@ export interface AchievementContext {
   streakDays: number;
   /** 完成过工作的不同（有效）类别数 */
   distinctCategories: number;
+  /** 累计完成任务数（不含已取消） */
+  completedTasks: number;
+  /** 单日完成任务数最大值 */
+  maxDailyCompletedTasks: number;
+  /** 带计划时间（时间轴）的任务数（不含已取消） */
+  plannedTasks: number;
+  /** 完成且带计划时间的任务数 */
+  completedPlannedTasks: number;
 }
 
 function pct(current: number, target: number): number {
@@ -103,6 +131,10 @@ export function isValidCondition(cond: unknown): boolean {
     case "daily_duration":
     case "streak_days":
     case "category_count":
+    case "tasks_completed":
+    case "daily_tasks_completed":
+    case "planned_tasks":
+    case "planned_tasks_completed":
       return typeof c.target === "number" && Number.isFinite(c.target) && c.target > 0;
     case "category_duration":
       return (
@@ -138,6 +170,14 @@ export const ConditionEngine = {
         return ctx.streakDays >= condition.target;
       case "category_count":
         return ctx.distinctCategories >= condition.target;
+      case "tasks_completed":
+        return ctx.completedTasks >= condition.target;
+      case "daily_tasks_completed":
+        return ctx.maxDailyCompletedTasks >= condition.target;
+      case "planned_tasks":
+        return ctx.plannedTasks >= condition.target;
+      case "planned_tasks_completed":
+        return ctx.completedPlannedTasks >= condition.target;
       case "and":
         return condition.conditions.every((c) => ConditionEngine.evaluate(c, ctx));
       case "or":
@@ -202,6 +242,46 @@ export const ConditionEngine = {
       }
       case "category_count": {
         const current = ctx.distinctCategories;
+        return {
+          current,
+          target: condition.target,
+          percentage: pct(current, condition.target),
+          completed: current >= condition.target,
+          unit: "count",
+        };
+      }
+      case "tasks_completed": {
+        const current = ctx.completedTasks;
+        return {
+          current,
+          target: condition.target,
+          percentage: pct(current, condition.target),
+          completed: current >= condition.target,
+          unit: "count",
+        };
+      }
+      case "daily_tasks_completed": {
+        const current = ctx.maxDailyCompletedTasks;
+        return {
+          current,
+          target: condition.target,
+          percentage: pct(current, condition.target),
+          completed: current >= condition.target,
+          unit: "count",
+        };
+      }
+      case "planned_tasks": {
+        const current = ctx.plannedTasks;
+        return {
+          current,
+          target: condition.target,
+          percentage: pct(current, condition.target),
+          completed: current >= condition.target,
+          unit: "count",
+        };
+      }
+      case "planned_tasks_completed": {
+        const current = ctx.completedPlannedTasks;
         return {
           current,
           target: condition.target,

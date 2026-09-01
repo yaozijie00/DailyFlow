@@ -1,4 +1,4 @@
-import { count, eq, sql } from "drizzle-orm";
+import { and, count, eq, gte, lt, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { tasks } from "../schema";
 
@@ -132,5 +132,48 @@ export class TaskRepository {
       total: rows[0]?.total ?? 0,
       completed: Number(rows[0]?.completed ?? 0),
     };
+  }
+
+  /** [from, to) 内创建的任务按状态计数（统计总览用）。 */
+  async countCreatedInRange(
+    from: number,
+    to: number,
+  ): Promise<{ total: number; completed: number; cancelled: number }> {
+    const rows = await this.db
+      .select({
+        status: tasks.status,
+        n: count(),
+      })
+      .from(tasks)
+      .where(and(gte(tasks.createdAt, from), lt(tasks.createdAt, to)))
+      .groupBy(tasks.status)
+      .all();
+    let total = 0;
+    let completed = 0;
+    let cancelled = 0;
+    for (const r of rows) {
+      total += r.n;
+      if (r.status === "COMPLETED") completed += r.n;
+      else if (r.status === "CANCELLED") cancelled += r.n;
+    }
+    return { total, completed, cancelled };
+  }
+
+  /** [from, to) 内完成的任务（completedAt 落在区间），供完成数/每日完成趋势聚合。 */
+  async listCompletedInRange(
+    from: number,
+    to: number,
+  ): Promise<{ id: number; completedAt: number | null }[]> {
+    return this.db
+      .select({ id: tasks.id, completedAt: tasks.completedAt })
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.status, "COMPLETED"),
+          gte(tasks.completedAt, from),
+          lt(tasks.completedAt, to),
+        ),
+      )
+      .all();
   }
 }

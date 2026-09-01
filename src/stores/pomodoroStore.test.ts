@@ -1,6 +1,9 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createPomodoroStore } from "./pomodoroStore";
 import type { FocusService } from "../services/focusService";
+
+const invokeMock = vi.hoisted(() => vi.fn());
+vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
 
 const MINUTE = 60_000;
 
@@ -36,6 +39,101 @@ function makeStore() {
   const store = createPomodoroStore(clock.now, focus as unknown as FocusService);
   return { store, clock, focus };
 }
+
+describe("专注完成通知调度（Bug 3：最小化/后台也能提醒）", () => {
+  beforeEach(() => {
+    invokeMock.mockReset();
+    invokeMock.mockResolvedValue(1);
+  });
+
+  /** 等待 invoke 的异步 id 回填（notificationService.scheduledTimerId）。 */
+  async function flush() {
+    await Promise.resolve();
+    await Promise.resolve();
+  }
+
+  it("startFocus 调度 Rust 原生完成通知", async () => {
+    const { store } = makeStore();
+    store.getState().startFocus(7);
+    await flush();
+    expect(invokeMock).toHaveBeenCalledWith(
+      "schedule_focus_end_notification",
+      expect.objectContaining({ plannedMinutes: 25 }),
+    );
+  });
+
+  it("pause 取消调度，resume 按剩余时长重新调度", async () => {
+    const { store, clock } = makeStore();
+    store.getState().startFocus(7);
+    await flush();
+    clock.advance(10 * MINUTE);
+    store.getState().pause();
+    expect(invokeMock).toHaveBeenCalledWith(
+      "cancel_focus_notification",
+      expect.anything(),
+    );
+    store.getState().resume();
+    // 重新调度：剩余 15 分钟 → plannedMinutes 仍为 25（计划时长）
+    expect(invokeMock).toHaveBeenCalledWith(
+      "schedule_focus_end_notification",
+      expect.objectContaining({ plannedMinutes: 25 }),
+    );
+  });
+
+  it("提前结束/放弃取消调度", async () => {
+    const { store, clock } = makeStore();
+    store.getState().startFocus(7);
+    await flush();
+    clock.advance(8 * MINUTE);
+    store.getState().endFocus(); // 提前结束
+    expect(invokeMock).toHaveBeenCalledWith(
+      "cancel_focus_notification",
+      expect.anything(),
+    );
+
+    invokeMock.mockClear();
+    store.getState().startFocus(7);
+    await flush();
+    store.getState().abandonFocus();
+    expect(invokeMock).toHaveBeenCalledWith(
+      "cancel_focus_notification",
+      expect.anything(),
+    );
+  });
+});
+
+describe("自动完成看门狗（Bug 3：不依赖用户点击即落库）", () => {
+  it("时间耗尽后 refresh 自动落库并累计计数", () => {
+    const { store, clock, focus } = makeStore();
+    store.getState().startFocus(7);
+    clock.advance(26 * MINUTE);
+    store.getState().refresh();
+    expect(focus.finish).toHaveBeenCalledWith(true, 25 * 60);
+    expect(store.getState().completedFocusCount).toBe(1);
+    expect(store.getState().showResult).toBe(true);
+  });
+
+  it("惰性完成后 startNextFocus 前旧会话已落库（不遗留开放会话）", () => {
+    const { store, clock, focus } = makeStore();
+    store.getState().startFocus(7);
+    clock.advance(26 * MINUTE);
+    store.getState().refresh(); // 看门狗落库
+    store.getState().startNextFocus();
+    expect(focus.finish).toHaveBeenCalledTimes(1);
+    expect(focus.start).toHaveBeenCalledTimes(2); // 新会话正常创建
+  });
+
+  it("暂停后不自动完成（PAUSED 时间冻结，看门狗不误触发）", () => {
+    const { store, clock, focus } = makeStore();
+    store.getState().startFocus(7);
+    clock.advance(10 * MINUTE);
+    store.getState().pause();
+    clock.advance(60 * MINUTE); // 暂停 1 小时
+    store.getState().refresh();
+    expect(store.getState().snapshot.state).toBe("PAUSED");
+    expect(focus.finish).not.toHaveBeenCalled();
+  });
+});
 
 describe("PomodoroStore 初始状态", () => {
   it("初始 IDLE、25 分钟、无任务、不显示结果", () => {
@@ -178,8 +276,8 @@ describe("休息循环（Focus → Break）", () => {
     const { store, clock } = makeStore();
     store.getState().startFocus(7);
     clock.advance(25 * MINUTE);
-    store.getState().refresh(); // 自动完成
-    store.setState({ completedFocusCount: 3 }); // 模拟已累计 3 次
+    store.getState().refresh(); // 看门狗：本次专注完成并计数（count=1）
+    store.setState({ completedFocusCount: 4 }); // 模拟含本次已累计 4 次
     store.getState().startBreak();
     const s = store.getState();
     expect(s.phase).toBe("long_break");
@@ -265,6 +363,34 @@ describe("专注持久化（B2/B9）", () => {
     clock.advance(10 * MINUTE);
     store.getState().endFocus();
     expect(focus.finish).toHaveBeenCalledWith(false, 10 * 60);
+  });
+
+  it("暂停后直接结束：只记录暂停前实际时长，不把暂停空等计入", () => {
+    const { store, focus, clock } = makeStore();
+    store.getState().startFocus(7); // 25 分钟计划
+    clock.advance(8 * MINUTE); // 实际运行 8 分钟
+    store.getState().pause();
+    clock.advance(60 * MINUTE); // 暂停后空等 1 小时
+    store.getState().endFocus();
+    expect(store.getState().snapshot.elapsedMs).toBe(8 * MINUTE);
+    expect(focus.finish).toHaveBeenCalledWith(false, 8 * 60); // 而非 68*60
+  });
+
+  it("多次暂停/恢复后结束：暂停段全部扣除，不重复计算", () => {
+    const { store, focus, clock } = makeStore();
+    store.getState().startFocus(7);
+    clock.advance(8 * MINUTE);
+    store.getState().pause();
+    clock.advance(2 * MINUTE);
+    store.getState().resume();
+    clock.advance(5 * MINUTE);
+    store.getState().pause();
+    clock.advance(3 * MINUTE);
+    store.getState().resume();
+    clock.advance(4 * MINUTE);
+    store.getState().endFocus();
+    expect(store.getState().snapshot.elapsedMs).toBe(17 * MINUTE); // 8+5+4
+    expect(focus.finish).toHaveBeenCalledWith(false, 17 * 60);
   });
 
   it("restoreActiveFocus 用持久化上下文重建计时器", async () => {

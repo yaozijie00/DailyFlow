@@ -84,4 +84,19 @@ describe("runMigrations 幂等收敛（H1 重试安全）", () => {
     expect(calls.length).toBe(1);
     await close();
   });
+
+  it("0012 移除新闻：表与设置键在全新库中不存在（V1.4.0 兼容升级）", async () => {
+    const { db, close } = await createTestDb();
+    const tables = await db.values(
+      sql`SELECT name FROM sqlite_master WHERE name IN ('news_items', 'news_sources')`,
+    );
+    expect(tables.length).toBe(0);
+    const keys = await db.values(
+      sql`SELECT key FROM settings WHERE key = 'news_refresh_interval'`,
+    );
+    expect(keys.length).toBe(0);
+    const applied = await getAppliedMigrationNames(db);
+    expect(applied).toContain("0012_remove_news.sql");
+    await close();
+  });
 });

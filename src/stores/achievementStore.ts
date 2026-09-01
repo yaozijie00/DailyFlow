@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { getDb } from "../db/db";
+import { TaskRepository } from "../db/repositories/taskRepository";
 import { FocusSessionRepository } from "../db/repositories/focusSessionRepository";
 import { CategoryRepository } from "../db/repositories/categoryRepository";
 import { AchievementProgressRepository } from "../db/repositories/achievementProgressRepository";
@@ -14,6 +15,7 @@ const achievementService = new AchievementService(
   new AchievementProgressRepository(getDb()),
   new FocusSessionRepository(getDb()),
   new CategoryRepository(getDb()),
+  new TaskRepository(getDb()),
 );
 
 export type AchievementFilter = "all" | "unlocked";

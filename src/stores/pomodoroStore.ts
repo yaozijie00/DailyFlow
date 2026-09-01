@@ -4,12 +4,14 @@ import { getDb } from "../db/db";
 import { FocusSessionRepository } from "../db/repositories/focusSessionRepository";
 import { SettingsRepository } from "../db/repositories/settingsRepository";
 import { TaskRepository } from "../db/repositories/taskRepository";
-import { CategoryRepository } from "../db/repositories/categoryRepository";
-import { AchievementProgressRepository } from "../db/repositories/achievementProgressRepository";
 import { FocusService } from "../services/focusService";
-import { AchievementService } from "../services/achievementService";
-import { notifyFocusStart, notifyFocusEnd } from "../services/notificationService";
-import { loadAchievementDefinitions } from "../achievements/definitions";
+import {
+  notifyFocusStart,
+  notifyFocusEnd,
+  scheduleFocusEndNotification,
+  cancelScheduledFocusEndNotification,
+} from "../services/notificationService";
+import { evaluateAndNotify } from "../services/achievementRuntime";
 import { useAppStore } from "./appStore";
 import { useSettingsStore } from "./settingsStore";
 
@@ -71,14 +73,6 @@ const defaultFocusService = new FocusService(
   taskRepo,
 );
 
-/** 成就服务（模块级单例）：专注落库后评估，失败静默不影响专注。 */
-const achievementService = new AchievementService(
-  loadAchievementDefinitions(),
-  new AchievementProgressRepository(getDb()),
-  new FocusSessionRepository(getDb()),
-  new CategoryRepository(getDb()),
-);
-
 function persistFail(): void {
   useAppStore.getState().pushToast("error", "专注记录保存失败");
 }
@@ -94,6 +88,11 @@ export function createPomodoroStore(
     /**
      * 落定并持久化当前专注会话（幂等：已落定则跳过）。
      * 走满（completed=true）时累计本轮专注计数。休息阶段无会话，直接跳过。
+     *
+     * 通知职责（V1.4.1 Bug 3）：
+     * - 自然走满的系统通知由 Rust 原生调度线程在结束时刻发送（最小化/后台也准时）；
+     * - 提前结束的系统通知由调用方（endFocus）在用户操作时发送；
+     * - 这里只负责落库/计数/成就，不再发送系统通知，避免重复提醒。
      */
     const finalizeCurrentSession = (): void => {
       if (get().phase !== "focus") return;
@@ -107,35 +106,11 @@ export function createPomodoroStore(
         .then(() => {
           set((s) => ({ focusVersion: s.focusVersion + 1, sessionId: null }));
           // 专注落库成功后评估成就（异步；失败静默，不影响专注记录）
-          void achievementService
-            .evaluate()
-            .then((newly) => {
-              for (const a of newly) {
-                useAppStore.getState().pushAchievement(a.name, a.description);
-              }
-            })
-            .catch(() => {});
+          void evaluateAndNotify();
         })
         .catch(persistFail);
       if (completed) {
         set((s) => ({ completedFocusCount: s.completedFocusCount + 1 }));
-        // 走满完成提醒（异步查任务名；页面切到任意页也生效）
-        const tid = get().taskId;
-        if (tid != null) {
-          void taskRepo
-            .findById(tid)
-            .then((t) => notifyFocusEnd(t?.title ?? "未命名任务", true))
-            .catch(() => {});
-        }
-      } else {
-        // 提前结束提醒
-        const tid = get().taskId;
-        if (tid != null) {
-          void taskRepo
-            .findById(tid)
-            .then((t) => notifyFocusEnd(t?.title ?? "未命名任务", false))
-            .catch(() => {});
-        }
       }
     };
 
@@ -157,7 +132,8 @@ export function createPomodoroStore(
         if (state === "RUNNING" || state === "PAUSED") return; // 守卫：防双击/竞态
         // 上一段计时已自动完成但未落定（内部仍 RUNNING）时先落定，避免 start() 冲突
         if (state === "COMPLETED" && timer.getCompletedAt() === null) {
-          timer.complete();
+          finalizeCurrentSession(); // 专注阶段：落库旧会话（此前只 complete 不落库 → 遗留开放会话）
+          if (timer.getCompletedAt() === null) timer.complete(); // 休息计时器：仅落定状态
         }
         const ms =
           durationMs ?? useSettingsStore.getState().settings.pomodoroDurationMinutes * 60_000;
@@ -165,6 +141,8 @@ export function createPomodoroStore(
         const snap = timer.getSnapshot();
         set({ taskId, phase: "focus", showResult: false, sessionId: null, taskTitle: null, snapshot: snap });
         const plannedSeconds = Math.round(snap.durationMs / 1000);
+        // 调度「专注完成」系统通知（Rust 原生线程，最小化/后台也准时）
+        scheduleFocusEndNotification(Date.now() + ms, Math.round(ms / 60_000));
         // 开始提醒（异步查任务名；轻量；查询失败静默）
         void taskRepo
           .findById(taskId)
@@ -214,22 +192,43 @@ export function createPomodoroStore(
         if (timer.getState() !== "RUNNING") return;
         timer.pause();
         set({ snapshot: timer.getSnapshot() });
-        if (get().phase === "focus") void focus.pause().catch(persistFail);
+        if (get().phase === "focus") {
+          cancelScheduledFocusEndNotification(); // 暂停：取消已调度的完成通知
+          void focus.pause().catch(persistFail);
+        }
       },
 
       resume: () => {
         if (timer.getState() !== "PAUSED") return;
         timer.resume();
         set({ snapshot: timer.getSnapshot() });
-        if (get().phase === "focus") void focus.resume().catch(persistFail);
+        if (get().phase === "focus") {
+          // 恢复：按剩余时长重新调度完成通知
+          const snap = timer.getSnapshot();
+          scheduleFocusEndNotification(Date.now() + snap.remainingMs, Math.round(snap.durationMs / 60_000));
+          void focus.resume().catch(persistFail);
+        }
       },
 
       endFocus: () => {
         const state = timer.getState();
         const isAutoCompleted = state === "COMPLETED" && timer.getCompletedAt() === null;
         if (state !== "RUNNING" && state !== "PAUSED" && !isAutoCompleted) return;
+        const earlyEnd = state === "RUNNING" || state === "PAUSED";
+        if (earlyEnd) cancelScheduledFocusEndNotification(); // 提前结束：取消调度
         finalizeCurrentSession(); // 落定 + 持久化 +（走满时）计数
         set({ snapshot: timer.getSnapshot(), showResult: true });
+        // 提前结束：发送系统通知（含实际投入分钟）；走满时由 Rust 调度已通知，不重复
+        if (earlyEnd) {
+          const actualMinutes = Math.round(timer.getElapsedMs() / 60_000);
+          const tid = get().taskId;
+          if (tid != null) {
+            void taskRepo
+              .findById(tid)
+              .then((t) => notifyFocusEnd(t?.title ?? "未命名任务", false, actualMinutes))
+              .catch(() => {});
+          }
+        }
       },
 
       finalizeFocus: () => {
@@ -249,6 +248,7 @@ export function createPomodoroStore(
         const state = timer.getState();
         if (state !== "RUNNING" && state !== "PAUSED") return;
         timer.cancel();
+        cancelScheduledFocusEndNotification(); // 放弃：取消调度
         void focus.abandon().catch(persistFail);
         // 重建 timer 回到 IDLE，可重新选择任务（不落库、不完成任务）
         timer = new PomodoroTimer({ now });
@@ -265,6 +265,12 @@ export function createPomodoroStore(
 
       refresh: () => {
         const snap = timer.getSnapshot();
+        // 看门狗（Bug 3）：时间耗尽自动完成时立即落库，不依赖用户点击；
+        // 最小化/后台时 WebView2 定时器可能被节流，恢复可见/打开后第一次轮询即补落库，
+        // 系统通知由 Rust 原生调度线程在结束时刻准时发送。
+        if (snap.state === "COMPLETED" && timer.getCompletedAt() === null) {
+          finalizeCurrentSession();
+        }
         set((s) => ({
           snapshot: snap,
           showResult: s.showResult || (snap.state === "COMPLETED" && s.taskId !== null),
@@ -301,6 +307,17 @@ export function createPomodoroStore(
           }
         } catch {
           taskTitle = null;
+        }
+        // 恢复「专注完成」通知调度：运行中会话按剩余时长重新调度；暂停中不调度
+        if (active.pausedAt == null) {
+          const endAtMs =
+            active.session.startedAt +
+            active.session.plannedDuration * 1000 -
+            active.accumulatedPauseMs;
+          scheduleFocusEndNotification(
+            endAtMs,
+            Math.round(active.session.plannedDuration / 60),
+          );
         }
         set({
           taskId: active.session.taskId,

@@ -1,10 +1,129 @@
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, LazyLock, Mutex};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
+use tauri::Emitter;
 use tauri::Manager;
 use windows_core::PCWSTR;
+
+/// 专注结束系统通知调度（V1.4.1 Bug 3 修复）：
+/// 由 Rust 侧原生线程在「结束时刻」发送桌面通知，不依赖前端定时器/页面可见性，
+/// 因此应用最小化、后台运行、失焦时同样能准时提醒。
+/// - schedule：登记 cancel 标志并派生线程 sleep 到 end_at_ms 后发送；
+/// - cancel：置标志，线程醒来后跳过发送并自清理；
+/// - 多会话安全：id 自增，HashMap 维护活跃调度。
+static FOCUS_NOTIFY_NEXT_ID: AtomicU64 = AtomicU64::new(1);
+static FOCUS_NOTIFY_CANCEL: LazyLock<Mutex<HashMap<u64, Arc<AtomicBool>>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+fn now_ms() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// 调度一条「专注完成」系统通知：end_at_ms 时刻发送（前端按真实时间计算剩余）。
+#[tauri::command]
+fn schedule_focus_end_notification(end_at_ms: u64, planned_minutes: u64) -> u64 {
+    let id = FOCUS_NOTIFY_NEXT_ID.fetch_add(1, Ordering::Relaxed);
+    let cancel = Arc::new(AtomicBool::new(false));
+    {
+        let mut map = FOCUS_NOTIFY_CANCEL.lock().unwrap();
+        map.insert(id, cancel.clone());
+    }
+    std::thread::spawn(move || {
+        let wait = end_at_ms.saturating_sub(now_ms());
+        std::thread::sleep(Duration::from_millis(wait));
+        if !cancel.load(Ordering::SeqCst) {
+            let body = if planned_minutes > 0 {
+                format!("{planned_minutes} 分钟专注已结束，休息一下吧。")
+            } else {
+                "本次专注已结束，休息一下吧。".to_string()
+            };
+            let _ = notify_rust::Notification::new()
+                .appname("DailyFlow")
+                .summary("专注完成")
+                .body(&body)
+                .show();
+        }
+        FOCUS_NOTIFY_CANCEL.lock().unwrap().remove(&id);
+    });
+    id
+}
+
+/// 取消已调度的专注结束通知（暂停/提前结束/放弃时调用；幂等）。
+#[tauri::command]
+fn cancel_focus_notification(timer_id: u64) {
+    if let Some(flag) = FOCUS_NOTIFY_CANCEL.lock().unwrap().get(&timer_id) {
+        flag.store(true, Ordering::SeqCst);
+    }
+}
+
+// ---------- 窗口 / 系统托盘（V1.4.1 窗口行为） ----------
+
+/// 显示并聚焦主窗口（托盘「显示 DailyFlow」/ 左键单击托盘图标）。窗口已存在则复用，不重复创建。
+fn show_main_window(app: &tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.show();
+        let _ = w.unminimize();
+        let _ = w.set_focus();
+    }
+}
+
+/// 隐藏主窗口到系统托盘（应用继续运行，Focus 计时不受影响）。
+#[tauri::command]
+fn hide_to_tray(app: tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.hide();
+    }
+}
+
+/// 真正退出应用（托盘「退出 DailyFlow」或前端确认退出时调用；不再二次确认）。
+#[tauri::command]
+fn exit_app(app: tauri::AppHandle) {
+    app.exit(0);
+}
+
+/// 初始化系统托盘：图标 + 右键菜单（显示 / 开始暂停专注 / 退出）+ 左键单击显示窗口。
+fn setup_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
+    use tauri::menu::{Menu, MenuItem};
+    use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
+
+    let show_item = MenuItem::with_id(app, "show", "显示 DailyFlow", true, None::<&str>)?;
+    let toggle_item = MenuItem::with_id(app, "toggle_focus", "开始 / 暂停专注", true, None::<&str>)?;
+    let quit_item = MenuItem::with_id(app, "quit", "退出 DailyFlow", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&show_item, &toggle_item, &quit_item])?;
+
+    let mut builder = TrayIconBuilder::with_id("main-tray")
+        .icon(app.default_window_icon().expect("窗口图标缺失").clone())
+        .menu(&menu)
+        .show_menu_on_left_click(false)
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "show" => show_main_window(app),
+            "toggle_focus" => {
+                // 前端监听后调用 pomodoroStore 暂停/恢复（不阻塞托盘线程）
+                let _ = app.emit("tray-toggle-focus", ());
+            }
+            "quit" => app.exit(0), // 用户明确选择退出：直接退出，不二次询问
+            _ => {}
+        })
+        .on_tray_icon_event(|tray, event| {
+            if let TrayIconEvent::Click {
+                button: MouseButton::Left,
+                ..
+            } = event
+            {
+                show_main_window(tray.app_handle());
+            }
+        });
+    builder.build(app)?;
+    Ok(())
+}
 
 /// 存储路径配置（storage.json）：dataDir / cacheDir / backupDir。
 #[derive(Serialize, Deserialize, Default)]
@@ -240,19 +359,6 @@ fn resolve_backups_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(backups)
 }
 
-/// 缓存目录：配置了 cache_dir 用之，否则 <数据目录>\cache。
-fn resolve_cache_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    let cfg = read_storage_paths(app);
-    if !cfg.cache_dir.trim().is_empty() {
-        let dir = PathBuf::from(cfg.cache_dir.trim());
-        fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-        return Ok(dir);
-    }
-    let dir = dailyflow_data_dir(app)?.join("cache");
-    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    Ok(dir)
-}
-
 /// 计算从 from_dir 到 to_file 的相对路径（含必要的 ".." 上溯）。
 fn relative_path(from_dir: &Path, to_file: &Path) -> Option<PathBuf> {
     let ancestors: Vec<&Path> = from_dir.ancestors().collect();
@@ -425,83 +531,6 @@ fn set_storage_paths(
     Ok(())
 }
 
-/// 用系统默认浏览器打开外链（新闻原文；不做内置浏览器）。
-#[tauri::command]
-fn open_url(url: String) -> Result<(), String> {
-    open::that(&url).map_err(|e| e.to_string())
-}
-
-/// 异步拉取 URL 文本（RSS 源）。阻塞网络 I/O 放到 spawn_blocking，避免阻塞主线程；
-/// 前端经此绕过浏览器 CORS 限制抓取公开 Feed。
-#[tauri::command]
-async fn fetch_text(url: String) -> Result<String, String> {
-    let result = tauri::async_runtime::spawn_blocking(move || -> Result<String, String> {
-        let resp = ureq::get(&url)
-            .set(
-                "User-Agent",
-                "DailyFlow/1.1 (news reader; +https://dailyflow.local)",
-            )
-            .set(
-                "Accept",
-                "application/rss+xml, application/atom+xml, application/xml, text/xml, */*",
-            )
-            .timeout(std::time::Duration::from_secs(8))
-            .call()
-            .map_err(|e| format!("请求失败：{e}"))?;
-        let status = resp.status();
-        let body = resp.into_string().map_err(|e| format!("读取响应失败：{e}"))?;
-        if status >= 400 {
-            return Err(format!("HTTP {status}"));
-        }
-        Ok(body)
-    })
-    .await
-    .map_err(|e| format!("线程错误：{e}"))?;
-    result
-}
-
-/// 下载新闻图片到缓存目录（已存在则跳过下载），返回绝对路径。
-/// 前端用 convertFileSrc 转成可加载的 asset URL。
-#[tauri::command]
-async fn cache_image(
-    app: tauri::AppHandle,
-    url: String,
-    filename: String,
-) -> Result<String, String> {
-    if filename.is_empty()
-        || filename.contains('/')
-        || filename.contains('\\')
-        || filename.contains("..")
-    {
-        return Err("非法文件名".into());
-    }
-    let dir = resolve_cache_dir(&app)?.join("news-images");
-    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let dest = dir.join(&filename);
-    if dest.is_file() {
-        return Ok(dest.to_string_lossy().into_owned()); // 已缓存
-    }
-    let dest_for_task = dest.clone();
-    let result: Result<(), String> = tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
-        let resp = ureq::get(&url)
-            .set("User-Agent", "DailyFlow/1.1")
-            .timeout(std::time::Duration::from_secs(8))
-            .call()
-            .map_err(|e| format!("请求失败：{e}"))?;
-        if resp.status() >= 400 {
-            return Err(format!("HTTP {}", resp.status()));
-        }
-        let mut reader = resp.into_reader();
-        let mut file = std::fs::File::create(&dest_for_task).map_err(|e| e.to_string())?;
-        std::io::copy(&mut reader, &mut file).map_err(|e| e.to_string())?;
-        Ok(())
-    })
-    .await
-    .map_err(|e| format!("线程错误：{e}"))?;
-    result?;
-    Ok(dest.to_string_lossy().into_owned())
-}
-
 /// 启动失败时弹出可读提示（避免「白屏挂起」无从排查）。
 fn show_startup_error(message: &str) {
     let title: Vec<u16> = "DailyFlow 启动失败"
@@ -583,6 +612,10 @@ pub fn run() {
     let result = tauri::Builder::default()
         .plugin(tauri_plugin_sql::Builder::default().build())
         .plugin(tauri_plugin_notification::init())
+        .setup(|app| {
+            setup_tray(app.handle())?;
+            Ok(())
+        })
         .on_page_load(move |_webview, payload| {
             hook_flag.store(true, std::sync::atomic::Ordering::SeqCst);
             append_startup_log(&format!(
@@ -590,6 +623,14 @@ pub fn run() {
                 payload.event(),
                 payload.url()
             ));
+        })
+        // 关闭拦截（V1.4.1 窗口行为）：始终阻止默认关闭，交由前端按 closeBehavior 决定
+        // （首次询问 / 隐藏到托盘 / 退出），避免「关闭即销毁窗口」破坏托盘常驻。
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = window.emit("app-close-requested", ());
+            }
         })
         .invoke_handler(tauri::generate_handler![
             data_dir,
@@ -601,9 +642,10 @@ pub fn run() {
             append_log,
             get_storage_paths,
             set_storage_paths,
-            fetch_text,
-            cache_image,
-            open_url
+            schedule_focus_end_notification,
+            cancel_focus_notification,
+            hide_to_tray,
+            exit_app
         ])
         .run(tauri::generate_context!());
 

@@ -1,5 +1,6 @@
 import { FocusSessionRepository } from "../db/repositories/focusSessionRepository";
 import { CategoryRepository } from "../db/repositories/categoryRepository";
+import { TaskRepository } from "../db/repositories/taskRepository";
 import { AchievementProgressRepository } from "../db/repositories/achievementProgressRepository";
 import { dateStringOf } from "../lib/date";
 import {
@@ -42,13 +43,15 @@ export class AchievementService {
     private readonly progress: AchievementProgressRepository,
     private readonly sessions: FocusSessionRepository,
     private readonly categories: CategoryRepository,
+    private readonly tasks: TaskRepository,
   ) {}
 
-  /** 聚合全部 WorkEvent 构建评估上下文（实时计算，不落库）。 */
+  /** 聚合全部 WorkEvent + 任务数据构建评估上下文（实时计算，不落库）。 */
   async buildContext(): Promise<AchievementContext> {
-    const [rows, cats] = await Promise.all([
+    const [rows, cats, allTasks] = await Promise.all([
       this.sessions.listAll(),
       this.categories.findAll(),
+      this.tasks.findAll(),
     ]);
     const nameById = new Map(cats.map((c) => [c.id, c.name]));
 
@@ -80,6 +83,26 @@ export class AchievementService {
       if (v > maxDailyDurationSeconds) maxDailyDurationSeconds = v;
     }
 
+    // 任务维度（不含已取消；计划 = plannedStart != null）
+    let completedTasks = 0;
+    let maxDailyCompletedTasks = 0;
+    let plannedTasks = 0;
+    let completedPlannedTasks = 0;
+    const completedByDate = new Map<string, number>();
+    for (const t of allTasks) {
+      if (t.status === "CANCELLED") continue;
+      if (t.plannedStart != null) plannedTasks += 1;
+      if (t.status === "COMPLETED") {
+        completedTasks += 1;
+        if (t.plannedStart != null) completedPlannedTasks += 1;
+        const date = dateStringOf(t.completedAt ?? t.updatedAt);
+        completedByDate.set(date, (completedByDate.get(date) ?? 0) + 1);
+      }
+    }
+    for (const v of completedByDate.values()) {
+      if (v > maxDailyCompletedTasks) maxDailyCompletedTasks = v;
+    }
+
     return {
       completedCount,
       totalDurationSeconds,
@@ -87,6 +110,10 @@ export class AchievementService {
       maxDailyDurationSeconds,
       streakDays: computeStreakDays(completedDays),
       distinctCategories: distinctNames.size,
+      completedTasks,
+      maxDailyCompletedTasks,
+      plannedTasks,
+      completedPlannedTasks,
     };
   }
 

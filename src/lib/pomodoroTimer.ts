@@ -110,6 +110,7 @@ export class PomodoroTimer {
     if (this.state !== "RUNNING" && this.state !== "PAUSED") {
       throw new Error("PomodoroTimer: cannot complete() unless RUNNING or PAUSED");
     }
+    this.foldPendingPause(); // PAUSED 结束：暂停后空等的时间计入暂停段，避免多记
     this.state = "COMPLETED";
     this.completedAt = this.now();
     return this.notify();
@@ -120,9 +121,21 @@ export class PomodoroTimer {
     if (this.state !== "RUNNING" && this.state !== "PAUSED") {
       throw new Error("PomodoroTimer: cannot cancel() unless RUNNING or PAUSED");
     }
+    this.foldPendingPause(); // PAUSED 取消：与 complete 一致，不把暂停后空等计入
     this.state = "CANCELLED";
     this.cancelledAt = this.now();
     return this.notify();
+  }
+
+  /**
+   * 若当前处于 PAUSED，把「pausedAt 至今」的待定暂停段累加进 totalPausedDuration
+   * （与 resume() 口径一致）。用于 PAUSED 直接 complete/cancel 时冻结已专注时长。
+   */
+  private foldPendingPause(): void {
+    if (this.state === "PAUSED") {
+      this.totalPausedDurationMs += this.now() - this.pausedAt!;
+      this.pausedAt = null;
+    }
   }
 
   /** 从持久化状态重建计时器（重启恢复）：根据 pausedAt 决定 RUNNING/PAUSED。 */

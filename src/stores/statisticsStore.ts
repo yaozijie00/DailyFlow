@@ -8,17 +8,16 @@ import {
   type RangeStatistics,
   type CategoryStatistic,
   type HourlyStatistic,
+  type OverviewStatistics,
 } from "../services/statisticsService";
 import {
   startOfToday,
   startOfTomorrow,
-  startOfWeek,
-  startOfMonth,
   dateStringToStart,
   todayString,
 } from "../lib/date";
 
-export type RangePreset = "today" | "week" | "month" | "custom";
+export type RangePreset = "today" | "days7" | "days30" | "all" | "custom";
 
 /** 「统计」页顶层 Tab：统计 / 成就（成就由快捷键与 Tab 切换进入）。 */
 export type StatsTab = "statistics" | "achievements";
@@ -35,18 +34,19 @@ export function computeRange(
   customFrom: string,
   customTo: string,
 ): { from: number; to: number } {
-  const now = new Date();
   switch (range) {
     case "today":
       return { from: startOfToday(), to: startOfTomorrow() };
-    case "week": {
-      const from = startOfWeek(now);
-      return { from, to: from + 7 * 86_400_000 };
+    case "days7": {
+      const from = startOfToday() - 6 * 86_400_000; // 含今天共 7 天
+      return { from, to: startOfTomorrow() };
     }
-    case "month": {
-      const from = startOfMonth(now);
-      return { from, to: new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime() };
+    case "days30": {
+      const from = startOfToday() - 29 * 86_400_000; // 含今天共 30 天
+      return { from, to: startOfTomorrow() };
     }
+    case "all":
+      return { from: 0, to: startOfTomorrow() };
     case "custom": {
       const from = dateStringToStart(customFrom);
       const to = dateStringToStart(customTo);
@@ -68,6 +68,7 @@ interface StatisticsState {
   rangeStats: RangeStatistics | null;
   categoryStats: CategoryStatistic[];
   hourlyStats: HourlyStatistic[];
+  overview: OverviewStatistics | null;
   setTab: (t: StatsTab) => void;
   setRange: (r: RangePreset) => void;
   setCustomRange: (from: string, to: string) => void;
@@ -83,6 +84,7 @@ export const useStatisticsStore = create<StatisticsState>((set, get) => ({
   rangeStats: null,
   categoryStats: [],
   hourlyStats: [],
+  overview: null,
 
   setTab: (t) => {
     set({ tab: t });
@@ -103,14 +105,15 @@ export const useStatisticsStore = create<StatisticsState>((set, get) => ({
     const { from, to } = computeRange(range, customFrom, customTo);
     set({ loading: true });
     try {
-      const [rangeStats, categoryStats, hourlyStats] = await Promise.all([
+      const [rangeStats, categoryStats, hourlyStats, overview] = await Promise.all([
         statisticsService.getRangeStatistics(from, to),
         statisticsService.getCategoryStatistics(from, to),
         range === "today"
           ? statisticsService.getHourlyStatistics(from, to)
           : Promise.resolve([] as HourlyStatistic[]),
+        statisticsService.getOverview(from, to),
       ]);
-      set({ rangeStats, categoryStats, hourlyStats, loading: false });
+      set({ rangeStats, categoryStats, hourlyStats, overview, loading: false });
     } catch {
       set({ loading: false });
     }

@@ -10,7 +10,6 @@ const mocks = vi.hoisted(() => ({
   completeTask: vi.fn(),
   pause: vi.fn(),
   resume: vi.fn(),
-  refreshNews: vi.fn(),
   setTab: vi.fn(),
   show: vi.fn(),
   unminimize: vi.fn(),
@@ -43,11 +42,6 @@ vi.mock("../stores/pomodoroStore", () => ({
     }),
   },
 }));
-vi.mock("../stores/newsStore", () => ({
-  useNewsStore: {
-    getState: () => ({ refresh: mocks.refreshNews }),
-  },
-}));
 vi.mock("../stores/statisticsStore", () => ({
   useStatisticsStore: {
     getState: () => ({ setTab: mocks.setTab }),
@@ -62,10 +56,12 @@ vi.mock("@tauri-apps/api/window", () => ({
 }));
 
 import { dispatchShortcut } from "./shortcutActions";
+import { undoManager } from "./undoManager";
 
 describe("dispatchShortcut", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    undoManager.clear();
   });
 
   test("open_today / open_focus / open_settings 切换页面", () => {
@@ -75,14 +71,6 @@ describe("dispatchShortcut", () => {
     expect(mocks.setPage).toHaveBeenCalledWith("focus");
     dispatchShortcut("open_settings");
     expect(mocks.setPage).toHaveBeenCalledWith("settings");
-  });
-
-  test("open_news 切换页面，refresh_news 切换并刷新", () => {
-    dispatchShortcut("open_news");
-    expect(mocks.setPage).toHaveBeenCalledWith("news");
-    dispatchShortcut("refresh_news");
-    expect(mocks.setPage).toHaveBeenCalledWith("news");
-    expect(mocks.refreshNews).toHaveBeenCalled();
   });
 
   test("open_statistics 切到统计 Tab，open_achievements 切到成就 Tab", () => {
@@ -124,5 +112,28 @@ describe("dispatchShortcut", () => {
     expect(mocks.show).toHaveBeenCalled();
     expect(mocks.unminimize).toHaveBeenCalled();
     expect(mocks.setFocus).toHaveBeenCalled();
+  });
+
+  test("undo / redo 调用全局撤销管理器", async () => {
+    const calls: string[] = [];
+    undoManager.push({
+      type: "test",
+      label: "测试",
+      undo: () => {
+        calls.push("undo");
+      },
+      redo: () => {
+        calls.push("redo");
+      },
+    });
+    dispatchShortcut("undo");
+    await vi.waitFor(() => expect(calls).toContain("undo"));
+    dispatchShortcut("redo");
+    await vi.waitFor(() => expect(calls).toContain("redo"));
+    // 空栈不报错
+    undoManager.clear();
+    dispatchShortcut("undo");
+    dispatchShortcut("redo");
+    expect(calls).toEqual(["undo", "redo"]);
   });
 });

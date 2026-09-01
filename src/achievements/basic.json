@@ -38,5 +38,15 @@
     "chainId": "pomodoro_count",
     "order": 4,
     "condition": { "type": "event_count", "target": 100 }
+  },
+  {
+    "id": "five_hundred_pomodoros",
+    "name": "千锤百炼",
+    "description": "累计完成 500 个番茄钟",
+    "icon": "Award",
+    "category": "basic",
+    "chainId": "pomodoro_count",
+    "order": 5,
+    "condition": { "type": "event_count", "target": 500 }
   }
 ]

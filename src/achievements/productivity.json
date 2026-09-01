@@ -30,6 +30,16 @@
     "condition": { "type": "total_duration", "target": 3000 }
   },
   {
+    "id": "total_100h",
+    "name": "时间的掌控者",
+    "description": "累计投入 100 小时",
+    "icon": "Crown",
+    "category": "productivity",
+    "chainId": "total_duration",
+    "order": 4,
+    "condition": { "type": "total_duration", "target": 6000 }
+  },
+  {
     "id": "daily_4h",
     "name": "全天候",
     "description": "单日投入达到 4 小时",
@@ -58,13 +68,23 @@
     "condition": { "type": "streak_days", "target": 7 }
   },
   {
+    "id": "streak_14",
+    "name": "两周坚持",
+    "description": "连续 14 天完成番茄钟",
+    "icon": "CalendarHeart",
+    "category": "productivity",
+    "chainId": "streak",
+    "order": 3,
+    "condition": { "type": "streak_days", "target": 14 }
+  },
+  {
     "id": "streak_30",
     "name": "月度达人",
     "description": "连续 30 天完成番茄钟",
     "icon": "Medal",
     "category": "productivity",
     "chainId": "streak",
-    "order": 3,
+    "order": 4,
     "condition": { "type": "streak_days", "target": 30 }
   }
 ]

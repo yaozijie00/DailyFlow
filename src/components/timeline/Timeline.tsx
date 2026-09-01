@@ -62,6 +62,8 @@ export default function Timeline() {
   const createTask = useTaskStore((s) => s.createTask);
   const taskDrag = useTaskStore((s) => s.taskDrag);
   const endTaskDrag = useTaskStore((s) => s.endTaskDrag);
+  const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
+  const selectTask = useTaskStore((s) => s.selectTask);
   const notes = useNoteStore((s) => s.notes);
   const updateNote = useNoteStore((s) => s.update);
   const settings = useSettingsStore((s) => s.settings);
@@ -70,6 +72,8 @@ export default function Timeline() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const taskAreaRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ startY: number } | null>(null);
+  /** 任务块拖拽标记：本次 mousedown 是否真的发生了拖动（抑制拖拽后的 click 选中） */
+  const blockDragRef = useRef(false);
   const [preview, setPreview] = useState<TimeRange | null>(null);
   const [blockPreview, setBlockPreview] = useState<BlockPreview | null>(null);
   const [dropPreview, setDropPreview] = useState<BlockPreview | null>(null);
@@ -375,6 +379,7 @@ export default function Timeline() {
   function startMove(e: React.MouseEvent, task: Task) {
     e.stopPropagation();
     e.preventDefault(); // 阻止拖拽过程中选中文字
+    blockDragRef.current = false;
     const origStart = task.plannedStart!;
     const origEnd = task.plannedEnd!;
     const startY = yFromClientY(e.clientY);
@@ -395,6 +400,7 @@ export default function Timeline() {
     startWindowDrag(
       {
         onMove: (ev) => {
+          blockDragRef.current = true; // 发生过拖动 → 松手后的 click 不触发选中
           const removing = isOutside(ev);
           const deltaY = yFromClientY(ev.clientY) - startY;
           const { startMs, endMs } = moveTaskBy(origStart, origEnd, deltaY, config, pxPerMinute);
@@ -675,10 +681,18 @@ export default function Timeline() {
               // 视觉状态（拖拽/调整中不套用状态样式，避免干扰）
               const state = isPreviewing ? "normal" : taskBlockState(task.status);
               const info = blockInfoLevel(height);
+              const selected = task.id === selectedTaskId;
               return (
                 <div
                   key={task.id}
                   onMouseDown={(e) => startMove(e, task)}
+                  onClick={() => {
+                    if (blockDragRef.current) {
+                      blockDragRef.current = false; // 拖拽后的 click 不触发选中
+                      return;
+                    }
+                    selectTask(task.id); // 单击任务块 → 右侧详情面板
+                  }}
                   onDoubleClick={() => handleTaskDoubleClick(task)}
                   className={`absolute cursor-grab select-none overflow-hidden rounded text-xs active:cursor-grabbing ${
                     isRemoving
@@ -690,6 +704,10 @@ export default function Timeline() {
                           : state === "cancelled"
                             ? "opacity-40"
                             : "text-neutral-900 hover:brightness-95"
+                  } ${
+                    selected
+                      ? "z-10 ring-2 ring-neutral-900/40"
+                      : ""
                   } ${laneStyle ? "" : "left-1 right-1"}`}
                   style={{
                     top,

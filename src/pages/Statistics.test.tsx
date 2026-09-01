@@ -2,10 +2,29 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import Statistics from "./Statistics";
-import type { RangeStatistics } from "../services/statisticsService";
+import type { OverviewStatistics } from "../services/statisticsService";
 import type { AchievementProgressView } from "../services/achievementService";
 
 afterEach(cleanup);
+
+function makeOverview(overrides: Partial<OverviewStatistics> = {}): OverviewStatistics {
+  return {
+    totalSeconds: 1500,
+    sessionCount: 2,
+    completedFocusCount: 1,
+    avgSessionSeconds: 750,
+    avgDailySeconds: 1500,
+    topCategory: "开发",
+    taskCreated: 5,
+    taskCompleted: 3,
+    taskIncomplete: 2,
+    completionRate: 0.6,
+    categoryStats: [],
+    dailyFocus: [],
+    dailyCompletedTasks: [],
+    ...overrides,
+  };
+}
 
 const statsState = vi.hoisted(() => ({
   tab: "statistics",
@@ -13,9 +32,8 @@ const statsState = vi.hoisted(() => ({
   customFrom: "2026-08-27",
   customTo: "2026-08-27",
   loading: false,
-  rangeStats: null as RangeStatistics | null,
-  categoryStats: [] as unknown[],
   hourlyStats: [] as unknown[],
+  overview: null as OverviewStatistics | null,
   setTab: vi.fn(),
   setRange: vi.fn(),
   setCustomRange: vi.fn(),
@@ -74,8 +92,7 @@ function makeAchievement(overrides: Partial<AchievementProgressView> = {}): Achi
 describe("Statistics 页面（统计 + 成就 Tab）", () => {
   beforeEach(() => {
     statsState.tab = "statistics";
-    statsState.rangeStats = null;
-    statsState.categoryStats = [];
+    statsState.overview = null;
     statsState.hourlyStats = [];
     achState.items = [];
     achState.loading = false;
@@ -112,10 +129,14 @@ describe("Statistics 页面（统计 + 成就 Tab）", () => {
     expect(screen.getByText(/暂无成就/)).toBeTruthy();
   });
 
-  it("统计 Tab 有数据时显示汇总卡", () => {
-    statsState.rangeStats = { totalSeconds: 1500, completedCount: 1, eventCount: 2 };
+  it("统计 Tab 有数据时显示核心指标", () => {
+    statsState.overview = makeOverview();
     render(<Statistics />);
     expect(screen.getByText("总投入")).toBeTruthy();
-    expect(screen.getByText("完成番茄")).toBeTruthy();
+    expect(screen.getByText("专注次数")).toBeTruthy();
+    expect(screen.getByText("完成任务")).toBeTruthy();
+    expect(screen.getByText("完成率")).toBeTruthy();
+    expect(screen.getByText("60%")).toBeTruthy(); // 完成率 0.6
+    expect(screen.getByText("开发")).toBeTruthy(); // 最常类别
   });
 });

@@ -5,6 +5,7 @@ import { CategoryRepository, type Category } from "../db/repositories/categoryRe
 import { FocusSessionRepository } from "../db/repositories/focusSessionRepository";
 import { TaskService, type TaskCreateInput } from "../services/taskService";
 import { CategoryService } from "../services/categoryService";
+import { evaluateAndNotify } from "../services/achievementRuntime";
 import { todayString } from "../lib/date";
 import { useAppStore } from "./appStore";
 
@@ -12,6 +13,8 @@ const taskService = new TaskService(
   new TaskRepository(getDb()),
   new FocusSessionRepository(getDb()),
 );
+/** 共享任务服务单例（详情面板等只读查询复用，避免重复实例化）。 */
+export { taskService };
 const categoryService = new CategoryService(new CategoryRepository(getDb()));
 
 export interface CreateDraft {
@@ -142,6 +145,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     try {
       await taskService.completeTask(id);
       await get().load();
+      // 任务类成就（完成任务数 / 单日任务）在任务变更后评估
+      void evaluateAndNotify();
     } catch {
       fail("完成任务失败");
     }
@@ -151,6 +156,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     try {
       await taskService.toggleComplete(id);
       await get().load();
+      void evaluateAndNotify();
     } catch {
       fail("切换任务状态失败");
     }
@@ -160,6 +166,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     try {
       await taskService.cancelTask(id);
       await get().load();
+      void evaluateAndNotify();
     } catch {
       fail("取消任务失败");
     }

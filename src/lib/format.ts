@@ -16,6 +16,17 @@ export function formatTimer(ms: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
+/** 把时间戳格式化为本地日期时间，如 2026-08-27 09:30。 */
+export function formatDateTime(ms: number | null): string {
+  if (ms == null) return "—";
+  const d = new Date(ms);
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const h = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${d.getFullYear()}-${m}-${day} ${h}:${min}`;
+}
+
 /** 把「秒」格式化为紧凑时长，如 25m / 1h 20m / 3h（统计图表用）。 */
 export function formatDurationCompact(seconds: number): string {
   const minutes = Math.round(seconds / 60);

@@ -1,0 +1,78 @@
+[
+  {
+    "id": "first_task_completed",
+    "name": "首战告捷",
+    "description": "完成第一个任务",
+    "icon": "CheckCircle",
+    "category": "task",
+    "chainId": "tasks_completed",
+    "order": 1,
+    "condition": { "type": "tasks_completed", "target": 1 }
+  },
+  {
+    "id": "ten_tasks_completed",
+    "name": "渐入佳境",
+    "description": "累计完成 10 个任务",
+    "icon": "ListChecks",
+    "category": "task",
+    "chainId": "tasks_completed",
+    "order": 2,
+    "condition": { "type": "tasks_completed", "target": 10 }
+  },
+  {
+    "id": "fifty_tasks_completed",
+    "name": "行动派",
+    "description": "累计完成 50 个任务",
+    "icon": "ClipboardCheck",
+    "category": "task",
+    "chainId": "tasks_completed",
+    "order": 3,
+    "condition": { "type": "tasks_completed", "target": 50 }
+  },
+  {
+    "id": "hundred_tasks_completed",
+    "name": "使命必达",
+    "description": "累计完成 100 个任务",
+    "icon": "BadgeCheck",
+    "category": "task",
+    "chainId": "tasks_completed",
+    "order": 4,
+    "condition": { "type": "tasks_completed", "target": 100 }
+  },
+  {
+    "id": "daily_three_tasks",
+    "name": "高效一日",
+    "description": "单日完成 3 个任务",
+    "icon": "Zap",
+    "category": "task",
+    "chainId": "daily_tasks",
+    "order": 1,
+    "condition": { "type": "daily_tasks_completed", "target": 3 }
+  },
+  {
+    "id": "daily_five_tasks",
+    "name": "火力全开",
+    "description": "单日完成 5 个任务",
+    "icon": "Rocket",
+    "category": "task",
+    "chainId": "daily_tasks",
+    "order": 2,
+    "condition": { "type": "daily_tasks_completed", "target": 5 }
+  },
+  {
+    "id": "first_planned_task",
+    "name": "规划者",
+    "description": "第一次在时间轴规划任务",
+    "icon": "CalendarRange",
+    "category": "task",
+    "condition": { "type": "planned_tasks", "target": 1 }
+  },
+  {
+    "id": "first_planned_completed",
+    "name": "按计划完成",
+    "description": "完成第一个时间轴规划的任务",
+    "icon": "CalendarCheck2",
+    "category": "task",
+    "condition": { "type": "planned_tasks_completed", "target": 1 }
+  }
+]

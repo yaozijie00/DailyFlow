@@ -14,6 +14,15 @@ import {
   Star,
   Target,
   Sun,
+  Crown,
+  CalendarHeart,
+  CheckCircle,
+  ListChecks,
+  ClipboardCheck,
+  BadgeCheck,
+  Rocket,
+  CalendarRange,
+  CalendarCheck2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -34,6 +43,15 @@ const ICONS: Record<string, LucideIcon> = {
   Star,
   Target,
   Sun,
+  Crown,
+  CalendarHeart,
+  CheckCircle,
+  ListChecks,
+  ClipboardCheck,
+  BadgeCheck,
+  Rocket,
+  CalendarRange,
+  CalendarCheck2,
 };
 
 export function AchievementIcon({ name, size = 22 }: { name: string; size?: number }) {

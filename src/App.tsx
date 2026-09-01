@@ -1,22 +1,22 @@
 import { useEffect } from "react";
 import Layout from "./components/Layout";
+import CloseBehaviorDialog from "./components/settings/CloseBehaviorDialog";
 import { useAppStore } from "./stores/appStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { usePomodoroStore } from "./stores/pomodoroStore";
 import { useGoalStore } from "./stores/goalStore";
 import Today from "./pages/Today";
 import Focus from "./pages/Focus";
-import News from "./pages/News";
 import Goals from "./pages/Goals";
 import Statistics from "./pages/Statistics";
 import Settings from "./pages/Settings";
 import { useShortcuts } from "./hooks/useShortcuts";
 import { databaseService } from "./services/databaseService";
+import { initWindowBehavior } from "./services/windowBehaviorService";
 
 const pages = {
   today: Today,
   focus: Focus,
-  news: News,
   goals: Goals,
   statistics: Statistics,
   settings: Settings,
@@ -28,6 +28,9 @@ function App() {
   const setDbStatus = useAppStore((s) => s.setDbStatus);
   const dbStatus = useAppStore((s) => s.dbStatus);
   const Page = pages[currentPage];
+
+  // 窗口行为（关闭拦截 / 托盘「开始暂停专注」）监听
+  useEffect(() => initWindowBehavior(), []);
 
   useEffect(() => {
     databaseService.init().then((result) => {
@@ -49,6 +52,7 @@ function App() {
   return (
     <Layout>
       <Page />
+      <CloseBehaviorDialog />
     </Layout>
   );
 }

@@ -3,7 +3,6 @@ import { create } from "zustand";
 export type Page =
   | "today"
   | "focus"
-  | "news"
   | "goals"
   | "statistics"
   | "settings";
@@ -23,6 +22,9 @@ export interface AchievementToast {
   description: string;
 }
 
+/** 关闭行为对话框类型：first=首次询问，exit-focus=退出前确认（Focus 运行中）。 */
+export type CloseDialogKind = "first" | "exit-focus";
+
 interface AppState {
   currentPage: Page;
   setPage: (page: Page) => void;
@@ -39,6 +41,11 @@ interface AppState {
   achievementToasts: AchievementToast[];
   pushAchievement: (name: string, description: string) => void;
   removeAchievementToast: (id: number) => void;
+
+  /** 关闭行为对话框（首次询问 / Focus 运行中退出确认）；null=关闭 */
+  closeDialog: CloseDialogKind | null;
+  openCloseDialog: (kind: CloseDialogKind) => void;
+  closeCloseDialog: () => void;
 }
 
 let toastId = 0;
@@ -70,4 +77,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   removeAchievementToast: (id) =>
     set((s) => ({ achievementToasts: s.achievementToasts.filter((t) => t.id !== id) })),
+
+  closeDialog: null,
+  openCloseDialog: (kind) => set({ closeDialog: kind }),
+  closeCloseDialog: () => set({ closeDialog: null }),
 }));

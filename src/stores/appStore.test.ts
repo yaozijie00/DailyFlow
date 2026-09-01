@@ -3,8 +3,32 @@ import { useAppStore } from "./appStore";
 
 afterEach(() => {
   // 重置 toast 状态，避免用例间串扰
-  useAppStore.setState({ toasts: [], achievementToasts: [] });
+  useAppStore.setState({ toasts: [], achievementToasts: [], closeDialog: null });
   vi.useRealTimers();
+});
+
+describe("appStore 默认页面 / 关闭对话框", () => {
+  it("默认启动页面为「今日」（不记忆上次页面）", () => {
+    expect(useAppStore.getState().currentPage).toBe("today");
+  });
+
+  it("setPage 切换页面", () => {
+    useAppStore.getState().setPage("statistics");
+    expect(useAppStore.getState().currentPage).toBe("statistics");
+    useAppStore.getState().setPage("today"); // 还原
+  });
+
+  it("closeDialog：首次询问打开/关闭", () => {
+    const s = useAppStore.getState();
+    expect(s.closeDialog).toBeNull();
+    s.openCloseDialog("first");
+    expect(useAppStore.getState().closeDialog).toBe("first");
+    useAppStore.getState().closeCloseDialog();
+    expect(useAppStore.getState().closeDialog).toBeNull();
+    useAppStore.getState().openCloseDialog("exit-focus");
+    expect(useAppStore.getState().closeDialog).toBe("exit-focus");
+    useAppStore.getState().closeCloseDialog();
+  });
 });
 
 describe("appStore.toasts", () => {

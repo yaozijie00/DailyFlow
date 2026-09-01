@@ -23,11 +23,16 @@ export interface AppSettings {
   timelineSnapMinutes: number;
   /** 时间轴缩放（每像素分钟数，默认 1.5） */
   timelinePxPerMinute: number;
-  /** 新闻自动刷新间隔（分钟） */
-  newsRefreshIntervalMinutes: number;
   /** 专注开始/结束系统通知开关 */
   notificationsEnabled: boolean;
+  /** 关闭窗口行为：exit=退出 DailyFlow，tray=隐藏到系统托盘 */
+  closeBehavior: CloseBehavior;
+  /** 用户是否已明确选择过关闭行为（首次点击 X 询问后置 true） */
+  closeBehaviorConfigured: boolean;
 }
+
+/** 关闭窗口行为。 */
+export type CloseBehavior = "exit" | "tray";
 
 export const DEFAULT_SETTINGS: AppSettings = {
   pomodoroDurationMinutes: 25,
@@ -38,8 +43,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   timelineEndMinutes: 24 * 60, // 24:00
   timelineSnapMinutes: 15,
   timelinePxPerMinute: 1.5,
-  newsRefreshIntervalMinutes: 30,
   notificationsEnabled: true,
+  closeBehavior: "exit",
+  closeBehaviorConfigured: false, // 旧版本升级：首次点击 X 询问
 };
 
 /** settings 表键名（存储格式：时长用秒或分钟、时间用 "HH:mm"、粒度用分钟）。 */
@@ -52,8 +58,9 @@ const KEY_TIMELINE_END = "timeline_end";
 const KEY_TIMELINE_SNAP = "timeline_snap";
 const KEY_TIMELINE_PX_PER_MINUTE = "timeline_px_per_minute";
 const KEY_SHORTCUTS = "shortcuts";
-const KEY_NEWS_REFRESH_INTERVAL = "news_refresh_interval";
 const KEY_NOTIFICATIONS = "notifications_enabled";
+const KEY_CLOSE_BEHAVIOR = "close_behavior";
+const KEY_CLOSE_BEHAVIOR_CONFIGURED = "close_behavior_configured";
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
@@ -127,10 +134,10 @@ export class SettingsService {
         DEFAULT_SETTINGS.timelineEndMinutes,
       timelineSnapMinutes: Math.round(parseIntSafe(stored[KEY_TIMELINE_SNAP], 15)),
       timelinePxPerMinute: parseFloatSafe(stored[KEY_TIMELINE_PX_PER_MINUTE], 1.5),
-      newsRefreshIntervalMinutes: Math.round(
-        parseIntSafe(stored[KEY_NEWS_REFRESH_INTERVAL], 30),
-      ),
       notificationsEnabled: stored[KEY_NOTIFICATIONS] !== "0",
+      closeBehavior:
+        stored[KEY_CLOSE_BEHAVIOR] === "tray" ? "tray" : "exit",
+      closeBehaviorConfigured: stored[KEY_CLOSE_BEHAVIOR_CONFIGURED] === "1",
     };
   }
 
@@ -170,14 +177,14 @@ export class SettingsService {
       const p = clamp(partial.timelinePxPerMinute, 1, 3);
       writes.push([KEY_TIMELINE_PX_PER_MINUTE, String(p)]);
     }
-    if (partial.newsRefreshIntervalMinutes !== undefined) {
-      writes.push([
-        KEY_NEWS_REFRESH_INTERVAL,
-        String(clamp(Math.round(partial.newsRefreshIntervalMinutes), 5, 1440)),
-      ]);
-    }
     if (partial.notificationsEnabled !== undefined) {
       writes.push([KEY_NOTIFICATIONS, partial.notificationsEnabled ? "1" : "0"]);
+    }
+    if (partial.closeBehavior !== undefined) {
+      writes.push([KEY_CLOSE_BEHAVIOR, partial.closeBehavior === "tray" ? "tray" : "exit"]);
+    }
+    if (partial.closeBehaviorConfigured !== undefined) {
+      writes.push([KEY_CLOSE_BEHAVIOR_CONFIGURED, partial.closeBehaviorConfigured ? "1" : "0"]);
     }
     for (const [k, v] of writes) {
       await this.repo.set(k, v);

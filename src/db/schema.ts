@@ -1,7 +1,7 @@
 import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
 
 /**
- * 数据模型（9 张表）+ 外键关系
+ * 数据模型（7 张表）+ 外键关系
  * - 时长单位：秒
  * - 时间戳单位：Unix 毫秒
  * - 日期：本地 YYYY-MM-DD
@@ -60,31 +60,6 @@ export const focusSessions = sqliteTable("focus_sessions", {
 export const settings = sqliteTable("settings", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
-});
-
-export const newsItems = sqliteTable("news_items", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  guid: text("guid").unique(),
-  url: text("url").notNull().unique(),
-  title: text("title").notNull(),
-  source: text("source").notNull(),
-  imageUrl: text("image_url"),
-  summary: text("summary"),
-  category: text("category").notNull(),
-  publishedAt: integer("published_at"),
-  isRead: integer("is_read", { mode: "boolean" }).notNull().default(false),
-  isFavorite: integer("is_favorite", { mode: "boolean" }).notNull().default(false),
-  createdAt: integer("created_at").notNull(),
-});
-
-export const newsSources = sqliteTable("news_sources", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull(),
-  url: text("url").notNull().unique(),
-  category: text("category").notNull(),
-  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
-  sortOrder: integer("sort_order").notNull().default(0),
-  createdAt: integer("created_at").notNull(),
 });
 
 export const achievementProgress = sqliteTable("achievement_progress", {

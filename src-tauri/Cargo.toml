@@ -1,6 +1,6 @@
 [package]
 name = "dailyflow"
-version = "1.4.0"
+version = "1.4.1"
 description = "DailyFlow - 个人本地时间管理工具"
 authors = ["you"]
 edition = "2021"
@@ -18,16 +18,15 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["protocol-asset"] }
+tauri = { version = "2", features = ["protocol-asset", "tray-icon"] }
 tauri-plugin-sql = { version = "2", features = ["sqlite"] }
 tauri-plugin-notification = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 chrono = "0.4"
 windows-sys = { version = "0.59", features = ["Win32_UI_WindowsAndMessaging", "Win32_System_Com"] }
-# 新闻源抓取（RSS，阻塞调用在 spawn_blocking 中执行）与系统浏览器打开外链
-ureq = "2"
-open = "5"
+# 专注完成原生桌面通知（与 tauri-plugin-notification 共用同一版本，无新增传递依赖）
+notify-rust = "4"
 # 仅用于启动自诊断：探测 WebView2 加载器将使用的运行时版本
 webview2-com-sys = "0.38"
 webview2-com = "0.38"
