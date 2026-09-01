@@ -610,6 +610,15 @@ pub fn run() {
     });
 
     let result = tauri::Builder::default()
+        // 单实例保护（置于最前）：重复启动（双击 exe/快捷方式、托盘已运行）时
+        // 聚焦并显示已有主窗口，而不是再开一个进程/窗口。
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.show();
+                let _ = w.unminimize();
+                let _ = w.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_sql::Builder::default().build())
         .plugin(tauri_plugin_notification::init())
         .setup(|app| {
