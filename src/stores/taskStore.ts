@@ -9,6 +9,7 @@ import { CategoryService } from "../services/categoryService";
 import { NoteService } from "../services/noteService";
 import { evaluateAndNotify } from "../services/achievementRuntime";
 import { convertTaskToNote } from "../lib/noteConvert";
+import { undoManager } from "../lib/undoManager";
 import { todayString } from "../lib/date";
 import { useAppStore } from "./appStore";
 import { useNoteStore } from "./noteStore";
@@ -150,12 +151,15 @@ export const useTaskStore = create<TaskState>((set, get) => ({
 
   convertToNote: async (id) => {
     try {
-      const ok = await convertTaskToNote(
-        id,
-        get().tasks,
-        (input) => noteService.create(input),
-        (taskId) => taskService.deleteTaskKeepSessions(taskId),
-        (noteId) => noteService.delete(noteId),
+      // 任务 → 便签 作为一次 Undo 复合操作（创建便签 + 删除任务，一次撤销整体还原）
+      const ok = await undoManager.withBatchAsync(() =>
+        convertTaskToNote(
+          id,
+          get().tasks,
+          (input) => noteService.create(input),
+          (taskId) => taskService.deleteTaskKeepSessions(taskId),
+          (noteId) => noteService.delete(noteId),
+        ),
       );
       if (!ok) {
         fail("转为便签失败");

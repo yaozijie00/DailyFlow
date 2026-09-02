@@ -13,6 +13,7 @@ import Settings from "./pages/Settings";
 import { useShortcuts } from "./hooks/useShortcuts";
 import { databaseService } from "./services/databaseService";
 import { initWindowBehavior } from "./services/windowBehaviorService";
+import { undoManager } from "./lib/undoManager";
 
 const pages = {
   today: Today,
@@ -27,7 +28,13 @@ function App() {
   const currentPage = useAppStore((s) => s.currentPage);
   const setDbStatus = useAppStore((s) => s.setDbStatus);
   const dbStatus = useAppStore((s) => s.dbStatus);
+  const undoLimit = useSettingsStore((s) => s.settings.undoHistoryLimit);
   const Page = pages[currentPage];
+
+  // 撤销历史上限：跟随设置（默认 50），修改后立即生效
+  useEffect(() => {
+    undoManager.setMaxHistory(undoLimit);
+  }, [undoLimit]);
 
   // 窗口行为（关闭拦截 / 托盘「开始暂停专注」）监听
   useEffect(() => initWindowBehavior(), []);

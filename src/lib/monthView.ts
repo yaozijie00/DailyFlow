@@ -1,8 +1,8 @@
 /**
- * 月视图纯工具（V2 长期规划）：
- * - 月份网格（周一为一周首日）
- * - 日期字符串 / 解析
- * - 任务块在月网格中的定位（开始列 / 跨天宽度）
+ * 月视图纯工具（V2/v1.6 长期规划）：
+ * - 月度日时间轴：当月每天一个独立日期列（非 7 列周视图）
+ * - 动态天数（28/29/30/31，跨年正确）
+ * - 任务块按「日偏移 × 日宽」定位，跨月裁剪
  * 无 UI 依赖，便于单测。
  */
 
@@ -13,46 +13,55 @@ export function dateKey(d: Date): string {
   return `${d.getFullYear()}-${m}-${day}`;
 }
 
-/** 解析 YYYY-MM-DD（本地时区，当日 00:00）。非法返回 null。 */
+/** 解析 YYYY-MM-DD（本地时区）。非法返回 null。 */
 export function parseDateKey(s: string): Date | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
   if (!m) return null;
   const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-  if (d.getFullYear() !== Number(m[1]) || d.getMonth() !== Number(m[2]) - 1 || d.getDate() !== Number(m[3])) {
+  if (
+    d.getFullYear() !== Number(m[1]) ||
+    d.getMonth() !== Number(m[2]) - 1 ||
+    d.getDate() !== Number(m[3])
+  ) {
     return null;
   }
   return d;
 }
 
-export interface MonthCell {
-  /** YYYY-MM-DD */
-  date: string;
-  /** 当月日号（1..31） */
-  day: number;
-  /** 是否属于当月（false 为上/下月补位） */
-  inMonth: boolean;
+/** 某月自然日数（2 月 28/29、大小月自动）。 */
+export function daysInMonth(year: number, month: number): number {
+  return new Date(year, month + 1, 0).getDate();
 }
 
-/** 构建某月的网格（周一为一周首日），首尾用相邻月日期补齐到整周。 */
-export function buildMonthGrid(year: number, month: number): MonthCell[] {
-  const first = new Date(year, month, 1);
-  // 周一=0 ... 周日=6
-  const lead = (first.getDay() + 6) % 7;
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const cells: MonthCell[] = [];
-  for (let i = 0; i < lead; i++) {
-    const d = new Date(year, month, 1 - (lead - i));
-    cells.push({ date: dateKey(d), day: d.getDate(), inMonth: false });
+export const WEEKDAY_NAMES = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
+
+/** 日期字符串 → 星期名（周一为首）。 */
+export function weekdayOf(dateStr: string): string {
+  const d = parseDateKey(dateStr);
+  if (!d) return "";
+  return WEEKDAY_NAMES[(d.getDay() + 6) % 7];
+}
+
+export interface MonthDay {
+  /** YYYY-MM-DD */
+  date: string;
+  /** 当月日号 1..N */
+  day: number;
+  /** 周几（周一..周日） */
+  weekday: string;
+  /** 是否今天 */
+  isToday: boolean;
+}
+
+/** 生成当月每天的日期列（连续横向时间轴，1..daysInMonth）。 */
+export function monthDays(year: number, month: number, today = dateKey(new Date())): MonthDay[] {
+  const n = daysInMonth(year, month);
+  const out: MonthDay[] = [];
+  for (let d = 1; d <= n; d++) {
+    const date = dateKey(new Date(year, month, d));
+    out.push({ date, day: d, weekday: weekdayOf(date), isToday: date === today });
   }
-  for (let d = 1; d <= daysInMonth; d++) {
-    cells.push({ date: dateKey(new Date(year, month, d)), day: d, inMonth: true });
-  }
-  const tail = (7 - (cells.length % 7)) % 7;
-  for (let i = 1; i <= tail; i++) {
-    const d = new Date(year, month, daysInMonth + i);
-    cells.push({ date: dateKey(d), day: d.getDate(), inMonth: false });
-  }
-  return cells;
+  return out;
 }
 
 /** 月份标题，如「2026年9月」。 */
@@ -60,34 +69,29 @@ export function monthLabel(year: number, month: number): string {
   return `${year}年${month + 1}月`;
 }
 
-/** 日期字符串比较是否 a <= b。 */
-export function dateLE(a: string, b: string): boolean {
-  return a <= b;
-}
-
 /**
- * 计算任务块在某月网格中的跨度：
- * 返回 [startIndex, endIndex]（闭区间，列下标）；若与本月无交集返回 null。
- * 无开始/结束日期时视为「未安排」由调用方单独处理。
+ * 任务块在某月内的日跨度（1-based 天号，闭区间）。
+ * 与本月无交集返回 null；跨月任务裁剪到月边界。
  */
-export function spanInGrid(
+export function daySpanInMonth(
   startDate: string | null,
   endDate: string | null,
-  cells: MonthCell[],
-): { startIndex: number; endIndex: number } | null {
+  year: number,
+  month: number,
+): { start: number; end: number } | null {
   if (!startDate || !endDate) return null;
-  const first = cells[0].date;
-  const last = cells[cells.length - 1].date;
-  const s = startDate < first ? first : startDate;
-  const e = endDate > last ? last : endDate;
-  if (s > last || e < first || s > e) return null;
-  const startIndex = cells.findIndex((c) => c.date === s);
-  const endIndex = cells.findIndex((c) => c.date === e);
-  if (startIndex < 0 || endIndex < 0) return null;
-  return { startIndex: Math.min(startIndex, endIndex), endIndex: Math.max(startIndex, endIndex) };
+  const start = parseDateKey(startDate);
+  const end = parseDateKey(endDate);
+  if (!start || !end) return null;
+  const monthStart = new Date(year, month, 1);
+  const monthEnd = new Date(year, month + 1, 0);
+  if (end < monthStart || start > monthEnd) return null;
+  const s = start < monthStart ? 1 : start.getDate();
+  const e = end > monthEnd ? daysInMonth(year, month) : end.getDate();
+  return { start: Math.min(s, e), end: Math.max(s, e) };
 }
 
-/** 把任务块平移 delta 天（返回新 [startDate, endDate]），无日期范围则返回 null。 */
+/** 把任务块平移 delta 天（返回新 [startDate, endDate]），无日期范围返回 null。 */
 export function shiftDateRange(
   startDate: string | null,
   endDate: string | null,

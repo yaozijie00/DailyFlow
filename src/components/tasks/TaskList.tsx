@@ -11,6 +11,7 @@ import {
   noteDropCallbacks,
   noteDropZoneAt,
 } from "../../lib/noteConvert";
+import { undoManager } from "../../lib/undoManager";
 import { formatDuration } from "../../lib/format";
 import { TASK_STATUS_LABEL } from "../../lib/taskLabels";
 import { NO_CATEGORY_COLOR } from "../../lib/categoryColors";
@@ -98,10 +99,10 @@ export default function TaskList() {
     return () => window.removeEventListener("mousemove", onMove);
   }, []);
 
-  /** 注册投放回调：便签松手在列表上 → 转今日任务（无时间块）。 */
+  /** 注册投放回调：便签松手在列表上 → 转今日任务（无时间块），作为一次 Undo 复合操作。 */
   useEffect(() => {
     noteDropCallbacks.tasklist = (noteId) => {
-      void convertNoteToTask(noteId, notes, createTask, updateNote);
+      void undoManager.withBatchAsync(() => convertNoteToTask(noteId, notes, createTask, updateNote));
     };
     return () => {
       delete noteDropCallbacks.tasklist;

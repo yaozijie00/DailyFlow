@@ -1,76 +1,102 @@
 import { describe, it, expect } from "vitest";
 import {
-  buildMonthGrid,
+  daysInMonth,
+  monthDays,
   monthLabel,
-  spanInGrid,
-  shiftDateRange,
   dateKey,
+  daySpanInMonth,
+  shiftDateRange,
+  weekdayOf,
 } from "./monthView";
 
-describe("buildMonthGrid", () => {
-  it("2026年9月：周一为首，首尾补齐整周，含 30 天", () => {
-    const cells = buildMonthGrid(2026, 8);
-    expect(cells.length % 7).toBe(0);
-    const inMonth = cells.filter((c) => c.inMonth);
-    expect(inMonth.length).toBe(30);
-    expect(inMonth[0].date).toBe("2026-09-01");
-    expect(inMonth[29].date).toBe("2026-09-30");
-    // 2026-09-01 是周二（getDay()=2）→ 周一补位 1 天
-    expect(new Date(2026, 8, 1).getDay()).toBe(2);
-    expect(cells[0].date).toBe("2026-08-31");
-    expect(cells[0].inMonth).toBe(false);
+describe("daysInMonth（动态天数，不硬编码）", () => {
+  it("2026 年 9 月 30 天", () => {
+    expect(daysInMonth(2026, 8)).toBe(30);
+  });
+  it("2026 年 10 月 31 天", () => {
+    expect(daysInMonth(2026, 9)).toBe(31);
+  });
+  it("平年 2 月 28 天、闰年 2 月 29 天", () => {
+    expect(daysInMonth(2026, 1)).toBe(28);
+    expect(daysInMonth(2028, 1)).toBe(29);
+    expect(daysInMonth(2024, 1)).toBe(29);
+  });
+  it("跨年月份正常", () => {
+    expect(daysInMonth(2026, 11)).toBe(31); // 2026-12
+    expect(daysInMonth(2027, 0)).toBe(31); // 2027-01
   });
 });
 
-describe("monthLabel / dateKey", () => {
-  it("monthLabel 输出「YYYY年M月」", () => {
-    expect(monthLabel(2026, 8)).toBe("2026年9月");
+describe("monthDays（月度日时间轴：每月每天一列）", () => {
+  it("2026 年 9 月生成 1..30 共 30 个日期列（非 7 列）", () => {
+    const days = monthDays(2026, 8);
+    expect(days).toHaveLength(30);
+    expect(days[0]).toMatchObject({ date: "2026-09-01", day: 1 });
+    expect(days[29]).toMatchObject({ date: "2026-09-30", day: 30 });
   });
-  it("dateKey 输出本地 YYYY-MM-DD", () => {
-    expect(dateKey(new Date(2026, 8, 5))).toBe("2026-09-05");
+
+  it("每天带星期标注；2026-09-01 为周二", () => {
+    const days = monthDays(2026, 8);
+    expect(days[0].weekday).toBe("周二");
+    expect(days[2].weekday).toBe("周四");
+  });
+
+  it("今天高亮标记", () => {
+    const days = monthDays(2026, 8, "2026-09-02");
+    expect(days.find((d) => d.isToday)?.day).toBe(2);
+  });
+
+  it("weekdayOf：2026-09-05 周六 / 09-06 周日", () => {
+    expect(weekdayOf("2026-09-05")).toBe("周六");
+    expect(weekdayOf("2026-09-06")).toBe("周日");
   });
 });
 
-describe("spanInGrid（任务块跨度）", () => {
-  const cells = buildMonthGrid(2026, 8); // 2026-09
-
-  it("完全在月内", () => {
-    const s = spanInGrid("2026-09-05", "2026-09-20", cells);
-    expect(s).not.toBeNull();
-    expect(cells[s!.startIndex].date).toBe("2026-09-05");
-    expect(cells[s!.endIndex].date).toBe("2026-09-20");
+describe("daySpanInMonth（任务块日跨度 + 跨月裁剪）", () => {
+  it("完全在月内：3～8 → {start:3,end:8}", () => {
+    expect(daySpanInMonth("2026-09-03", "2026-09-08", 2026, 8)).toEqual({ start: 3, end: 8 });
   });
-
-  it("跨月任务：夹取到网格边界（含首尾补位单元格）", () => {
-    const s = spanInGrid("2026-08-25", "2026-10-20", cells);
-    expect(s).not.toBeNull();
-    expect(s!.startIndex).toBe(0);
-    expect(s!.endIndex).toBe(cells.length - 1);
+  it("跨月任务：8/25～9/10 → 裁剪为 1～10", () => {
+    expect(daySpanInMonth("2026-08-25", "2026-09-10", 2026, 8)).toEqual({ start: 1, end: 10 });
   });
-
+  it("跨月任务：9/25～10/05 → 裁剪为 25～30", () => {
+    expect(daySpanInMonth("2026-09-25", "2026-10-05", 2026, 8)).toEqual({ start: 25, end: 30 });
+  });
   it("与本月无交集返回 null", () => {
-    expect(spanInGrid("2026-07-01", "2026-07-10", cells)).toBeNull();
+    expect(daySpanInMonth("2026-07-01", "2026-07-10", 2026, 8)).toBeNull();
+    expect(daySpanInMonth("2026-11-01", "2026-11-30", 2026, 8)).toBeNull();
   });
-
   it("无日期范围返回 null", () => {
-    expect(spanInGrid(null, "2026-09-10", cells)).toBeNull();
+    expect(daySpanInMonth(null, "2026-09-10", 2026, 8)).toBeNull();
   });
 });
 
-describe("shiftDateRange（整体平移）", () => {
-  it("平移 +5 天", () => {
+describe("shiftDateRange（日级平移）", () => {
+  it("+5 天", () => {
     expect(shiftDateRange("2026-09-05", "2026-09-20", 5)).toEqual({
       startDate: "2026-09-10",
       endDate: "2026-09-25",
     });
   });
-  it("平移 -3 天", () => {
+  it("-3 天", () => {
     expect(shiftDateRange("2026-09-05", "2026-09-20", -3)).toEqual({
       startDate: "2026-09-02",
       endDate: "2026-09-17",
     });
   });
-  it("无日期范围返回 null", () => {
-    expect(shiftDateRange(null, "2026-09-20", 1)).toBeNull();
+  it("跨月平移", () => {
+    expect(shiftDateRange("2026-09-29", "2026-10-02", 3)).toEqual({
+      startDate: "2026-10-02",
+      endDate: "2026-10-05",
+    });
+  });
+});
+
+describe("monthLabel / dateKey", () => {
+  it("monthLabel", () => {
+    expect(monthLabel(2026, 8)).toBe("2026年9月");
+  });
+  it("dateKey", () => {
+    expect(dateKey(new Date(2026, 8, 5))).toBe("2026-09-05");
   });
 });

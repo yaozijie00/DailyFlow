@@ -128,6 +128,11 @@ export class TaskRepository {
     return rows.length > 0;
   }
 
+  /** 以原 id 重建任务行（撤销「删除任务」用；AUTOINCREMENT 接受显式 id）。 */
+  async insertRestored(task: Task): Promise<void> {
+    await this.db.insert(tasks).values(task).run();
+  }
+
   /** 统计某日任务总数与完成数（含已取消，与任务列表口径一致），单条 SQL 实时聚合。 */
   async countTodayStats(scheduledDate: string): Promise<{ total: number; completed: number }> {
     const rows = await this.db

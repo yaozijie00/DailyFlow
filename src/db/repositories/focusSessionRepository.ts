@@ -103,6 +103,11 @@ export class FocusSessionRepository {
     return rows.length > 0;
   }
 
+  /** 以原 id 重建专注会话（撤销「删除任务」时连带恢复其专注历史）。 */
+  async insertRestored(session: FocusSession): Promise<void> {
+    await this.db.insert(focusSessions).values(session).run();
+  }
+
   /** 统计 [from, to) 内开始会话的总实际时长（秒）与次数，单条 SQL 实时聚合。 */
   async getTodayStats(from: number, to: number): Promise<{ totalSeconds: number; count: number }> {
     const rows = await this.db

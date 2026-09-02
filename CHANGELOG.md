@@ -1,5 +1,27 @@
 # Changelog
 
+## DailyFlow 1.6.0
+
+### Bug Fixes
+
+- Detail Panel 选择同步：拖动任务块后的尾随 click 不再吞掉下一次选择（仅同块拖拽抑制），点击任意块右侧立即切换对应任务
+- Focus Timer 简化：取消「根据任务预计时间/番茄目标自动限制或推算专注时长」（删除约束弹窗与双击自动规划），用户自选时长，系统只按真实 Session 累计实际投入
+- Timeline 块跳动：编辑任务只改内容（标题/备注/分类/预计）时不再重排 sort_order，块位置保持不变；仅改时间才重排
+- 长期月视图时间粒度：从「7 列周视图」改为「月度连续日时间轴」（当月每天一列 + 星期标注，今天高亮、周末浅底、横向滚动、日级 snap、跨月裁剪）
+
+### Features
+
+- 完整 Undo/Redo：删除任务（含专注历史恢复）、便签创建/编辑/完成/删除全部接入；Note↔Task 转换为单次复合操作（一次 Ctrl+Z 整体还原）；历史上限可设（20/50/100/200，默认 50，内存历史不跨重启）
+- Undo/Redo UI：侧边栏按钮（无历史禁用、Undo 后 Redo 启用）+ Ctrl+Y 重做别名 + 失败时栈一致并 Toast 提示
+- 统计「每日任务」按 scheduledDate 分组列表
+
+### Technical
+
+- UndoManager：maxHistory / subscribe / withBatchAsync（批量动作合并）/ 失败回滚栈
+- Repository 新增 insertRestored（任务/会话/便签原 id 重建，供删除撤销）
+- 月视图重构：monthView 提供 daysInMonth/monthDays/daySpanInMonth（动态天数 + 跨月裁剪），任务块定位基于日偏移×日宽
+- 测试 505 项全部通过；版本 1.6.0
+
 ## DailyFlow 1.5.0
 
 ### Bug Fixes

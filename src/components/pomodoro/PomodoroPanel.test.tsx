@@ -166,8 +166,10 @@ describe("PomodoroPanel 规划时间约束（Batch 2C）", () => {
     expect(screen.queryByText("仍然开始")).toBeNull();
   });
 
-  it("剩余 15min / Focus 25min → 弹确认框", () => {
-    vi.spyOn(usePomodoroStore.getState(), "startFocus").mockImplementation(() => {});
+  it("剩余 15min / Focus 25min → 不弹确认框，直接按用户时长开始（v1.6 用户自选）", () => {
+    const startSpy = vi
+      .spyOn(usePomodoroStore.getState(), "startFocus")
+      .mockImplementation(() => {});
     useTaskStore.setState({
       tasks: [
         {
@@ -180,53 +182,15 @@ describe("PomodoroPanel 规划时间约束（Batch 2C）", () => {
       categories: [],
     });
     selectTaskAndStart();
-    expect(screen.getByText(/当前 Focus/)).toBeTruthy();
-    expect(screen.getByText("调整为 15 分钟")).toBeTruthy();
-    expect(screen.getByText("仍然开始")).toBeTruthy();
-  });
-
-  it("点「调整为 15 分钟」→ 按剩余时长开始", () => {
-    const startSpy = vi
-      .spyOn(usePomodoroStore.getState(), "startFocus")
-      .mockImplementation(() => {});
-    useTaskStore.setState({
-      tasks: [
-        {
-          ...task,
-          plannedStart: ts(10, 0),
-          plannedEnd: ts(11, 30),
-          actualDuration: 75 * 60,
-        },
-      ],
-      categories: [],
-    });
-    selectTaskAndStart();
-    fireEvent.click(screen.getByText("调整为 15 分钟"));
-    expect(startSpy).toHaveBeenCalledWith(7, 15 * 60_000);
-  });
-
-  it("点「仍然开始」→ 按原时长开始（记录真实 Focus 时间）", () => {
-    const startSpy = vi
-      .spyOn(usePomodoroStore.getState(), "startFocus")
-      .mockImplementation(() => {});
-    useTaskStore.setState({
-      tasks: [
-        {
-          ...task,
-          plannedStart: ts(10, 0),
-          plannedEnd: ts(11, 30),
-          actualDuration: 75 * 60,
-        },
-      ],
-      categories: [],
-    });
-    selectTaskAndStart();
-    fireEvent.click(screen.getByText("仍然开始"));
     expect(startSpy).toHaveBeenCalledWith(7, 25 * 60_000);
+    expect(screen.queryByText("仍然开始")).toBeNull();
+    expect(screen.queryByText(/当前 Focus/)).toBeNull();
   });
 
-  it("规划时间已用完（剩余 ≤ 0）→ 只提供「仍然开始」", () => {
-    vi.spyOn(usePomodoroStore.getState(), "startFocus").mockImplementation(() => {});
+  it("规划时间已用完 → 仍直接按用户时长开始（不限制）", () => {
+    const startSpy = vi
+      .spyOn(usePomodoroStore.getState(), "startFocus")
+      .mockImplementation(() => {});
     useTaskStore.setState({
       tasks: [
         {
@@ -239,8 +203,8 @@ describe("PomodoroPanel 规划时间约束（Batch 2C）", () => {
       categories: [],
     });
     selectTaskAndStart();
-    expect(screen.queryByText(/调整为/)).toBeNull();
-    expect(screen.getByText("仍然开始")).toBeTruthy();
+    expect(startSpy).toHaveBeenCalledWith(7, 25 * 60_000);
+    expect(screen.queryByText(/仍然开始/)).toBeNull();
   });
 
   it("运行中显示「重新选择」按钮（可返回任务选择，不完成任务）", () => {

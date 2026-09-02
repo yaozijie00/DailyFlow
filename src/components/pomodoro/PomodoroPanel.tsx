@@ -3,13 +3,7 @@ import { Play, Pause, CheckCircle2, Flag, Coffee, SkipForward } from "lucide-rea
 import { usePomodoroStore } from "../../stores/pomodoroStore";
 import { useTaskStore } from "../../stores/taskStore";
 import { useSettingsStore } from "../../stores/settingsStore";
-import { Dialog } from "../ui/Dialog";
 import { formatTimer, formatDuration, parseDurationMinutes } from "../../lib/format";
-import {
-  remainingFocusMs,
-  remainingMinutesLabel,
-} from "../../lib/focusConstraint";
-import type { Task } from "../../db/repositories/taskRepository";
 
 function stateLabel(state: string, phase: string): string {
   if (state === "RUNNING") return phase === "focus" ? "专注中" : "休息中";
@@ -59,23 +53,11 @@ export default function PomodoroPanel() {
   const [durationDraft, setDurationDraft] = useState("");
   /** 滑块本地实时值（拖动时立即反映数字，松手才写入设置） */
   const [sliderValue, setSliderValue] = useState(pomodoroDurationMinutes);
-  /** 约束确认弹窗：本次 Focus 超过 Task 剩余规划时长 */
-  const [constraint, setConstraint] = useState<{
-    task: Task;
-    remainingMs: number;
-    durationMs: number;
-  } | null>(null);
 
-  // 双击时间轴任务预选：回到 IDLE 时自动选中，并应用「本次规划」（时长/番茄数，仅本次）
+  // 双击时间轴任务预选：回到 IDLE 时自动选中（时长由用户自选，不自动推算）
   useEffect(() => {
     if (snapshot.state === "IDLE" && pendingTaskId != null) {
       setSelectedId(String(pendingTaskId));
-      const ctx = usePomodoroStore.getState().plannedContext;
-      if (ctx) {
-        setFocusCountGoal(ctx.count);
-        setSliderValue(ctx.durationMinutes);
-        usePomodoroStore.getState().setPlannedContext(null);
-      }
       setPendingTaskId(null);
     }
   }, [snapshot.state, pendingTaskId, setPendingTaskId]);
@@ -128,19 +110,13 @@ export default function PomodoroPanel() {
   };
 
   /**
-   * 开始专注前的约束检查：本次 Focus 若超过 Task 剩余规划时长，
-   * 弹确认框（提供「调整为剩余」或「仍然开始」），不静默允许。
+   * 开始专注（v1.6）：用户自选时长，系统不根据任务预计时间限制/推算。
    * 时长取滑块/输入的实时值（sliderValue；滑块松手已写回 Settings）。
    */
   function handleStart() {
     const t = tasks.find((x) => x.id === Number(selectedId));
     if (!t) return;
     const durationMs = sliderValue * 60_000;
-    const remaining = remainingFocusMs(t);
-    if (remaining != null && remaining < durationMs) {
-      setConstraint({ task: t, remainingMs: remaining, durationMs });
-      return;
-    }
     startFocus(t.id, durationMs);
   }
 
@@ -246,22 +222,6 @@ export default function PomodoroPanel() {
             </button>
             <span className="text-xs text-neutral-400">目标 {focusCountGoal} 个</span>
           </div>
-
-          {/* 目标总时长 vs 任务剩余规划时间的提示（Count 不产生非法计划） */}
-          {(() => {
-            const t = tasks.find((x) => x.id === Number(selectedId));
-            if (!t) return null;
-            const remaining = remainingFocusMs(t);
-            if (remaining == null) return null;
-            const planTotal = focusCountGoal * pomodoroDurationMinutes * 60_000;
-            if (planTotal <= remaining) return null;
-            return (
-              <p className="text-xs text-amber-600">
-                目标总时长 {formatDuration(planTotal)} 超过任务剩余规划时间{" "}
-                {remainingMinutesLabel(remaining)}，建议减少番茄目标
-              </p>
-            );
-          })()}
         </div>
       )}
 
@@ -413,55 +373,6 @@ export default function PomodoroPanel() {
           )}
         </>
       )}
-
-      {/* 约束确认：本次 Focus 超过 Task 剩余规划时长 */}
-      <Dialog
-        open={constraint != null}
-        onClose={() => setConstraint(null)}
-        title="专注时长超过任务规划"
-      >
-        {constraint && (
-          <div className="space-y-3 text-sm">
-            <p className="text-neutral-700">
-              任务「{constraint.task.title}」剩余规划时间：
-              <span className="font-medium text-neutral-900">
-                {remainingMinutesLabel(constraint.remainingMs)}
-              </span>
-            </p>
-            <p className="text-neutral-700">
-              当前 Focus：
-              <span className="font-medium text-neutral-900">
-                {Math.round(constraint.durationMs / 60_000)} 分钟
-              </span>
-            </p>
-            <p className="text-xs text-neutral-500">
-              继续将记录真实专注时间；如选择调整，本次按剩余时间执行。
-            </p>
-            <div className="flex justify-end gap-2 pt-2">
-              {constraint.remainingMs > 0 && (
-                <button
-                  onClick={() => {
-                    startFocus(constraint.task.id, constraint.remainingMs);
-                    setConstraint(null);
-                  }}
-                  className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
-                >
-                  调整为 {Math.max(1, Math.round(constraint.remainingMs / 60_000))} 分钟
-                </button>
-              )}
-              <button
-                onClick={() => {
-                  startFocus(constraint.task.id, constraint.durationMs);
-                  setConstraint(null);
-                }}
-                className="rounded-md bg-neutral-900 px-3 py-1.5 text-sm text-white hover:bg-neutral-700"
-              >
-                仍然开始
-              </button>
-            </div>
-          </div>
-        )}
-      </Dialog>
     </div>
   );
 }

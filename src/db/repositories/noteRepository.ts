@@ -102,4 +102,9 @@ export class NoteRepository {
       .all();
     return rows.length > 0;
   }
+
+  /** 以原 id 重建便签（撤销「删除便签」用）。 */
+  async insertRestored(note: Note): Promise<void> {
+    await this.db.insert(notes).values(note).run();
+  }
 }

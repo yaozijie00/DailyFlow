@@ -29,6 +29,8 @@ export interface AppSettings {
   closeBehavior: CloseBehavior;
   /** 用户是否已明确选择过关闭行为（首次点击 X 询问后置 true） */
   closeBehaviorConfigured: boolean;
+  /** 撤销记录数量上限（默认 50；可设 20/50/100/200） */
+  undoHistoryLimit: number;
 }
 
 /** 关闭窗口行为。 */
@@ -46,6 +48,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   notificationsEnabled: true,
   closeBehavior: "exit",
   closeBehaviorConfigured: false, // 旧版本升级：首次点击 X 询问
+  undoHistoryLimit: 50,
 };
 
 /** settings 表键名（存储格式：时长用秒或分钟、时间用 "HH:mm"、粒度用分钟）。 */
@@ -61,6 +64,7 @@ const KEY_SHORTCUTS = "shortcuts";
 const KEY_NOTIFICATIONS = "notifications_enabled";
 const KEY_CLOSE_BEHAVIOR = "close_behavior";
 const KEY_CLOSE_BEHAVIOR_CONFIGURED = "close_behavior_configured";
+const KEY_UNDO_LIMIT = "undo_history_limit";
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
@@ -138,6 +142,7 @@ export class SettingsService {
       closeBehavior:
         stored[KEY_CLOSE_BEHAVIOR] === "tray" ? "tray" : "exit",
       closeBehaviorConfigured: stored[KEY_CLOSE_BEHAVIOR_CONFIGURED] === "1",
+      undoHistoryLimit: Math.round(parseIntSafe(stored[KEY_UNDO_LIMIT], 50)),
     };
   }
 
@@ -185,6 +190,10 @@ export class SettingsService {
     }
     if (partial.closeBehaviorConfigured !== undefined) {
       writes.push([KEY_CLOSE_BEHAVIOR_CONFIGURED, partial.closeBehaviorConfigured ? "1" : "0"]);
+    }
+    if (partial.undoHistoryLimit !== undefined) {
+      const n = Math.max(10, Math.min(500, Math.round(partial.undoHistoryLimit)));
+      writes.push([KEY_UNDO_LIMIT, String(n)]);
     }
     for (const [k, v] of writes) {
       await this.repo.set(k, v);

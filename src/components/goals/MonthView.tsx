@@ -1,42 +1,40 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useWindowDrag } from "../../hooks/useWindowDrag";
 import {
-  buildMonthGrid,
+  monthDays,
   monthLabel,
-  spanInGrid,
+  daySpanInMonth,
   shiftDateRange,
   dateKey,
 } from "../../lib/monthView";
 import type { GoalWithProgress } from "../../db/repositories/goalRepository";
 
-const WEEKDAYS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
+/** 每日期列宽度（px）：统一宽度，任务块按日偏移严格对齐。 */
+const DAY_COLUMN_WIDTH = 56;
 
 interface MonthViewProps {
   goals: GoalWithProgress[];
-  /** 点击任务块 → 编辑该目标 */
   onEdit: (goal: GoalWithProgress) => void;
-  /** 拖动/调整日期范围后回写 */
   onMoveRange: (goalId: number, startDate: string, endDate: string) => void;
 }
 
 /**
- * 长期月视图（V2）：月份网格 + 跨天任务块。
- * - 任务块按 startDate ~ deadline 跨天渲染（连续，不按天复制）；
- * - 拖动整块 → 整体平移；拖动左/右边缘 → 调整开始/结束日期；
- * - 点击块 → 编辑；无日期范围的目标归入「未安排」。
- * 复用 useWindowDrag（与今日时间轴一致的鼠标拖拽方案）。
+ * 长期月视图（v1.6）：月度日时间轴。
+ * - 当月每天一个独立日期列（1..30/31，非 7 列周视图），每列显示 日号 + 星期；
+ * - 今天高亮、周末浅底；左侧任务名固定，右侧横向滚动；
+ * - 任务块按 日偏移×日宽 定位、宽度=跨天数×日宽，跨月任务裁剪到月边界；
+ * - 拖动整块按天平移、拖边缘按天调整起止（日级 snap）。
  */
 export default function MonthView({ goals, onEdit, onMoveRange }: MonthViewProps) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
-  const trackRef = useRef<HTMLDivElement>(null);
   const { start: startWindowDrag } = useWindowDrag();
 
-  const cells = buildMonthGrid(year, month);
+  const cells = monthDays(year, month);
   const n = cells.length;
-  const colW = () => (trackRef.current ? trackRef.current.getBoundingClientRect().width / n : 1);
+  const trackWidth = n * DAY_COLUMN_WIDTH;
 
   const goMonth = (delta: number) => {
     const d = new Date(year, month + delta, 1);
@@ -51,10 +49,9 @@ export default function MonthView({ goals, onEdit, onMoveRange }: MonthViewProps
   const arranged = goals.filter((g) => g.startDate && g.deadline);
   const unscheduled = goals.filter((g) => !g.startDate || !g.deadline);
 
-  /** 按水平位移把日期范围平移 deltaDays 天并回写。 */
+  /** 按水平位移（日列宽换算）平移/调整日期范围，日级 snap。 */
   function dragBlock(e: React.MouseEvent, goal: GoalWithProgress, mode: "move" | "start" | "end") {
     e.stopPropagation();
-    // 注意：不 preventDefault，否则会抑制随后的 click（点击块应打开编辑）。
     const startX = e.clientX;
     let dragging = false;
     let lastDelta = 0;
@@ -64,7 +61,7 @@ export default function MonthView({ goals, onEdit, onMoveRange }: MonthViewProps
           const dx = ev.clientX - startX;
           if (!dragging && Math.abs(dx) < 4) return;
           dragging = true;
-          const deltaDays = Math.round(dx / colW());
+          const deltaDays = Math.round(dx / DAY_COLUMN_WIDTH);
           if (deltaDays === lastDelta) return;
           lastDelta = deltaDays;
           if (mode === "move") {
@@ -83,7 +80,7 @@ export default function MonthView({ goals, onEdit, onMoveRange }: MonthViewProps
           }
         },
         onUp: () => {
-          /* 松手即保存（onMove 已回写） */
+          /* 松手即保存 */
         },
       },
       () => {
@@ -121,77 +118,113 @@ export default function MonthView({ goals, onEdit, onMoveRange }: MonthViewProps
         </button>
       </div>
 
-      {/* 表头 */}
-      <div className="flex">
-        <div className="w-32 shrink-0" />
-        <div className="grid flex-1 grid-cols-7 text-center text-xs text-neutral-500">
-          {WEEKDAYS.map((d) => (
-            <div key={d}>{d}</div>
-          ))}
-        </div>
-      </div>
-
-      {/* 任务行 */}
-      <div className="space-y-2">
-        {arranged.length === 0 && unscheduled.length === 0 && (
-          <p className="py-4 text-center text-sm text-neutral-400">暂无长期任务</p>
-        )}
-        {arranged.map((g) => {
-          const span = spanInGrid(g.startDate, g.deadline, cells);
-          return (
-            <div key={g.id} className="flex items-center gap-2">
+      {arranged.length === 0 && unscheduled.length === 0 ? (
+        <p className="py-4 text-center text-sm text-neutral-400">暂无长期任务</p>
+      ) : (
+        <div className="flex rounded-md border border-neutral-200">
+          {/* 左侧固定：任务名 */}
+          <div className="w-28 shrink-0 border-r border-neutral-100">
+            <div className="flex h-9 items-end px-2 pb-1 text-[10px] text-neutral-400">任务</div>
+            {arranged.map((g) => (
               <div
-                className="w-32 shrink-0 truncate text-right text-xs text-neutral-600"
+                key={g.id}
+                className="flex h-9 items-center truncate px-2 text-xs text-neutral-600"
                 title={g.title}
               >
                 {g.title}
               </div>
-              <div ref={trackRef} className="relative h-7 flex-1 rounded bg-neutral-100">
-                {/* 周分隔线 */}
-                <div className="absolute inset-0 grid grid-cols-7">
-                  {Array.from({ length: 7 }).map((_, i) => (
-                    <div key={i} className="border-r border-neutral-200 last:border-r-0" />
-                  ))}
-                </div>
-                {span && (
+            ))}
+          </div>
+
+          {/* 右侧可横向滚动：日期表头 + 任务行（共用同一滚动容器，保证对齐） */}
+          <div className="min-w-0 flex-1 overflow-x-auto">
+            <div style={{ width: trackWidth }}>
+              {/* 日期表头：日号 + 星期；今天高亮、周末浅底 */}
+              <div className="flex h-9 border-b border-neutral-100">
+                {cells.map((c) => (
                   <div
-                    onMouseDown={(e) => dragBlock(e, g, "move")}
-                    onClick={() => onEdit(g)}
-                    aria-label="编辑长期任务"
-                    className="absolute top-1 bottom-1 flex cursor-grab items-center overflow-hidden rounded bg-neutral-900/15 hover:bg-neutral-900/25 active:cursor-grabbing"
-                    style={{
-                      left: `${(span.startIndex / n) * 100}%`,
-                      width: `${((span.endIndex - span.startIndex + 1) / n) * 100}%`,
-                    }}
-                    title={`${g.title}：${g.startDate} ~ ${g.deadline}（拖动移动）`}
+                    key={c.date}
+                    className={`shrink-0 border-l border-neutral-100 first:border-l-0 ${
+                      c.isToday ? "bg-amber-50" : ""
+                    } ${
+                      !c.isToday && (c.weekday === "周六" || c.weekday === "周日")
+                        ? "bg-neutral-50"
+                        : ""
+                    }`}
+                    style={{ width: DAY_COLUMN_WIDTH }}
                   >
-                    {/* 进度填充 */}
                     <div
-                      className="absolute inset-y-0 left-0 bg-neutral-900/70"
-                      style={{ width: `${g.progressPercent}%` }}
-                    />
-                    {/* 左边缘（调整开始日期） */}
-                    <div
-                      onMouseDown={(e) => dragBlock(e, g, "start")}
-                      className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize"
-                      title="拖动调整开始日期"
-                    />
-                    {/* 右边缘（调整结束日期） */}
-                    <div
-                      onMouseDown={(e) => dragBlock(e, g, "end")}
-                      className="absolute right-0 top-0 h-full w-1.5 cursor-ew-resize"
-                      title="拖动调整结束日期"
-                    />
-                    <span className="relative z-10 truncate px-2 text-[10px] text-neutral-900">
-                      {g.title}
-                    </span>
+                      className={`pt-1 text-center text-xs font-medium ${
+                        c.isToday ? "text-amber-700" : "text-neutral-700"
+                      }`}
+                    >
+                      {c.day}
+                      {c.isToday && <span className="ml-0.5 text-[10px]">今</span>}
+                    </div>
+                    <div className="text-center text-[10px] text-neutral-400">{c.weekday}</div>
                   </div>
-                )}
+                ))}
               </div>
+
+              {/* 任务行 */}
+              {arranged.map((g) => {
+                const span = daySpanInMonth(g.startDate, g.deadline, year, month);
+                return (
+                  <div key={g.id} className="relative flex h-9 border-t border-neutral-100">
+                    {/* 日列背景：周末浅底 + 今天列 */}
+                    <div className="absolute inset-0 flex">
+                      {cells.map((c) => (
+                        <div
+                          key={c.date}
+                          className={`shrink-0 border-l border-neutral-100 first:border-l-0 ${
+                            c.isToday
+                              ? "bg-amber-50/60"
+                              : c.weekday === "周六" || c.weekday === "周日"
+                                ? "bg-neutral-50"
+                                : ""
+                          }`}
+                          style={{ width: DAY_COLUMN_WIDTH }}
+                        />
+                      ))}
+                    </div>
+                    {span && (
+                      <div
+                        onMouseDown={(e) => dragBlock(e, g, "move")}
+                        onClick={() => onEdit(g)}
+                        aria-label="编辑长期任务"
+                        className="absolute top-1 bottom-1 z-10 flex cursor-grab items-center overflow-hidden rounded bg-neutral-900/15 hover:bg-neutral-900/25 active:cursor-grabbing"
+                        style={{
+                          left: (span.start - 1) * DAY_COLUMN_WIDTH,
+                          width: (span.end - span.start + 1) * DAY_COLUMN_WIDTH,
+                        }}
+                        title={`${g.title}：${g.startDate} ~ ${g.deadline}（拖动移动）`}
+                      >
+                        <div
+                          className="absolute inset-y-0 left-0 bg-neutral-900/70"
+                          style={{ width: `${g.progressPercent}%` }}
+                        />
+                        <div
+                          onMouseDown={(e) => dragBlock(e, g, "start")}
+                          className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize"
+                          title="拖动调整开始日期"
+                        />
+                        <div
+                          onMouseDown={(e) => dragBlock(e, g, "end")}
+                          className="absolute right-0 top-0 h-full w-1.5 cursor-ew-resize"
+                          title="拖动调整结束日期"
+                        />
+                        <span className="relative z-10 truncate px-2 text-[10px] text-neutral-900">
+                          {g.title}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
-      </div>
+          </div>
+        </div>
+      )}
 
       {/* 未安排（无日期范围） */}
       {unscheduled.length > 0 && (

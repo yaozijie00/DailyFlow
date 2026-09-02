@@ -27,13 +27,67 @@ export class UndoManager {
   private redoStack: UndoableAction[] = [];
   /** 正在应用 undo/redo（业务层据此跳过入栈） */
   applying = false;
+  /** 撤销历史上限（默认 50；可设置 20/50/100/200） */
+  maxHistory = 50;
+  private listeners = new Set<() => void>();
+  /** 批量上下文：withBatch 内 push 的动作被合并为一个复合动作 */
+  private batchDepth = 0;
+  private batchActions: UndoableAction[] = [];
 
   push(action: UndoableAction): void {
+    if (this.batchDepth > 0) {
+      this.batchActions.push(action);
+      this.notify();
+      return;
+    }
     this.undoStack.push(action);
     this.redoStack = []; // 新动作使 redo 失效
+    // 超过上限：丢弃最旧记录（内存历史上限）
+    while (this.undoStack.length > this.maxHistory) {
+      this.undoStack.shift();
+    }
+    this.notify();
   }
 
-  /** 撤销最近一个动作；无可撤销动作返回 false。 */
+  /** 批量执行：fn 内 push 的所有动作合并为一个复合动作（一次 Undo 整体撤销）。 */
+  withBatch<T>(fn: () => T): T {
+    this.batchDepth++;
+    try {
+      return fn();
+    } finally {
+      this.flushBatch();
+    }
+  }
+
+  /** 异步批量执行（转换类操作内部为异步 push 时使用）。 */
+  async withBatchAsync<T>(fn: () => Promise<T>): Promise<T> {
+    this.batchDepth++;
+    try {
+      return await fn();
+    } finally {
+      this.flushBatch();
+    }
+  }
+
+  private flushBatch(): void {
+    this.batchDepth--;
+    if (this.batchDepth === 0 && this.batchActions.length > 0) {
+      const actions = this.batchActions;
+      this.batchActions = [];
+      this.push({
+        type: `batch:${actions[0].type}`,
+        label: actions[0].label,
+        undo: async () => {
+          for (const a of [...actions].reverse()) await a.undo();
+        },
+        redo: async () => {
+          for (const a of actions) await a.redo();
+        },
+      });
+    }
+  }
+
+  /** 撤销最近一个动作；无可撤销动作返回 false。失败时不移动栈并抛出。 */
   async undo(): Promise<boolean> {
     const action = this.undoStack.pop();
     if (!action) return false;
@@ -41,13 +95,18 @@ export class UndoManager {
     try {
       await action.undo();
       this.redoStack.push(action);
+    } catch (e) {
+      // 撤销失败：把动作放回撤销栈顶部，保持栈一致，由调用方提示
+      this.undoStack.push(action);
+      throw e;
     } finally {
       this.applying = false;
     }
+    this.notify();
     return true;
   }
 
-  /** 重做最近一个被撤销的动作；无可重做动作返回 false。 */
+  /** 重做最近一个被撤销的动作；无可重做动作返回 false。失败时不移动栈并抛出。 */
   async redo(): Promise<boolean> {
     const action = this.redoStack.pop();
     if (!action) return false;
@@ -55,9 +114,13 @@ export class UndoManager {
     try {
       await action.redo();
       this.undoStack.push(action);
+    } catch (e) {
+      this.redoStack.push(action);
+      throw e;
     } finally {
       this.applying = false;
     }
+    this.notify();
     return true;
   }
 
@@ -72,6 +135,26 @@ export class UndoManager {
   clear(): void {
     this.undoStack = [];
     this.redoStack = [];
+    this.notify();
+  }
+
+  setMaxHistory(n: number): void {
+    const limit = Math.max(10, Math.min(500, Math.round(n)));
+    this.maxHistory = limit;
+    while (this.undoStack.length > limit) this.undoStack.shift();
+    this.notify();
+  }
+
+  /** 订阅栈变化（UI 按钮启停用）。返回取消订阅函数。 */
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private notify(): void {
+    for (const l of this.listeners) l();
   }
 
   get undoSize(): number {

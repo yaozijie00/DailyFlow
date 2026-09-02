@@ -30,13 +30,13 @@ import {
   type TimeSpan,
 } from "../../lib/timeline";
 import { startOfToday, todayString } from "../../lib/date";
-import { plannedDurationMs } from "../../lib/focusConstraint";
 import {
   convertNoteToTask,
   noteDragSession,
   noteDropCallbacks,
   noteDropZoneAt,
 } from "../../lib/noteConvert";
+import { undoManager } from "../../lib/undoManager";
 import { NO_CATEGORY_COLOR } from "../../lib/categoryColors";
 
 /** 横向滚动触发阈值：栏位使块宽低于该值（px）时内容加宽并横向滚动。 */
@@ -76,6 +76,8 @@ export default function Timeline() {
   const dragRef = useRef<{ startY: number } | null>(null);
   /** 任务块拖拽标记：本次 mousedown 是否真的发生了拖动（抑制拖拽后的 click 选中） */
   const blockDragRef = useRef(false);
+  /** 最近被拖动的块 id（仅抑制「同块拖拽尾随 click」，其他 click 正常选中） */
+  const lastDraggedBlockRef = useRef<number | null>(null);
   const [preview, setPreview] = useState<TimeRange | null>(null);
   const [blockPreview, setBlockPreview] = useState<BlockPreview | null>(null);
   const [dropPreview, setDropPreview] = useState<BlockPreview | null>(null);
@@ -265,7 +267,7 @@ export default function Timeline() {
     return () => window.removeEventListener("mousemove", onMove);
   }, [notes, config, pxPerMinute]);
 
-  /** 便签投放回调：按落点 y 创建带时间块的 Task，原便签标记「已安排」。 */
+  /** 便签投放回调：按落点 y 创建带时间块的 Task，原便签标记「已安排」（一次 Undo 复合操作）。 */
   useEffect(() => {
     noteDropCallbacks.timeline = (noteId, _clientX, clientY) => {
       setNotePreview(null);
@@ -273,12 +275,14 @@ export default function Timeline() {
       const y = clientY - taskAreaRef.current.getBoundingClientRect().top;
       const startMs = dragRangeToTimes(y, y, config, pxPerMinute).startMs;
       const endMs = startMs + NOTE_DEFAULT_MINUTES * 60_000;
-      void convertNoteToTask(
-        noteId,
-        notes,
-        createTask,
-        updateNote,
-        { scheduledDate: selectedDate, plannedStart: startMs, plannedEnd: endMs },
+      void undoManager.withBatchAsync(() =>
+        convertNoteToTask(
+          noteId,
+          notes,
+          createTask,
+          updateNote,
+          { scheduledDate: selectedDate, plannedStart: startMs, plannedEnd: endMs },
+        ),
       );
     };
     return () => {
@@ -288,23 +292,12 @@ export default function Timeline() {
 
   /**
    * 双击任务块：进入该 Task 的 Focus 上下文（跳转专注页并预选该任务）。
-   * 若任务有规划时长：按「任务时长 ÷ 当前专注时长」自动规划番茄数；
-   * 若结果为 1 个番茄，本次专注时长自动设为任务时长（仅本次，不改全局设置）。
+   * v1.6：不再根据任务预计时长自动推算/覆盖本次专注时长（由用户在专注页自选）。
    * 当前已有其他 Focus 在运行：只切换待选上下文，不停止、不破坏当前 Focus Session。
    */
   function handleTaskDoubleClick(task: Task) {
     // 已完成/已取消的任务不再进入专注
     if (task.status === "COMPLETED" || task.status === "CANCELLED") return;
-    const T = plannedDurationMs(task);
-    if (T != null) {
-      const D = useSettingsStore.getState().settings.pomodoroDurationMinutes * 60_000;
-      const count = Math.max(1, Math.ceil(T / D));
-      const durationMinutes =
-        count === 1
-          ? Math.max(15, Math.round(T / 60_000))
-          : useSettingsStore.getState().settings.pomodoroDurationMinutes;
-      usePomodoroStore.getState().setPlannedContext({ durationMinutes, count });
-    }
     useAppStore.getState().setPage("focus");
     usePomodoroStore.getState().setPendingTaskId(task.id);
   }
@@ -404,6 +397,7 @@ export default function Timeline() {
       {
         onMove: (ev) => {
           blockDragRef.current = true; // 发生过拖动 → 松手后的 click 不触发选中
+          lastDraggedBlockRef.current = task.id;
           const removing = isOutside(ev);
           const deltaY = yFromClientY(ev.clientY) - startY;
           const { startMs, endMs } = moveTaskBy(origStart, origEnd, deltaY, config, pxPerMinute);
@@ -690,10 +684,15 @@ export default function Timeline() {
                   key={task.id}
                   onMouseDown={(e) => startMove(e, task)}
                   onClick={() => {
-                    if (blockDragRef.current) {
-                      blockDragRef.current = false; // 拖拽后的 click 不触发选中
+                    // 仅当本块自身刚被拖动（拖拽尾随 click）时抑制选中，
+                    // 其余 click（含拖动后点击其他块）一律更新选择 → Detail Panel 同步。
+                    if (blockDragRef.current && lastDraggedBlockRef.current === task.id) {
+                      blockDragRef.current = false;
+                      lastDraggedBlockRef.current = null;
                       return;
                     }
+                    blockDragRef.current = false;
+                    lastDraggedBlockRef.current = null;
                     selectTask(task.id); // 单击任务块 → 右侧详情面板
                   }}
                   onDoubleClick={() => handleTaskDoubleClick(task)}

@@ -122,4 +122,56 @@ describe("TaskService Undo 集成（数据与 SQLite 一致）", () => {
     await undoManager.redo();
     expect(undoManager.undoSize).toBe(sizeBefore);
   });
+
+  it("只改标题/备注 → 不重排 sort_order（Timeline 块不跳动）", async () => {    const a = await tasks.create({
+      title: "A",
+      scheduledDate: "2026-08-27",
+      plannedStart: 9 * 3_600_000,
+      plannedEnd: 10 * 3_600_000,
+    });
+    const b = await tasks.create({
+      title: "B",
+      scheduledDate: "2026-08-27",
+      plannedStart: 14 * 3_600_000,
+      plannedEnd: 15 * 3_600_000,
+    });
+    await svc.reorderTasks([b.id, a.id]); // 手动排成 B 在前
+    const beforeA = (await tasks.findById(a.id))!.sortOrder;
+    const beforeB = (await tasks.findById(b.id))!.sortOrder;
+    expect(beforeB).toBeLessThan(beforeA);
+
+    await svc.updateTask(a.id, { title: "改名", notes: "新备注" }); // 只改内容
+    expect((await tasks.findById(a.id))!.sortOrder).toBe(beforeA);
+    expect((await tasks.findById(b.id))!.sortOrder).toBe(beforeB);
+
+    await svc.updateTask(a.id, { plannedStart: 8 * 3_600_000, plannedEnd: 9 * 3_600_000 }); // 改时间
+    expect((await tasks.findById(a.id))!.sortOrder).toBeLessThan(
+      (await tasks.findById(b.id))!.sortOrder,
+    );
+  });
+
+  it("删除任务 → Undo 恢复任务与专注历史（SQLite 一致），Redo 再删", async () => {
+    const t = await tasks.create({ title: "删我", scheduledDate: "2026-08-27" });
+    const s = await new FocusSessionRepository(db).create({
+      taskId: t.id,
+      plannedDuration: 1500,
+      startedAt: Date.now(),
+      actualDuration: 600,
+      endedAt: Date.now(),
+      completed: false,
+    });
+
+    await svc.deleteTask(t.id);
+    expect(await tasks.findById(t.id)).toBeNull();
+    expect((await new FocusSessionRepository(db).findById(s.id))).toBeNull();
+
+    await undoManager.undo();
+    const restored = await tasks.findById(t.id);
+    expect(restored).not.toBeNull();
+    expect(restored?.title).toBe("删我");
+    expect((await new FocusSessionRepository(db).findById(s.id))?.actualDuration).toBe(600);
+
+    await undoManager.redo();
+    expect(await tasks.findById(t.id)).toBeNull();
+  });
 });

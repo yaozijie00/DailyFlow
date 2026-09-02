@@ -75,8 +75,16 @@ export class TaskService {
     const before = await this.tasks.findById(id);
     const updated = await this.tasks.update(id, input);
     if (updated) {
-      if (before?.scheduledDate) await this.tasks.reorderByTime(before.scheduledDate);
-      await this.tasks.reorderByTime(updated.scheduledDate);
+      // v1.6：仅当时间相关字段变化时才按时间重排（sort_order），
+      // 否则（只改标题/备注/分类/预计等）保留原有顺序 → Timeline 块位置不跳动。
+      const timeChanged =
+        input.scheduledDate !== undefined ||
+        input.plannedStart !== undefined ||
+        input.plannedEnd !== undefined;
+      if (timeChanged) {
+        if (before?.scheduledDate) await this.tasks.reorderByTime(before.scheduledDate);
+        await this.tasks.reorderByTime(updated.scheduledDate);
+      }
       this.captureTaskUpdate(id, before, updated);
     }
     return updated;
@@ -107,6 +115,26 @@ export class TaskService {
 
   /** 删除任务：先清理其全部专注记录（统计数据不再包含该任务），再删除任务。 */
   async deleteTask(id: number): Promise<boolean> {
+    if (!undoManager.applying) {
+      const task = await this.tasks.findById(id);
+      if (task) {
+        const t = { ...task };
+        const sessions = await this.sessions.findByTaskId(id);
+        const ss = sessions.map((s) => ({ ...s }));
+        undoManager.push({
+          type: "task.delete",
+          label: "删除任务",
+          undo: async () => {
+            await this.tasks.insertRestored(t);
+            for (const s of ss) await this.sessions.insertRestored(s);
+          },
+          redo: async () => {
+            await this.sessions.deleteByTaskId(t.id);
+            await this.tasks.delete(t.id);
+          },
+        });
+      }
+    }
     await this.sessions.deleteByTaskId(id);
     return this.tasks.delete(id);
   }
@@ -116,6 +144,22 @@ export class TaskService {
    * 统计仍计入该任务的投入时间，不因「拖回便签」丢失专注历史。
    */
   async deleteTaskKeepSessions(id: number): Promise<boolean> {
+    if (!undoManager.applying) {
+      const task = await this.tasks.findById(id);
+      if (task) {
+        const t = { ...task };
+        undoManager.push({
+          type: "task.delete_keep_sessions",
+          label: "转为便签",
+          undo: async () => {
+            await this.tasks.insertRestored(t);
+          },
+          redo: async () => {
+            await this.tasks.delete(t.id);
+          },
+        });
+      }
+    }
     return this.tasks.delete(id);
   }
 

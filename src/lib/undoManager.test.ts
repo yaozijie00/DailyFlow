@@ -170,3 +170,81 @@ describe("undoManager 单例", () => {
     expect(undoManager.canUndo()).toBe(false);
   });
 });
+
+describe("UndoManager v1.6（批量 / 上限 / 订阅 / 错误）", () => {
+  let manager: UndoManager;
+  beforeEach(() => {
+    manager = new UndoManager();
+  });
+
+  it("withBatchAsync：内部多个 push 合并为一个复合动作，一次 Undo 整体撤销", async () => {
+    const log: string[] = [];
+    await manager.withBatchAsync(async () => {
+      manager.push({
+        type: "a",
+        label: "A",
+        undo: () => {
+          log.push("undo A");
+        },
+        redo: () => {
+          log.push("redo A");
+        },
+      });
+      manager.push({
+        type: "b",
+        label: "B",
+        undo: () => {
+          log.push("undo B");
+        },
+        redo: () => {
+          log.push("redo B");
+        },
+      });
+    });
+    expect(manager.undoSize).toBe(1); // 合并为 1 条
+    await manager.undo();
+    expect(log).toEqual(["undo B", "undo A"]); // 逆序整体撤销
+    await manager.redo();
+    expect(log).toEqual(["undo B", "undo A", "redo A", "redo B"]);
+  });
+
+  it("maxHistory：超出上限丢弃最旧记录", () => {
+    manager.setMaxHistory(10);
+    for (let i = 0; i < 12; i++) {
+      manager.push({ type: `a${i}`, label: `A${i}`, undo: vi.fn(), redo: vi.fn() });
+    }
+    expect(manager.undoSize).toBe(10);
+  });
+
+  it("subscribe：push/undo/clear 触发通知", async () => {
+    const calls: string[] = [];
+    manager.subscribe(() => calls.push("notify"));
+    manager.push({ type: "a", label: "A", undo: vi.fn(), redo: vi.fn() });
+    expect(calls.length).toBe(1);
+    await manager.undo();
+    expect(calls.length).toBe(2);
+    manager.clear();
+    expect(calls.length).toBe(3);
+  });
+
+  it("undo 失败：动作放回栈顶（栈一致），并抛出", async () => {
+    manager.push({
+      type: "a",
+      label: "A",
+      undo: () => {
+        throw new Error("boom");
+      },
+      redo: vi.fn(),
+    });
+    await expect(manager.undo()).rejects.toThrow("boom");
+    expect(manager.undoSize).toBe(1); // 仍在撤销栈
+    expect(manager.canRedo()).toBe(false);
+  });
+
+  it("setMaxHistory 上限范围夹取（10-500 之间）", () => {
+    manager.setMaxHistory(5);
+    expect(manager.maxHistory).toBe(10);
+    manager.setMaxHistory(999);
+    expect(manager.maxHistory).toBe(500);
+  });
+});

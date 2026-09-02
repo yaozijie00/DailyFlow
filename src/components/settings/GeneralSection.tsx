@@ -49,6 +49,24 @@ export default function GeneralSection() {
           尚未设置过关闭行为：第一次点击 X 时会询问你一次。
         </p>
       )}
+
+      <div className="border-t border-neutral-100 pt-4">
+        <div className="text-sm text-neutral-700">撤销记录数量</div>
+        <p className="mt-0.5 text-xs text-neutral-400">
+          保留多少条可撤销操作（内存历史，应用关闭后清空；上限越高占内存越多）。
+        </p>
+        <select
+          value={settings.undoHistoryLimit}
+          onChange={(e) => void update({ undoHistoryLimit: Number(e.target.value) })}
+          className="mt-2 rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+        >
+          {[20, 50, 100, 200].map((n) => (
+            <option key={n} value={n}>
+              {n} 条
+            </option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 }

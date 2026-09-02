@@ -44,8 +44,6 @@ export interface PomodoroState {
   taskTitle: string | null;
   /** 待选任务（双击时间轴任务预选；IDLE 时自动选中，不中断进行中的专注） */
   pendingTaskId: number | null;
-  /** 双击任务自动规划的本次专注上下文（仅本次生效，不改全局设置） */
-  plannedContext: { durationMinutes: number; count: number } | null;
 
   startFocus: (taskId: number, durationMs?: number) => void;
   startBreak: () => void;
@@ -56,7 +54,6 @@ export interface PomodoroState {
   finalizeFocus: () => void;
   setFocusCountGoal: (n: number) => void;
   setPendingTaskId: (id: number | null) => void;
-  setPlannedContext: (ctx: { durationMinutes: number; count: number } | null) => void;
   /** 放弃本次专注并返回任务选择（不落库、不完成任务） */
   abandonFocus: () => void;
   refresh: () => void;
@@ -125,7 +122,6 @@ export function createPomodoroStore(
       focusVersion: 0,
       taskTitle: null,
       pendingTaskId: null,
-      plannedContext: null,
 
       startFocus: (taskId, durationMs) => {
         const state = timer.getState();
@@ -241,8 +237,6 @@ export function createPomodoroStore(
       },
 
       setPendingTaskId: (id) => set({ pendingTaskId: id }),
-
-      setPlannedContext: (ctx) => set({ plannedContext: ctx }),
 
       abandonFocus: () => {
         const state = timer.getState();
