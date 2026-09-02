@@ -23,6 +23,8 @@ interface GoalState {
   create: (input: CreateGoalInput) => Promise<void>;
   update: (id: number, input: UpdateGoalInput) => Promise<void>;
   complete: (id: number) => Promise<void>;
+  /** 把已完成目标恢复为进行中（误完成/误点可修正，可撤销） */
+  restore: (id: number) => Promise<void>;
   remove: (id: number) => Promise<void>;
 }
 
@@ -69,6 +71,15 @@ export const useGoalStore = create<GoalState>((set, get) => ({
       await get().load();
     } catch {
       useAppStore.getState().pushToast("error", "完成长期目标失败");
+    }
+  },
+
+  restore: async (id) => {
+    try {
+      await goalService.update(id, { status: "active", completedAt: null });
+      await get().load();
+    } catch {
+      useAppStore.getState().pushToast("error", "恢复长期目标失败");
     }
   },
 

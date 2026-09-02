@@ -14,6 +14,7 @@ const mockState = vi.hoisted(() => ({
   create: vi.fn(),
   update: vi.fn(),
   complete: vi.fn(),
+  restore: vi.fn(),
   remove: vi.fn(),
 }));
 
@@ -58,6 +59,7 @@ describe("Goals 页面（长期月视图）", () => {
     mockState.create.mockClear();
     mockState.update.mockClear();
     mockState.complete.mockClear();
+    mockState.restore.mockClear();
     mockState.remove.mockClear();
   });
 
@@ -122,5 +124,25 @@ describe("Goals 页面（长期月视图）", () => {
     expect(screen.queryByText("已完成目标")).toBeNull();
     fireEvent.click(screen.getByText(/已完成（1）/));
     expect(screen.getByText("已完成目标")).toBeTruthy();
+  });
+
+  it("已完成目标可「恢复为进行中」（误完成修正）", () => {
+    mockState.completedGoals = [
+      makeGoal({ id: 9, title: "已完成目标", status: "completed" }),
+    ];
+    render(<Goals />);
+    fireEvent.click(screen.getByText(/已完成（1）/));
+    fireEvent.click(screen.getByLabelText("恢复长期任务"));
+    expect(mockState.restore).toHaveBeenCalledWith(9);
+  });
+
+  it("已完成目标可删除（撤销兜底）", () => {
+    mockState.completedGoals = [
+      makeGoal({ id: 9, title: "已完成目标", status: "completed" }),
+    ];
+    render(<Goals />);
+    fireEvent.click(screen.getByText(/已完成（1）/));
+    fireEvent.click(screen.getByLabelText("删除已完成任务"));
+    expect(mockState.remove).toHaveBeenCalledWith(9);
   });
 });

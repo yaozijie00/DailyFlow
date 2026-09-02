@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Check, Plus, Trash2 } from "lucide-react";
+import { Check, Plus, Trash2, RotateCcw } from "lucide-react";
 import { useAppStore } from "../stores/appStore";
 import { useGoalStore } from "../stores/goalStore";
 import type { GoalWithProgress } from "../db/repositories/goalRepository";
@@ -52,6 +52,7 @@ export default function Goals() {
   const create = useGoalStore((s) => s.create);
   const update = useGoalStore((s) => s.update);
   const complete = useGoalStore((s) => s.complete);
+  const restore = useGoalStore((s) => s.restore);
   const remove = useGoalStore((s) => s.remove);
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<GoalFormState>(emptyForm);
@@ -308,13 +309,35 @@ export default function Goals() {
               {completedGoals.map((g) => (
                 <div
                   key={g.id}
-                  className="flex items-center gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-500"
+                  className="group flex items-center gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-500"
                 >
                   <Check size={14} className="shrink-0 text-green-600" />
-                  <span className="truncate line-through decoration-neutral-300">{g.title}</span>
+                  <span className="min-w-0 flex-1 truncate line-through decoration-neutral-300">
+                    {g.title}
+                  </span>
                   {g.deadline && (
-                    <span className="ml-auto shrink-0 text-xs text-neutral-400">{g.deadline}</span>
+                    <span className="hidden shrink-0 text-xs text-neutral-400 sm:block">
+                      {g.deadline}
+                    </span>
                   )}
+                  <span className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
+                    <button
+                      onClick={() => void restore(g.id)}
+                      aria-label="恢复长期任务"
+                      title="恢复为进行中（误完成可修正）"
+                      className="rounded p-0.5 text-neutral-400 hover:bg-green-50 hover:text-green-600"
+                    >
+                      <RotateCcw size={14} />
+                    </button>
+                    <button
+                      onClick={() => void remove(g.id)}
+                      aria-label="删除已完成任务"
+                      title="删除（可撤销）"
+                      className="rounded p-0.5 text-neutral-400 hover:bg-red-50 hover:text-red-600"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </span>
                 </div>
               ))}
             </div>
