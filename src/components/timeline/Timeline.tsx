@@ -396,8 +396,14 @@ export default function Timeline() {
     startWindowDrag(
       {
         onMove: (ev) => {
-          blockDragRef.current = true; // 发生过拖动 → 松手后的 click 不触发选中
-          lastDraggedBlockRef.current = task.id;
+          // 仅当位移 >4px 才算「真实拖动」：纯点击（含 <4px 手抖）不置抑制标记，
+          // 松手后的 click 正常选中任务 → Detail Panel 可靠切换。
+          if (
+            Math.hypot(ev.clientX - startX, ev.clientY - startY) > 4
+          ) {
+            blockDragRef.current = true;
+            lastDraggedBlockRef.current = task.id;
+          }
           const removing = isOutside(ev);
           const deltaY = yFromClientY(ev.clientY) - startY;
           const { startMs, endMs } = moveTaskBy(origStart, origEnd, deltaY, config, pxPerMinute);

@@ -1,5 +1,15 @@
 # Changelog
 
+## DailyFlow 1.6.1
+
+### Bug Fixes
+
+- 时间轴任务块选择灵敏度：mousedown 后 <4px 的轻微手抖不再被误判为拖动，纯点击可靠切换右侧 Detail Panel（此前无位移阈值，轻微位移即吞掉 click 导致详情不更新；切页后 Timeline 重挂载才恢复）
+
+### Technical
+
+- 版本统一 1.6.1
+
 ## DailyFlow 1.6.0
 
 ### Bug Fixes
