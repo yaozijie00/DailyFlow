@@ -1,10 +1,9 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Target, Check, Plus, Trash2 } from "lucide-react";
+import { Check, Plus, Trash2 } from "lucide-react";
 import { useAppStore } from "../stores/appStore";
 import { useGoalStore } from "../stores/goalStore";
 import type { GoalWithProgress } from "../db/repositories/goalRepository";
 import { PageHeader } from "../components/ui/PageHeader";
-import { EmptyState } from "../components/ui/EmptyState";
 import MonthView from "../components/goals/MonthView";
 import { formatDuration } from "../lib/format";
 
@@ -74,6 +73,12 @@ export default function Goals() {
     setShowCreate(false);
   };
 
+  /** 月历空白格/圈选：预填日期范围打开新建表单。 */
+  const createOnDates = (startDate: string, endDate: string) => {
+    setForm({ ...emptyForm(), startDate, deadline: endDate });
+    setShowCreate(true);
+  };
+
   const openEdit = (goal: GoalWithProgress) => {
     setEditing(goal);
     setEditForm(toInput(goal));
@@ -97,7 +102,10 @@ export default function Goals() {
         description={`月规划 · 进行中 ${goals.length} · 已完成 ${completedGoals.length}；任务关联目标后进度自动统计`}
         actions={
           <button
-            onClick={() => setShowCreate((v) => !v)}
+            onClick={() => {
+              if (!showCreate) setForm(emptyForm());
+              setShowCreate((v) => !v);
+            }}
             className="flex items-center gap-1 rounded-md bg-neutral-900 px-3 py-2 text-sm text-white hover:bg-neutral-700"
           >
             <Plus size={16} />
@@ -179,14 +187,13 @@ export default function Goals() {
 
       {loading && goals.length === 0 ? (
         <div className="text-sm text-neutral-400">加载中…</div>
-      ) : goals.length === 0 ? (
-        <EmptyState
-          icon={<Target size={28} />}
-          title="暂无长期任务"
-          description="新建一个带日期范围的任务，把它排进月视图。"
-        />
       ) : (
-        <MonthView goals={goals} onEdit={openEdit} onMoveRange={moveRange} />
+        <MonthView
+          goals={goals}
+          onEdit={openEdit}
+          onMoveRange={moveRange}
+          onRequestCreate={createOnDates}
+        />
       )}
 
       {/* 编辑弹窗 */}

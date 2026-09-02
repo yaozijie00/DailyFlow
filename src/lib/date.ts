@@ -7,6 +7,16 @@ export function todayString(): string {
   return `${y}-${m}-${d}`;
 }
 
+/** 返回本地时区的昨天日期，格式 YYYY-MM-DD（逾期结转提示用）。 */
+export function yesterdayString(): string {
+  const now = new Date();
+  now.setDate(now.getDate() - 1);
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
 
 /** 返回中文星期，如「星期六」。 */

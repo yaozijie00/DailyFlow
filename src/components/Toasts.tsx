@@ -48,6 +48,17 @@ export default function Toasts() {
           className={`pointer-events-auto flex items-start justify-between gap-2 rounded-md border px-3 py-2 text-sm shadow-sm ${STYLE[t.type] ?? STYLE.info}`}
         >
           <span className="min-w-0 flex-1">{t.text}</span>
+          {t.action && (
+            <button
+              onClick={() => {
+                t.action!.onClick();
+                removeToast(t.id);
+              }}
+              className="shrink-0 font-medium underline underline-offset-2 hover:opacity-70"
+            >
+              {t.action.label}
+            </button>
+          )}
           <button
             onClick={() => removeToast(t.id)}
             className="shrink-0 text-neutral-400 hover:text-neutral-600"

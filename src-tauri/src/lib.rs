@@ -95,16 +95,41 @@ fn setup_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
     use tauri::tray::{MouseButton, TrayIconBuilder, TrayIconEvent};
 
     let show_item = MenuItem::with_id(app, "show", "显示 DailyFlow", true, None::<&str>)?;
+    let open_today = MenuItem::with_id(app, "open_today", "打开今日", true, None::<&str>)?;
+    let open_goals = MenuItem::with_id(app, "open_goals", "打开长期", true, None::<&str>)?;
+    let open_stats = MenuItem::with_id(app, "open_statistics", "打开统计", true, None::<&str>)?;
     let toggle_item = MenuItem::with_id(app, "toggle_focus", "开始 / 暂停专注", true, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, "quit", "退出 DailyFlow", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&show_item, &toggle_item, &quit_item])?;
+    let menu = Menu::with_items(
+        app,
+        &[
+            &show_item,
+            &open_today,
+            &open_goals,
+            &open_stats,
+            &toggle_item,
+            &quit_item,
+        ],
+    )?;
 
-    let mut builder = TrayIconBuilder::with_id("main-tray")
+    let builder = TrayIconBuilder::with_id("main-tray")
         .icon(app.default_window_icon().expect("窗口图标缺失").clone())
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| match event.id.as_ref() {
             "show" => show_main_window(app),
+            "open_today" => {
+                let _ = app.emit("tray-open-page", "today");
+                show_main_window(app);
+            }
+            "open_goals" => {
+                let _ = app.emit("tray-open-page", "goals");
+                show_main_window(app);
+            }
+            "open_statistics" => {
+                let _ = app.emit("tray-open-page", "statistics");
+                show_main_window(app);
+            }
             "toggle_focus" => {
                 // 前端监听后调用 pomodoroStore 暂停/恢复（不阻塞托盘线程）
                 let _ = app.emit("tray-toggle-focus", ());

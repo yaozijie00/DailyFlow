@@ -19,6 +19,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     notes: "备注",
     sortOrder: 0,
     goalId: null,
+    repeatRule: "",
     ...overrides,
   };
 }

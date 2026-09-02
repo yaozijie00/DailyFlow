@@ -1,4 +1,4 @@
-import { and, count, eq, isNotNull, ne, sql, type SQL } from "drizzle-orm";
+import { and, count, eq, inArray, isNotNull, ne, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db";
 import { goals, tasks, focusSessions } from "../schema";
 
@@ -200,13 +200,58 @@ export class GoalRepository {
     return rows[0] ?? null;
   }
 
-  /** 物理删除（关联任务保留，goal_id 置空）。 */
+  /** 物理删除（关联任务保留，goal_id 置空——显式解绑，不依赖 FK pragma）。 */
   async delete(id: number): Promise<boolean> {
+    await this.unlinkTasks(id);
     const rows = await this.db
       .delete(goals)
       .where(eq(goals.id, id))
       .returning()
       .all();
     return rows.length > 0;
+  }
+
+  /* ---------- 撤销支持（v1.6.2：目标操作全量可撤销） ---------- */
+
+  /** 以显式 id 还原被删除的目标（撤销删除用）。 */
+  async insertRestored(goal: Goal): Promise<void> {
+    await this.db
+      .insert(goals)
+      .values({
+        id: goal.id,
+        title: goal.title,
+        description: goal.description,
+        deadline: goal.deadline,
+        startDate: goal.startDate,
+        priority: goal.priority,
+        manualProgress: goal.manualProgress,
+        status: goal.status,
+        sortOrder: goal.sortOrder,
+        createdAt: goal.createdAt,
+        updatedAt: goal.updatedAt,
+        completedAt: goal.completedAt,
+      })
+      .run();
+  }
+
+  /** 关联到某目标的任务 id（删除撤销需恢复 goal_id 关联）。 */
+  async taskIdsByGoal(goalId: number): Promise<number[]> {
+    const rows = await this.db
+      .select({ id: tasks.id })
+      .from(tasks)
+      .where(eq(tasks.goalId, goalId))
+      .all();
+    return rows.map((r) => r.id);
+  }
+
+  /** 把一批任务重新关联到目标（还原 FK SET NULL 的影响）。 */
+  async relinkTasks(taskIds: number[], goalId: number): Promise<void> {
+    if (taskIds.length === 0) return;
+    await this.db.update(tasks).set({ goalId }).where(inArray(tasks.id, taskIds)).run();
+  }
+
+  /** 解绑某目标下的任务（goal_id 置空）。 */
+  async unlinkTasks(goalId: number): Promise<void> {
+    await this.db.update(tasks).set({ goalId: null }).where(eq(tasks.goalId, goalId)).run();
   }
 }

@@ -94,6 +94,14 @@ export interface OverviewStatistics {
   dailyFocus: DailyStatistic[];
   /** 每日完成任务数（升序） */
   dailyCompletedTasks: { date: string; count: number }[];
+  /** 区间内完成任务数（预计>0 或实际>0，预计 vs 实际 对比样本） */
+  estimateRowCount: number;
+  /** 区间内完成任务预计时长合计（秒，estimatedDuration） */
+  estimatedTotalSeconds: number;
+  /** 区间内完成任务实际专注合计（秒，task.actualDuration 累计） */
+  actualTotalSeconds: number;
+  /** 逐项对比（预计 vs 实际），按偏差绝对值降序 */
+  estimateRows: { title: string; estimatedSeconds: number; actualSeconds: number }[];
 }
 
 /** 类别已删除时的显示名（category_id 快照 JOIN 不到名称）。 */
@@ -223,11 +231,12 @@ export class StatisticsService {
    * 涵盖 Focus 投入、任务完成、类别分布、每日趋势、平均值。
    */
   async getOverview(from: number, to: number): Promise<OverviewStatistics> {
-    const [rows, cats, created, completedRows] = await Promise.all([
+    const [rows, cats, created, completedRows, completedTasks] = await Promise.all([
       this.focusSessions.listInRange(from, to),
       this.categories.findAll(),
       this.tasks.countCreatedInRange(from, to),
       this.tasks.listCompletedInRange(from, to),
+      this.tasks.listCompletedTasksInRange(from, to),
     ]);
     const nameById = new Map(cats.map((c) => [c.id, c.name]));
     const colorById = new Map(cats.map((c) => [c.id, c.color]));
@@ -284,6 +293,26 @@ export class StatisticsService {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([date, count]) => ({ date, count }));
 
+    // 预计 vs 实际（核心复盘能力）：仅统计「预计>0 或 实际>0」的已完成任务，
+    // 实际取任务累计 actualDuration（真实 Focus Session 落库值，不推算）。
+    let estimatedTotalSeconds = 0;
+    let actualTotalSeconds = 0;
+    const estimateRows: OverviewStatistics["estimateRows"] = [];
+    for (const t of completedTasks) {
+      const est = t.estimatedDuration ?? 0;
+      const act = t.actualDuration ?? 0;
+      estimatedTotalSeconds += est;
+      actualTotalSeconds += act;
+      if (est > 0 || act > 0) {
+        estimateRows.push({ title: t.title, estimatedSeconds: est, actualSeconds: act });
+      }
+    }
+    estimateRows.sort(
+      (a, b) =>
+        Math.abs(b.actualSeconds - b.estimatedSeconds) -
+        Math.abs(a.actualSeconds - a.estimatedSeconds),
+    );
+
     const days = Math.max(1, Math.ceil((to - from) / 86_400_000));
     return {
       totalSeconds,
@@ -299,6 +328,10 @@ export class StatisticsService {
       categoryStats,
       dailyFocus,
       dailyCompletedTasks,
+      estimateRowCount: estimateRows.length,
+      estimatedTotalSeconds,
+      actualTotalSeconds,
+      estimateRows,
     };
   }
 }

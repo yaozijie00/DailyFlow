@@ -3,6 +3,7 @@ import { X } from "lucide-react";
 import { useTaskStore } from "../../stores/taskStore";
 import { useGoalStore } from "../../stores/goalStore";
 import { formatTimeRange } from "../../lib/timeline";
+import { REPEAT_RULES } from "../../lib/repeat";
 
 export default function TaskFormModal() {
   const isCreateOpen = useTaskStore((s) => s.isCreateOpen);
@@ -28,6 +29,7 @@ export default function TaskFormModal() {
   const [goalId, setGoalId] = useState("");
   const [estimatedMinutes, setEstimatedMinutes] = useState("");
   const [notes, setNotes] = useState("");
+  const [repeatRule, setRepeatRule] = useState("");
 
   useEffect(() => {
     if (editingTask) {
@@ -41,6 +43,7 @@ export default function TaskFormModal() {
           : "",
       );
       setNotes(editingTask.notes ?? "");
+      setRepeatRule(editingTask.repeatRule ?? "");
     } else if (hasDraft) {
       setTitle("");
       setCategoryId("");
@@ -49,12 +52,14 @@ export default function TaskFormModal() {
         String((createDraft.plannedEnd! - createDraft.plannedStart!) / 60000),
       );
       setNotes("");
+      setRepeatRule("");
     } else {
       setTitle("");
       setCategoryId("");
       setGoalId("");
       setEstimatedMinutes("");
       setNotes("");
+      setRepeatRule("");
     }
   }, [editingTaskId, isCreateOpen, editingTask, createDraft, hasDraft]);
 
@@ -80,6 +85,7 @@ export default function TaskFormModal() {
           ? null
           : Math.round(estimated * 60),
       notes: notes.trim() === "" ? null : notes.trim(),
+      repeatRule,
       ...(hasDraft
         ? {
             plannedStart: createDraft.plannedStart,
@@ -166,6 +172,23 @@ export default function TaskFormModal() {
               placeholder="例如：90"
               className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
             />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-neutral-600">重复</label>
+            <select
+              value={repeatRule}
+              onChange={(e) => setRepeatRule(e.target.value)}
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
+            >
+              {REPEAT_RULES.map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-[11px] text-neutral-400">
+              完成后自动生成下一次任务（每天/工作日/每周/每月）
+            </p>
           </div>
           <div>
             <label className="mb-1 block text-sm text-neutral-600">备注</label>

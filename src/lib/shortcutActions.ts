@@ -3,7 +3,7 @@ import { useAppStore } from "../stores/appStore";
 import { usePomodoroStore } from "../stores/pomodoroStore";
 import { useTaskStore } from "../stores/taskStore";
 import { useStatisticsStore } from "../stores/statisticsStore";
-import { undoManager } from "./undoManager";
+import { performUndo, performRedo } from "./undoActions";
 import type { ShortcutAction } from "./shortcuts";
 
 /** 执行快捷键动作（所有副作用走 store getState，便于测试）。 */
@@ -51,10 +51,10 @@ export function dispatchShortcut(action: ShortcutAction): void {
       app.setPage("settings");
       break;
     case "undo":
-      void undoManager.undo();
+      void performUndo();
       break;
     case "redo":
-      void undoManager.redo();
+      void performRedo();
       break;
   }
 }

@@ -10,7 +10,7 @@ import { NoteService } from "../services/noteService";
 import { evaluateAndNotify } from "../services/achievementRuntime";
 import { convertTaskToNote } from "../lib/noteConvert";
 import { undoManager } from "../lib/undoManager";
-import { todayString } from "../lib/date";
+import { todayString, yesterdayString } from "../lib/date";
 import { useAppStore } from "./appStore";
 import { useNoteStore } from "./noteStore";
 
@@ -32,6 +32,8 @@ interface TaskState {
   tasks: Task[];
   categories: Category[];
   loading: boolean;
+  /** 昨日未完成任务（逾期结转横幅；仅查看「今天」时有意义） */
+  overdue: Task[];
   /** 当前查看的日期（YYYY-MM-DD），今日页据此加载任务/时间轴 */
   selectedDate: string;
   selectedTaskId: number | null;
@@ -44,6 +46,21 @@ interface TaskState {
   load: () => Promise<void>;
   /** 加载「今天」任务（专注页使用，始终今天） */
   loadToday: () => Promise<void>;
+  /** 加载昨日未完成任务（逾期结转横幅用；非「今天」视图时清空） */
+  loadOverdue: () => Promise<void>;
+  /** 把昨日未完成任务结转/推迟到今天（一次拖动 = 一次批量 Undo；传空数组=全部结转） */
+  carryOver: (taskIds: number[]) => Promise<void>;
+  /** 标题模糊搜索（命令面板/全局查找） */
+  searchTasks: (query: string) => Promise<Task[]>;
+  /** 快速捕获：在指定日期创建任务（不切换当前视图）；成功返回 true */
+  createScheduledTask: (input: {
+    title: string;
+    scheduledDate: string;
+    plannedStart?: number | null;
+    plannedEnd?: number | null;
+    estimatedDuration?: number | null;
+    categoryId?: number | null;
+  }) => Promise<boolean>;
   setSelectedDate: (date: string) => void;
   goToToday: () => void;
   createTask: (input: TaskCreateInput) => Promise<void>;
@@ -81,6 +98,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   tasks: [],
   categories: [],
   loading: false,
+  overdue: [],
   selectedDate: todayString(),
   selectedTaskId: null,
   isCreateOpen: false,
@@ -108,10 +126,76 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     await get().load();
   },
 
+  loadOverdue: async () => {
+    if (get().selectedDate !== todayString()) {
+      set({ overdue: [] });
+      return;
+    }
+    try {
+      const rows = await taskService.getUnfinishedTasksByDate(yesterdayString());
+      set({ overdue: rows });
+    } catch {
+      set({ overdue: [] });
+    }
+  },
+
+  carryOver: async (taskIds) => {
+    const pending =
+      taskIds.length === 0
+        ? get().overdue
+        : get().overdue.filter((t) => taskIds.includes(t.id));
+    if (pending.length === 0) return;
+    const today = todayString();
+    try {
+      // 一次批量 Undo：全部结转 = 一个撤销动作（scheduledDate 已纳入可撤销字段）
+      await undoManager.withBatchAsync(async () => {
+        for (const t of pending) {
+          await taskService.updateTask(t.id, { scheduledDate: today });
+        }
+      });
+      await get().load();
+      set({ overdue: [] });
+      useAppStore
+        .getState()
+        .pushToast("success", `已结转 ${pending.length} 项任务到今天（可撤销）`);
+    } catch {
+      fail("结转任务失败");
+    }
+  },
+
   setSelectedDate: (date) => {
     if (!date || date === get().selectedDate) return;
     set({ selectedDate: date, selectedTaskId: null });
     void get().load();
+  },
+
+  searchTasks: async (query) => {
+    try {
+      return await taskService.searchTasks(query, 15);
+    } catch {
+      return [];
+    }
+  },
+
+  createScheduledTask: async (input) => {
+    try {
+      await taskService.createTask({
+        title: input.title,
+        scheduledDate: input.scheduledDate,
+        plannedStart: input.plannedStart ?? null,
+        plannedEnd: input.plannedEnd ?? null,
+        estimatedDuration: input.estimatedDuration ?? null,
+        categoryId: input.categoryId ?? null,
+      });
+      if (get().selectedDate === input.scheduledDate) {
+        await get().load();
+      }
+      useAppStore.getState().pushToast("success", "任务已创建");
+      return true;
+    } catch {
+      fail("创建任务失败");
+      return false;
+    }
   },
 
   goToToday: () => {
@@ -144,6 +228,19 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       await taskService.deleteTask(id);
       set({ selectedTaskId: null });
       await get().load();
+      useAppStore.getState().pushToast("success", "任务已删除", {
+        label: "撤销",
+        onClick: () => {
+          void (async () => {
+            try {
+              await undoManager.undo();
+              await get().load();
+            } catch {
+              fail("撤销失败，数据没有改变，请重试");
+            }
+          })();
+        },
+      });
     } catch {
       fail("删除任务失败");
     }

@@ -14,6 +14,8 @@ import { formatProgress, formatDurationCompact } from "../../lib/format";
 const FILTERS: { key: AchievementFilter; label: string }[] = [
   { key: "all", label: "全部" },
   { key: "unlocked", label: "已解锁" },
+  { key: "locked", label: "未解锁" },
+  { key: "hidden", label: "隐藏" },
 ];
 
 function remainingText(a: AchievementProgressView): string {
@@ -97,6 +99,7 @@ export default function AchievementsView() {
   const loading = useAchievementStore((s) => s.loading);
   const filter = useAchievementStore((s) => s.filter);
   const setFilter = useAchievementStore((s) => s.setFilter);
+  const totals = useAchievementStore((s) => s.totals);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -105,14 +108,41 @@ export default function AchievementsView() {
     }
   }, [dbStatus]);
 
+  // 全部 = 全部可见项；已解锁/未解锁 = 按状态；隐藏 = 未解锁的隐藏成就（???）
   const visible =
-    filter === "unlocked"
-      ? items.filter((i) => i.unlocked)
-      : items.filter((i) => !i.unlocked);
+    filter === "all"
+      ? items
+      : filter === "unlocked"
+        ? items.filter((i) => i.unlocked)
+        : filter === "locked"
+          ? items.filter((i) => !i.unlocked)
+          : items.filter((i) => !i.unlocked && i.hidden);
   const selected = items.find((i) => i.id === selectedId) ?? null;
+  const unlockPct = totals.total === 0 ? 0 : Math.round((totals.unlocked / totals.total) * 100);
 
   return (
     <>
+      {/* 顶部总览：已解锁 X / 共 Y · 完成度 */}
+      {totals.total > 0 && (
+        <div className="flex items-center gap-4 rounded-md border border-neutral-200 bg-white px-4 py-3">
+          <div className="shrink-0">
+            <div className="text-lg font-semibold text-neutral-900 tabular-nums">
+              已解锁 {totals.unlocked}
+              <span className="text-sm font-normal text-neutral-400"> / {totals.total}</span>
+            </div>
+            <div className="text-xs text-neutral-500">完成度 {unlockPct}%</div>
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="h-1.5 overflow-hidden rounded-full bg-neutral-100">
+              <div
+                className="h-full rounded-full bg-amber-500"
+                style={{ width: `${Math.max(2, unlockPct)}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 过滤 */}
       <div className="flex rounded-md border border-neutral-200 bg-white p-0.5 self-start">
         {FILTERS.map((f) => (
@@ -135,8 +165,14 @@ export default function AchievementsView() {
       ) : visible.length === 0 ? (
         <EmptyState
           icon={<Trophy size={28} />}
-          title="暂无成就"
-          description="完成番茄钟后，这里会解锁你的成就。"
+          title={filter === "hidden" ? "暂无隐藏成就" : "暂无成就"}
+          description={
+            filter === "hidden"
+              ? "隐藏成就达成后才会揭晓。"
+              : filter === "unlocked"
+                ? "还没有解锁的成就，完成番茄钟后会显示在这里。"
+                : "完成番茄钟后，这里会解锁你的成就。"
+          }
         />
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">

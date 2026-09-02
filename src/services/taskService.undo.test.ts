@@ -174,4 +174,39 @@ describe("TaskService Undo 集成（数据与 SQLite 一致）", () => {
     await undoManager.redo();
     expect(await tasks.findById(t.id)).toBeNull();
   });
+
+  it("结转：改 scheduledDate → 撤销还原到原日期 → 重做再结转", async () => {
+    const t = await tasks.create({ title: "逾期项", scheduledDate: "2026-08-26" });
+    await svc.updateTask(t.id, { scheduledDate: "2026-08-27" });
+    expect((await tasks.findById(t.id))?.scheduledDate).toBe("2026-08-27");
+
+    await undoManager.undo();
+    expect((await tasks.findById(t.id))?.scheduledDate).toBe("2026-08-26");
+
+    await undoManager.redo();
+    expect((await tasks.findById(t.id))?.scheduledDate).toBe("2026-08-27");
+  });
+
+  it("创建 → 撤销 → 重做 → 再撤销：不残留重复任务块；重做恢复同 id", async () => {
+    const t = await svc.createTask({ title: "新任务块", scheduledDate: "2026-08-27" });
+    const origId = t.id;
+    expect(await tasks.findByDate("2026-08-27")).toHaveLength(1);
+
+    await undoManager.undo();
+    expect(await tasks.findByDate("2026-08-27")).toHaveLength(0);
+
+    await undoManager.redo();
+    const afterRedo = await tasks.findByDate("2026-08-27");
+    expect(afterRedo).toHaveLength(1);
+    expect(afterRedo[0].id).toBe(origId); // 同 id 还原（无漂移）
+
+    await undoManager.undo();
+    expect(await tasks.findByDate("2026-08-27")).toHaveLength(0); // 不再残留重复
+    expect(undoManager.canUndo()).toBe(false);
+
+    await undoManager.redo();
+    const again = await tasks.findByDate("2026-08-27");
+    expect(again).toHaveLength(1);
+    expect(again[0].id).toBe(origId);
+  });
 });

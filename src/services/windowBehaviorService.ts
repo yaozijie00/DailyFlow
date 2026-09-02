@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { useAppStore } from "../stores/appStore";
+import { useAppStore, type Page } from "../stores/appStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { usePomodoroStore } from "../stores/pomodoroStore";
 import type { CloseBehavior } from "./settingsService";
@@ -60,10 +60,21 @@ function handleTrayToggleFocus(): void {
   else useAppStore.getState().pushToast("info", "请先在「专注」页选择任务开始番茄钟");
 }
 
+const TRAY_PAGES: Page[] = ["today", "focus", "goals", "statistics", "settings"];
+
+/** 托盘「打开今日/长期/统计」：切页并显示窗口。 */
+function handleTrayOpenPage(page: unknown): void {
+  const p = page as string;
+  if (TRAY_PAGES.includes(p as Page)) {
+    useAppStore.getState().setPage(p as Page);
+  }
+}
+
 /**
  * 初始化窗口行为监听（App 挂载时调用一次）。返回清理函数。
  * - app-close-requested：Rust 窗口 X 被点击；
- * - tray-toggle-focus：托盘「开始 / 暂停专注」。
+ * - tray-toggle-focus：托盘「开始 / 暂停专注」；
+ * - tray-open-page：托盘「打开今日/长期/统计」。
  */
 export function initWindowBehavior(): () => void {
   let disposed = false;
@@ -73,6 +84,10 @@ export function initWindowBehavior(): () => void {
     else unlisteners.push(fn);
   });
   void listen("tray-toggle-focus", () => handleTrayToggleFocus()).then((fn) => {
+    if (disposed) fn();
+    else unlisteners.push(fn);
+  });
+  void listen("tray-open-page", (e) => handleTrayOpenPage(e.payload)).then((fn) => {
     if (disposed) fn();
     else unlisteners.push(fn);
   });

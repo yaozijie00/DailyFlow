@@ -7,6 +7,7 @@ import {
 } from "../db/repositories/taskRepository";
 import { FocusSessionRepository } from "../db/repositories/focusSessionRepository";
 import { undoManager, diffTaskUpdate } from "../lib/undoManager";
+import { nextOccurrenceDate } from "../lib/repeat";
 
 export type TaskCreateInput = Omit<RepoCreateInput, "scheduledDate"> & {
   scheduledDate?: string;
@@ -34,6 +35,18 @@ export class TaskService {
     return this.tasks.findByDate(date);
   }
 
+  /** 指定日期仍未完成（TODO，不含取消）的任务——昨日逾期结转用。 */
+  async getUnfinishedTasksByDate(date: string): Promise<Task[]> {
+    const rows = await this.tasks.findByDate(date);
+    return rows.filter((t) => t.status === "TODO");
+  }
+
+  /** 标题模糊搜索（命令面板用）。 */
+  async searchTasks(query: string, limit?: number): Promise<Task[]> {
+    if (!query.trim()) return [];
+    return this.tasks.searchByTitle(query, limit);
+  }
+
   async createTask(input: TaskCreateInput): Promise<Task> {
     const task = await this.tasks.create({
       ...input,
@@ -50,21 +63,10 @@ export class TaskService {
           await this.deleteTask(snapshot.id);
         },
         redo: async () => {
-          // 重做创建：以相同字段重建（新 id）
-          const re = await this.tasks.create({
-            title: snapshot.title,
-            scheduledDate: snapshot.scheduledDate,
-            categoryId: snapshot.categoryId,
-            status: snapshot.status,
-            estimatedDuration: snapshot.estimatedDuration,
-            plannedStart: snapshot.plannedStart,
-            plannedEnd: snapshot.plannedEnd,
-            actualDuration: snapshot.actualDuration,
-            completedAt: snapshot.completedAt,
-            notes: snapshot.notes,
-            goalId: snapshot.goalId,
-          });
-          await this.tasks.reorderByTime(re.scheduledDate);
+          // 重做创建：以「原 id」还原同一行（修复：new id 会令 undo→redo→undo
+          // 时撤销仍删旧 id → 残留重复任务块；AUTOINCREMENT 保证 id 不被复用）
+          await this.tasks.insertRestored(snapshot);
+          await this.tasks.reorderByTime(snapshot.scheduledDate);
         },
       });
     }
@@ -165,6 +167,11 @@ export class TaskService {
 
   async completeTask(id: number): Promise<Task | null> {
     const before = await this.tasks.findById(id);
+    if (!before) return null;
+    const completing = before.status !== "COMPLETED";
+    if (completing && before.repeatRule) {
+      return this.completeWithRepeat(id, before);
+    }
     const updated = await this.tasks.update(id, {
       status: "COMPLETED",
       completedAt: Date.now(),
@@ -177,12 +184,59 @@ export class TaskService {
   async toggleComplete(id: number): Promise<Task | null> {
     const before = await this.tasks.findById(id);
     if (!before) return null;
+    const completing = before.status !== "COMPLETED";
+    if (completing && before.repeatRule) {
+      return this.completeWithRepeat(id, before);
+    }
     const updated =
-      before.status === "COMPLETED"
-        ? await this.tasks.update(id, { status: "TODO", completedAt: null })
-        : await this.tasks.update(id, { status: "COMPLETED", completedAt: Date.now() });
+      completing
+        ? await this.tasks.update(id, { status: "COMPLETED", completedAt: Date.now() })
+        : await this.tasks.update(id, { status: "TODO", completedAt: null });
     this.captureTaskUpdate(id, before, updated);
     return updated;
+  }
+
+  /**
+   * 完成带重复规则的任务：完成 + 生成下一实例合并为一个复合撤销动作。
+   * 下一实例复制标题/分类/预计/备注/目标/规则，日期取规则下一次（严格晚于本次）。
+   */
+  private async completeWithRepeat(id: number, before: Task): Promise<Task | null> {
+    return undoManager.withBatchAsync(async () => {
+      const updated = await this.tasks.update(id, {
+        status: "COMPLETED",
+        completedAt: Date.now(),
+      });
+      this.captureTaskUpdate(id, before, updated);
+      if (updated) {
+        const nextDate = nextOccurrenceDate(before.scheduledDate, before.repeatRule);
+        if (nextDate) {
+          const child = await this.tasks.create({
+            title: before.title,
+            scheduledDate: nextDate,
+            categoryId: before.categoryId,
+            status: "TODO",
+            estimatedDuration: before.estimatedDuration,
+            notes: before.notes,
+            goalId: before.goalId,
+            repeatRule: before.repeatRule,
+          });
+          await this.tasks.reorderByTime(child.scheduledDate);
+          const snapshot = { ...child };
+          // 随外层 batch 合并：撤销完成 = 还原状态 + 删除下一实例
+          undoManager.push({
+            type: "task.repeat_create",
+            label: "生成重复任务",
+            undo: async () => {
+              await this.tasks.delete(snapshot.id);
+            },
+            redo: async () => {
+              await this.tasks.insertRestored(snapshot);
+            },
+          });
+        }
+      }
+      return updated;
+    });
   }
 
   async cancelTask(id: number): Promise<Task | null> {

@@ -14,11 +14,12 @@ import {
 import {
   startOfToday,
   startOfTomorrow,
+  startOfWeek,
   dateStringToStart,
   todayString,
 } from "../lib/date";
 
-export type RangePreset = "today" | "days7" | "days30" | "all" | "custom";
+export type RangePreset = "today" | "week" | "days7" | "days30" | "all" | "custom";
 
 /** 「统计」页顶层 Tab：统计 / 成就（成就由快捷键与 Tab 切换进入）。 */
 export type StatsTab = "statistics" | "achievements";
@@ -38,6 +39,9 @@ export function computeRange(
   switch (range) {
     case "today":
       return { from: startOfToday(), to: startOfTomorrow() };
+    case "week":
+      // 自然周（周一起始）→ 明天，复盘「本周」直觉口径
+      return { from: startOfWeek(), to: startOfTomorrow() };
     case "days7": {
       const from = startOfToday() - 6 * 86_400_000; // 含今天共 7 天
       return { from, to: startOfTomorrow() };

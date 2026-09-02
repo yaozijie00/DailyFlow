@@ -1,4 +1,4 @@
-import { FocusSessionRepository, type FocusSession } from "../db/repositories/focusSessionRepository";
+import { FocusSessionRepository, type FocusSession, type FocusSessionDetail } from "../db/repositories/focusSessionRepository";
 import { SettingsRepository } from "../db/repositories/settingsRepository";
 import { TaskRepository } from "../db/repositories/taskRepository";
 
@@ -111,8 +111,7 @@ export class FocusService {
     }
   }
 
-  /** 启动恢复：返回进行中会话的重建上下文；无进行中会话（或数据不一致）返回 null。 */
-  async getActiveForRestore(): Promise<{
+  /** 启动恢复：返回进行中会话的重建上下文；无进行中会话（或数据不一致）返回 null。 */  async getActiveForRestore(): Promise<{
     session: FocusSession;
     pausedAt: number | null;
     accumulatedPauseMs: number;
@@ -127,5 +126,12 @@ export class FocusService {
       return null;
     }
     return { session: open, pausedAt: active.pausedAt, accumulatedPauseMs: active.accumulatedPauseMs };
+  }
+
+  /** 今日专注历史（专注页列表：含任务/分类名，按开始时间倒序）。 */
+  async getTodaySessions(): Promise<FocusSessionDetail[]> {
+    const now = new Date(this.now());
+    const from = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    return this.sessions.listWithTaskInRange(from, from + 86_400_000);
   }
 }

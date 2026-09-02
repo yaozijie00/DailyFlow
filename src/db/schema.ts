@@ -41,6 +41,8 @@ export const tasks = sqliteTable("tasks", {
   sortOrder: integer("sort_order").notNull().default(0),
   /** 关联的长期目标（删除目标时任务保留，goal_id 置空） */
   goalId: integer("goal_id").references(() => goals.id, { onDelete: "set null" }),
+  /** 重复规则（v1.6.2）：'' 不重复 / daily / weekdays / weekly / monthly；完成自动生成下一实例 */
+  repeatRule: text("repeat_rule").notNull().default(""),
 });
 
 export const focusSessions = sqliteTable("focus_sessions", {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { StickyNote, Check, X, Plus } from "lucide-react";
+import { StickyNote, Check, X, Plus, RotateCcw } from "lucide-react";
 import { useNoteStore } from "../../stores/noteStore";
 import { useTaskStore } from "../../stores/taskStore";
 import { useAppStore } from "../../stores/appStore";
@@ -107,6 +107,16 @@ function NoteItem({ note }: { note: Note }) {
         </button>
       )}
       <span className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
+        {arranged && (
+          <button
+            onClick={() => void update(note.id, { status: "active" })}
+            aria-label="还原便签"
+            title="还原为未安排便签"
+            className="rounded p-0.5 text-neutral-400 hover:bg-amber-50 hover:text-amber-600"
+          >
+            <RotateCcw size={14} />
+          </button>
+        )}
         {!arranged && (
           <button
             onClick={() => void complete(note.id)}
@@ -140,9 +150,14 @@ export default function NoteList() {
   const notes = useNoteStore((s) => s.notes);
   const create = useNoteStore((s) => s.create);
   const load = useNoteStore((s) => s.load);
+  const clearArranged = useNoteStore((s) => s.clearArranged);
   const convertToNote = useTaskStore((s) => s.convertToNote);
   const [draft, setDraft] = useState("");
+  const [showArranged, setShowArranged] = useState(false);
   const [taskOver, setTaskOver] = useState(false);
+
+  const activeNotes = notes.filter((n) => n.status !== "arranged");
+  const arrangedNotes = notes.filter((n) => n.status === "arranged");
 
   useEffect(() => {
     if (dbStatus === "ready") {
@@ -217,11 +232,50 @@ export default function NoteList() {
           还没有便签，把想法记下来
         </p>
       ) : (
-        <ul className="space-y-1">
-          {notes.map((n) => (
-            <NoteItem key={n.id} note={n} />
-          ))}
-        </ul>
+        <>
+          {activeNotes.length > 0 && (
+            <ul className="space-y-1">
+              {activeNotes.map((n) => (
+                <NoteItem key={n.id} note={n} />
+              ))}
+            </ul>
+          )}
+          {activeNotes.length === 0 && arrangedNotes.length > 0 && (
+            <p className="pb-1 text-center text-[11px] text-neutral-400">便签都已安排为任务</p>
+          )}
+
+          {/* 已安排便签：默认折叠，可展开逐项还原/删除，或一键清理（可撤销） */}
+          {arrangedNotes.length > 0 && (
+            <div className="mt-1.5 border-t border-dashed border-neutral-200 pt-1.5">
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={() => setShowArranged((v) => !v)}
+                  className="flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-600"
+                >
+                  <span className="inline-block w-3 text-center">
+                    {showArranged ? "▾" : "▸"}
+                  </span>
+                  已安排（{arrangedNotes.length}）
+                </button>
+                {showArranged && (
+                  <button
+                    onClick={() => void clearArranged()}
+                    className="text-[11px] text-neutral-400 underline underline-offset-2 hover:text-neutral-600"
+                  >
+                    全部清理
+                  </button>
+                )}
+              </div>
+              {showArranged && (
+                <ul className="mt-1 space-y-1">
+                  {arrangedNotes.map((n) => (
+                    <NoteItem key={n.id} note={n} />
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

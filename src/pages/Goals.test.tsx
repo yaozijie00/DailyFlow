@@ -61,9 +61,9 @@ describe("Goals 页面（长期月视图）", () => {
     mockState.remove.mockClear();
   });
 
-  it("无目标时显示空状态", () => {
+  it("无目标时显示空状态（月历网格内置引导）", () => {
     render(<Goals />);
-    expect(screen.getByText(/暂无长期任务/)).toBeTruthy();
+    expect(screen.getByText(/本月暂无排期任务/)).toBeTruthy();
   });
 
   it("渲染带日期范围的长期任务块", () => {
@@ -88,7 +88,8 @@ describe("Goals 页面（长期月视图）", () => {
     mockState.goals = [makeGoal()];
     mockState.update.mockResolvedValue(undefined);
     render(<Goals />);
-    fireEvent.click(screen.getByLabelText("编辑长期任务"));
+    // 跨周任务按周拆段：同一目标有多个可视段，取首个
+    fireEvent.click(screen.getAllByLabelText("编辑长期任务")[0]);
     expect(screen.getByText("编辑长期任务")).toBeTruthy();
     fireEvent.change(screen.getByDisplayValue("完成 DailyFlow V2"), { target: { value: "改名" } });
     fireEvent.click(screen.getByText("保存"));
@@ -101,7 +102,7 @@ describe("Goals 页面（长期月视图）", () => {
   it("编辑弹窗内完成/删除", () => {
     mockState.goals = [makeGoal()];
     render(<Goals />);
-    fireEvent.click(screen.getByLabelText("编辑长期任务"));
+    fireEvent.click(screen.getAllByLabelText("编辑长期任务")[0]);
     fireEvent.click(screen.getByText("完成"));
     expect(mockState.complete).toHaveBeenCalledWith(1);
   });

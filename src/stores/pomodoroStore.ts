@@ -70,6 +70,9 @@ const defaultFocusService = new FocusService(
   taskRepo,
 );
 
+/** 共享专注服务单例（专注页今日历史等只读查询复用，避免重复实例化）。 */
+export { defaultFocusService };
+
 function persistFail(): void {
   useAppStore.getState().pushToast("error", "专注记录保存失败");
 }

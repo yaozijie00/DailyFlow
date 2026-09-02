@@ -22,6 +22,10 @@ function makeOverview(overrides: Partial<OverviewStatistics> = {}): OverviewStat
     categoryStats: [],
     dailyFocus: [],
     dailyCompletedTasks: [],
+    estimateRowCount: 0,
+    estimatedTotalSeconds: 0,
+    actualTotalSeconds: 0,
+    estimateRows: [],
     ...overrides,
   };
 }
@@ -45,6 +49,7 @@ const achState = vi.hoisted(() => ({
   items: [] as AchievementProgressView[],
   loading: false,
   filter: "all",
+  totals: { unlocked: 0, total: 0 },
   load: vi.fn(),
   setFilter: vi.fn(),
 }));

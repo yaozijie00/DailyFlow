@@ -97,11 +97,17 @@ describe("NoteList（便签区）", () => {
     expect(mockState.update).toHaveBeenCalledWith(1, { title: "设计新背包" });
   });
 
-  it("已安排（arranged）便签显示为划线灰显", () => {
+  it("已安排（arranged）便签默认折叠，展开后显示且无完成按钮", () => {
     mockState.notes = [makeNote({ status: "arranged", title: "已安排事项" })];
     render(<NoteList />);
+    // 默认折叠：只显示「已安排（1）」入口
+    expect(screen.getByText(/已安排（1）/)).toBeTruthy();
+    expect(screen.queryByText("已安排事项")).toBeNull();
+    // 展开后可见：划线灰显、无完成按钮（可还原/删除）
+    fireEvent.click(screen.getByText(/已安排（1）/));
     expect(screen.getByText("已安排事项")).toBeTruthy();
-    // arranged 不显示完成按钮（已安排）
     expect(screen.queryByLabelText("完成便签")).toBeNull();
+    expect(screen.getByLabelText("还原便签")).toBeTruthy();
+    expect(screen.getByText("全部清理")).toBeTruthy();
   });
 });

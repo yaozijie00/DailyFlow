@@ -3,6 +3,7 @@ import { useAppStore } from "../stores/appStore";
 import { useTaskStore } from "../stores/taskStore";
 import { PageHeader } from "../components/ui/PageHeader";
 import PomodoroPanel from "../components/pomodoro/PomodoroPanel";
+import TodayFocusHistory from "../components/pomodoro/TodayFocusHistory";
 
 export default function Focus() {
   const dbStatus = useAppStore((s) => s.dbStatus);
@@ -21,6 +22,7 @@ export default function Focus() {
         description="番茄钟：专注一个任务，完成后记录本次专注。"
       />
       <PomodoroPanel />
+      <TodayFocusHistory />
     </div>
   );
 }

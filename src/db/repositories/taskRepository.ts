@@ -1,4 +1,4 @@
-import { and, count, eq, gte, lt, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, like, lt, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { tasks } from "../schema";
 
@@ -17,6 +17,8 @@ export interface CreateTaskInput {
   notes?: string | null;
   /** 关联的长期目标（可空） */
   goalId?: number | null;
+  /** 重复规则（'' 不重复 / daily / weekdays / weekly / monthly） */
+  repeatRule?: string;
 }
 
 export type UpdateTaskInput = Partial<CreateTaskInput> & { sortOrder?: number };
@@ -42,6 +44,7 @@ export class TaskRepository {
         completedAt: input.completedAt ?? null,
         notes: input.notes ?? null,
         goalId: input.goalId ?? null,
+        repeatRule: input.repeatRule ?? "",
       })
       .returning()
       .all();
@@ -189,6 +192,33 @@ export class TaskRepository {
           lt(tasks.completedAt, to),
         ),
       )
+      .all();
+  }
+
+  /** [from, to) 内完成的任务完整行（v1.6.2 预计 vs 实际 对比用）。 */
+  async listCompletedTasksInRange(from: number, to: number): Promise<Task[]> {
+    return this.db
+      .select()
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.status, "COMPLETED"),
+          gte(tasks.completedAt, from),
+          lt(tasks.completedAt, to),
+        ),
+      )
+      .all();
+  }
+
+  /** 标题模糊搜索（命令面板/全局查找用）：按日期倒序，最多 limit 条。 */
+  async searchByTitle(query: string, limit = 15): Promise<Task[]> {
+    const q = `%${query.trim()}%`;
+    return this.db
+      .select()
+      .from(tasks)
+      .where(like(tasks.title, q))
+      .orderBy(desc(tasks.scheduledDate), desc(tasks.id))
+      .limit(limit)
       .all();
   }
 }

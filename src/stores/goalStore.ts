@@ -9,6 +9,7 @@ import {
 } from "../db/repositories/goalRepository";
 import { GoalService } from "../services/goalService";
 import { useAppStore } from "./appStore";
+import { undoManager } from "../lib/undoManager";
 
 const goalService = new GoalService(new GoalRepository(getDb()));
 
@@ -75,6 +76,19 @@ export const useGoalStore = create<GoalState>((set, get) => ({
     try {
       await goalService.delete(id);
       await get().load();
+      useAppStore.getState().pushToast("success", "长期任务已删除", {
+        label: "撤销",
+        onClick: () => {
+          void (async () => {
+            try {
+              await undoManager.undo();
+              await get().load();
+            } catch {
+              useAppStore.getState().pushToast("error", "撤销失败，数据没有改变，请重试");
+            }
+          })();
+        },
+      });
     } catch {
       useAppStore.getState().pushToast("error", "删除长期目标失败");
     }

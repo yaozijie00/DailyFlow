@@ -50,6 +50,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     notes: null,
     sortOrder: 0,
     goalId: null,
+    repeatRule: "",
     ...overrides,
   };
 }

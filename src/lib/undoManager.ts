@@ -27,6 +27,8 @@ export class UndoManager {
   private redoStack: UndoableAction[] = [];
   /** 正在应用 undo/redo（业务层据此跳过入栈） */
   applying = false;
+  /** 最近一次成功 undo/redo 的动作描述（成功 Toast 用） */
+  lastLabel: string | null = null;
   /** 撤销历史上限（默认 50；可设置 20/50/100/200） */
   maxHistory = 50;
   private listeners = new Set<() => void>();
@@ -95,6 +97,7 @@ export class UndoManager {
     try {
       await action.undo();
       this.redoStack.push(action);
+      this.lastLabel = action.label;
     } catch (e) {
       // 撤销失败：把动作放回撤销栈顶部，保持栈一致，由调用方提示
       this.undoStack.push(action);
@@ -114,6 +117,7 @@ export class UndoManager {
     try {
       await action.redo();
       this.undoStack.push(action);
+      this.lastLabel = action.label;
     } catch (e) {
       this.redoStack.push(action);
       throw e;
@@ -172,6 +176,7 @@ export const undoManager = new UndoManager();
  * 任务可撤销字段。排除派生/累计字段：
  * - sortOrder：由 reorderByTime 每次更新后重排，还原它会造成顺序回跳；
  * - actualDuration：由专注完成累加，还原它会抹掉后续专注投入。
+ * scheduledDate 自 v1.6.2 起纳入（结转/改日期可撤销）；repeatRule 同步纳入（改重复规则可撤销）。
  */
 export const TASK_UNDOABLE_FIELDS = [
   "title",
@@ -183,6 +188,8 @@ export const TASK_UNDOABLE_FIELDS = [
   "completedAt",
   "notes",
   "goalId",
+  "scheduledDate",
+  "repeatRule",
 ] as const;
 
 export type TaskUndoableField = (typeof TASK_UNDOABLE_FIELDS)[number];

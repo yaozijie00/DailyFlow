@@ -1,6 +1,6 @@
-import { and, count, eq, gte, isNull, lt, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, isNull, lt, sql } from "drizzle-orm";
 import type { Db } from "../db";
-import { focusSessions } from "../schema";
+import { categories, focusSessions, tasks } from "../schema";
 
 export type FocusSession = typeof focusSessions.$inferSelect;
 
@@ -160,4 +160,41 @@ export class FocusSessionRepository {
       .from(focusSessions)
       .all();
   }
+
+  /* ---------- 专注页历史（v1.6.2：今日专注列表 + 任务/分类名） ---------- */
+
+  /** 列出 [from, to) 内开始会话的明细，按开始时间倒序（任务已删除时标题兜底）。 */
+  async listWithTaskInRange(from: number, to: number): Promise<FocusSessionDetail[]> {
+    return this.db
+      .select({
+        id: focusSessions.id,
+        taskId: focusSessions.taskId,
+        taskTitle: sql<string>`coalesce(${tasks.title}, '已删除任务')`,
+        categoryName: categories.name,
+        plannedDuration: focusSessions.plannedDuration,
+        actualDuration: focusSessions.actualDuration,
+        startedAt: focusSessions.startedAt,
+        endedAt: focusSessions.endedAt,
+        completed: focusSessions.completed,
+      })
+      .from(focusSessions)
+      .leftJoin(tasks, eq(tasks.id, focusSessions.taskId))
+      .leftJoin(categories, eq(categories.id, focusSessions.categoryId))
+      .where(and(gte(focusSessions.startedAt, from), lt(focusSessions.startedAt, to)))
+      .orderBy(desc(focusSessions.startedAt))
+      .all();
+  }
+}
+
+/** 会话 + 任务/分类名的明细（专注页「今日专注」列表用）。 */
+export interface FocusSessionDetail {
+  id: number;
+  taskId: number | null;
+  taskTitle: string;
+  categoryName: string | null;
+  plannedDuration: number;
+  actualDuration: number;
+  startedAt: number;
+  endedAt: number | null;
+  completed: boolean;
 }

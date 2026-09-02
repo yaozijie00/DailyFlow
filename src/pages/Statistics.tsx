@@ -17,6 +17,7 @@ import { formatDurationCompact } from "../lib/format";
 
 const RANGE_TABS: { key: RangePreset; label: string }[] = [
   { key: "today", label: "今日" },
+  { key: "week", label: "本周" },
   { key: "days7", label: "近7天" },
   { key: "days30", label: "近30天" },
   { key: "all", label: "全部" },
@@ -37,6 +38,12 @@ function StatCard({ label, value, sub }: { label: string; value: string; sub?: s
       {sub != null && <div className="mt-0.5 text-xs text-neutral-400">{sub}</div>}
     </div>
   );
+}
+
+/** 带符号时长文本（秒 → 「+5分钟」/「-5分钟」）。 */
+function signedDuration(seconds: number): string {
+  if (seconds === 0) return "±0";
+  return `${seconds > 0 ? "+" : ""}${formatDurationCompact(seconds)}`;
 }
 
 export default function Statistics() {
@@ -178,6 +185,69 @@ export default function Statistics() {
                   <CategoryBarChart data={overview!.categoryStats} />
                 )}
               </section>
+
+              {/* 预计 vs 实际（真实复盘：预计时长 vs 专注实际投入） */}
+              {overview!.estimateRowCount > 0 && (
+                <section className="rounded-md border border-neutral-200 bg-white p-5">
+                  <h2 className="mb-4 text-sm font-medium text-neutral-600">
+                    预计 vs 实际
+                    <span className="ml-2 text-xs font-normal text-neutral-400">
+                      范围内完成任务 {overview!.estimateRowCount} 项 · 实际仅统计真实 Focus Session
+                    </span>
+                  </h2>
+                  <div className="mb-4 grid grid-cols-3 gap-3">
+                    <StatCard
+                      label="预计合计"
+                      value={formatDurationCompact(overview!.estimatedTotalSeconds)}
+                    />
+                    <StatCard
+                      label="实际合计"
+                      value={formatDurationCompact(overview!.actualTotalSeconds)}
+                    />
+                    <StatCard
+                      label="偏差（实际 − 预计）"
+                      value={signedDuration(overview!.actualTotalSeconds - overview!.estimatedTotalSeconds)}
+                      sub={
+                        overview!.actualTotalSeconds > overview!.estimatedTotalSeconds
+                          ? "普遍低估了时间"
+                          : overview!.actualTotalSeconds < overview!.estimatedTotalSeconds
+                            ? "普遍高估了时间"
+                            : "估算精准"
+                      }
+                    />
+                  </div>
+                  <ul className="space-y-1">
+                    {overview!.estimateRows.slice(0, 8).map((r, i) => {
+                      const diff = r.actualSeconds - r.estimatedSeconds;
+                      return (
+                        <li
+                          key={i}
+                          className="flex items-center gap-3 rounded-md px-2 py-1 text-xs text-neutral-700 odd:bg-neutral-50/60"
+                        >
+                          <span className="min-w-0 flex-1 truncate">{r.title}</span>
+                          <span className="shrink-0 tabular-nums text-neutral-400">
+                            预计 {formatDurationCompact(r.estimatedSeconds)}
+                          </span>
+                          <span className="shrink-0 tabular-nums text-neutral-500">
+                            实际 {formatDurationCompact(r.actualSeconds)}
+                          </span>
+                          <span
+                            className={`w-24 shrink-0 text-right font-medium tabular-nums ${
+                              diff > 0
+                                ? "text-amber-600"
+                                : diff < 0
+                                  ? "text-green-600"
+                                  : "text-neutral-400"
+                            }`}
+                          >
+                            {diff === 0 ? "±0" : diff > 0 ? `+${formatDurationCompact(diff)}` : formatDurationCompact(diff)}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              )}
 
               {/* 今日工作轨迹 / 每日投入趋势 */}
               {range === "today" ? (

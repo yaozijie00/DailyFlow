@@ -45,6 +45,7 @@ const task: Task = {
   notes: null,
   sortOrder: 0,
   goalId: null,
+  repeatRule: "",
 };
 
 beforeEach(() => {

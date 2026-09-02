@@ -10,10 +10,17 @@ export type DbStatus = "idle" | "ready" | "error";
 
 export type ToastType = "info" | "success" | "warning" | "error";
 
+/** Toast 内嵌操作（如「删除后点此撤销」）。 */
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 export interface Toast {
   id: number;
   type: ToastType;
   text: string;
+  action?: ToastAction;
 }
 
 export interface AchievementToast {
@@ -32,9 +39,9 @@ interface AppState {
   dbError: string | null;
   setDbStatus: (status: DbStatus, error?: string | null) => void;
 
-  /** 全局轻提示（3.5 秒自动消失） */
+  /** 全局轻提示（3.5 秒自动消失；带操作按钮的延长到 8 秒） */
   toasts: Toast[];
-  pushToast: (type: ToastType, text: string) => void;
+  pushToast: (type: ToastType, text: string, action?: ToastAction) => void;
   removeToast: (id: number) => void;
 
   /** 成就解锁提示（5 秒自动消失） */
@@ -58,12 +65,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   setDbStatus: (status, error = null) => set({ dbStatus: status, dbError: error }),
 
   toasts: [],
-  pushToast: (type, text) => {
+  pushToast: (type, text, action) => {
     const id = ++toastId;
-    set({ toasts: [...get().toasts, { id, type, text }] });
+    set({ toasts: [...get().toasts, { id, type, text, ...(action ? { action } : {}) }] });
     setTimeout(() => {
       set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
-    }, 3500);
+    }, action ? 8000 : 3500);
   },
   removeToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 

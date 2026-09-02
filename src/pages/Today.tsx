@@ -13,6 +13,7 @@ import TaskFormModal from "../components/tasks/TaskFormModal";
 import Timeline from "../components/timeline/Timeline";
 import TodaySummary from "../components/today/TodaySummary";
 import TodayFestival from "../components/today/TodayFestival";
+import OverdueBanner from "../components/today/OverdueBanner";
 import NoteList from "../components/notes/NoteList";
 import CalendarPopover from "../components/today/CalendarPopover";
 
@@ -95,6 +96,13 @@ export default function Today() {
     }
   }, [load, dbStatus]);
 
+  // 查看「今天」时加载昨日未完成（逾期结转横幅）；切到历史日期则清空
+  useEffect(() => {
+    if (dbStatus === "ready") {
+      void useTaskStore.getState().loadOverdue();
+    }
+  }, [dbStatus, selectedDate]);
+
   // 跨午夜自动刷新：停留在「今天」时跳到新的一天；查看历史日期则不动
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -164,6 +172,9 @@ export default function Today() {
           </IconButton>
         }
       />
+
+      {/* 昨日未完成 → 今日结转（仅查看「今天」时显示） */}
+      {selectedDate === todayString() && <OverdueBanner />}
 
       {/* 今日信息行：左侧 节日 + 统计（左对齐，与时间轴窗口左缘一致） */}
       <div className="flex items-center gap-4">
