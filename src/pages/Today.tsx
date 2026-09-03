@@ -14,6 +14,7 @@ import Timeline from "../components/timeline/Timeline";
 import TodaySummary from "../components/today/TodaySummary";
 import TodayFestival from "../components/today/TodayFestival";
 import OverdueBanner from "../components/today/OverdueBanner";
+import DayPlanWarnings from "../components/today/DayPlanWarnings";
 import NoteList from "../components/notes/NoteList";
 import CalendarPopover from "../components/today/CalendarPopover";
 
@@ -181,6 +182,9 @@ export default function Today() {
         <TodayFestival date={selectedDate} />
         <TodaySummary />
       </div>
+
+      {/* 今日计划警告：时间冲突 / 日程超载（含移明天快捷） */}
+      <DayPlanWarnings />
 
       <div className="flex min-h-0 flex-1" ref={containerRef}>
         {/* 左：任务列表 + 便签（持久区域） */}

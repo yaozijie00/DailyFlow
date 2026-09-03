@@ -13,6 +13,9 @@ import { undoManager } from "../lib/undoManager";
 
 const goalService = new GoalService(new GoalRepository(getDb()));
 
+/** 共享目标服务单例（命令面板搜索等只读查询复用）。 */
+export { goalService };
+
 interface GoalState {
   /** 进行中目标（含关联任务进度） */
   goals: GoalWithProgress[];

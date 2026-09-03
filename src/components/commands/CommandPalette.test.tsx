@@ -17,6 +17,8 @@ const taskState = vi.hoisted(() => ({
   searchTasks: vi.fn(),
 }));
 const statsState = vi.hoisted(() => ({ setTab: vi.fn() }));
+const goalServiceMock = vi.hoisted(() => ({ searchTitles: vi.fn() }));
+const noteServiceMock = vi.hoisted(() => ({ searchTitles: vi.fn() }));
 
 vi.mock("../../stores/appStore", () => ({
   useAppStore: { getState: () => appState },
@@ -27,6 +29,8 @@ vi.mock("../../stores/taskStore", () => ({
 vi.mock("../../stores/statisticsStore", () => ({
   useStatisticsStore: { getState: () => statsState },
 }));
+vi.mock("../../stores/goalStore", () => ({ goalService: goalServiceMock }));
+vi.mock("../../stores/noteStore", () => ({ noteService: noteServiceMock }));
 
 function makeTask(id: number, title: string, scheduledDate = "2026-08-27"): Task {
   return {
@@ -62,6 +66,10 @@ describe("CommandPalette（Ctrl+K 命令面板）", () => {
     taskState.searchTasks.mockReset();
     taskState.searchTasks.mockResolvedValue([]);
     statsState.setTab.mockClear();
+    goalServiceMock.searchTitles.mockReset();
+    goalServiceMock.searchTitles.mockResolvedValue([]);
+    noteServiceMock.searchTitles.mockReset();
+    noteServiceMock.searchTitles.mockResolvedValue([]);
   });
 
   it("Ctrl+K 打开，Esc 关闭", () => {
@@ -82,10 +90,10 @@ describe("CommandPalette（Ctrl+K 命令面板）", () => {
     expect(screen.queryByPlaceholderText(/跳转页面/)).toBeNull();
   });
 
-  it("「新建今日任务」跳到今日并打开新建", () => {
+  it("「新建任务」跳到今日并打开新建", () => {
     render(<CommandPalette />);
     openPalette();
-    fireEvent.click(screen.getByText("新建今日任务"));
+    fireEvent.click(screen.getByText("新建任务"));
     expect(appState.setPage).toHaveBeenCalledWith("today");
     expect(taskState.openCreate).toHaveBeenCalled();
   });
@@ -122,6 +130,24 @@ describe("CommandPalette（Ctrl+K 命令面板）", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(200);
     });
-    expect(screen.getByText("没有匹配的任务")).toBeTruthy();
+    expect(screen.getByText("没有匹配的结果")).toBeTruthy();
+  });
+
+  it("目标搜索结果点击跳转长期页", async () => {
+    vi.useFakeTimers();
+    goalServiceMock.searchTitles.mockResolvedValue([
+      { id: 3, title: "学习 Unreal", status: "active" },
+    ] as never);
+    render(<CommandPalette />);
+    openPalette();
+    fireEvent.change(screen.getByPlaceholderText(/跳转页面/), {
+      target: { value: "Unreal" },
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200);
+    });
+    expect(goalServiceMock.searchTitles).toHaveBeenCalledWith("Unreal");
+    fireEvent.click(screen.getByText("学习 Unreal"));
+    expect(appState.setPage).toHaveBeenCalledWith("goals");
   });
 });

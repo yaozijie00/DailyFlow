@@ -60,6 +60,12 @@ export class GoalService {
     return this.goals.listCompleted();
   }
 
+  /** 标题模糊搜索（命令面板用）。 */
+  async searchTitles(query: string, limit?: number): Promise<Goal[]> {
+    if (!query.trim()) return [];
+    return this.goals.searchByTitle(query, limit);
+  }
+
   async create(input: CreateGoalInput): Promise<Goal> {
     const goal = await this.goals.create(input);
     if (!undoManager.applying) {

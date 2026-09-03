@@ -15,6 +15,7 @@ const mockState = vi.hoisted(() => ({
   cancelTask: vi.fn(),
   deleteTask: vi.fn(),
   updateTask: vi.fn(),
+  selectTask: vi.fn(),
   openEdit: vi.fn(),
 }));
 
@@ -78,9 +79,22 @@ describe("TaskDetail（右侧详情面板）", () => {
     expect(screen.getByText(/30分钟/)).toBeTruthy(); // 预计
     expect(screen.getByText(/10分钟/)).toBeTruthy(); // 实际
     expect(screen.getByText(/待办/)).toBeTruthy(); // 状态
-    expect(screen.getByText(/2026-08-27/)).toBeTruthy(); // 创建时间
+    expect(screen.getAllByText(/2026-08-27/).length).toBeGreaterThan(0); // 创建时间/当前日期
     await screen.findByText(/15分钟/); // Focus 投入（异步）
     expect(await screen.findByText(/2 次（完成 1 个番茄）/)).toBeTruthy();
+  });
+
+  it("延期快捷：「明天」改 scheduledDate 并清空选中", () => {
+    mockState.selectedTaskId = 1;
+    mockState.tasks = [makeTask()];
+    mockState.updateTask.mockResolvedValue(undefined);
+    render(<TaskDetail />);
+    fireEvent.click(screen.getByText(/明天/));
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const ymd = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
+    expect(mockState.updateTask).toHaveBeenCalledWith(1, { scheduledDate: ymd });
+    expect(mockState.selectTask).toHaveBeenCalledWith(null);
   });
 
   it("切换选中任务：详情更新为另一个任务", () => {

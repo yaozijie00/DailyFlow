@@ -8,11 +8,16 @@ import {
   Plus,
   Trophy,
   Search,
+  StickyNote,
 } from "lucide-react";
 import { useAppStore, type Page } from "../../stores/appStore";
 import { useTaskStore } from "../../stores/taskStore";
 import { useStatisticsStore } from "../../stores/statisticsStore";
+import { goalService } from "../../stores/goalStore";
+import { noteService } from "../../stores/noteStore";
 import type { Task } from "../../db/repositories/taskRepository";
+import type { Goal } from "../../db/repositories/goalRepository";
+import type { Note } from "../../db/repositories/noteRepository";
 
 const PAGE_ICONS: Record<Page, typeof CalendarDays> = {
   today: CalendarDays,
@@ -45,23 +50,30 @@ interface Entry {
   run: () => void;
 }
 
+interface SearchResults {
+  tasks: Task[];
+  goals: Goal[];
+  notes: Note[];
+}
+
 /**
- * Ctrl+K 命令面板（v1.6.2 优化）：
+ * Ctrl+K 命令面板（v1.7 扩展为跨类型搜索）：
  * - 打开：Ctrl/Cmd+K；关闭：Esc / 点击遮罩；
- * - 上半区：页面跳转 + 常用动作；输入后：全库任务标题搜索（跳到对应日期并选中）；
+ * - 上半区：页面跳转 + 常用动作；输入后：全库搜索 任务/长期目标/便签；
+ * - 任务可跳到对应日期并选中；目标跳长期页；便签跳今日页；
  * - ↑↓ 选择、Enter 执行、鼠标悬停即选中。
  */
 export default function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
-  const [results, setResults] = useState<Task[]>([]);
+  const [results, setResults] = useState<SearchResults>({ tasks: [], goals: [], notes: [] });
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const close = () => {
     setOpen(false);
     setQ("");
-    setResults([]);
+    setResults({ tasks: [], goals: [], notes: [] });
   };
 
   useEffect(() => {
@@ -70,7 +82,7 @@ export default function CommandPalette() {
         e.preventDefault();
         setOpen((o) => !o);
         setQ("");
-        setResults([]);
+        setResults({ tasks: [], goals: [], notes: [] });
         setActive(0);
       } else if (e.key === "Escape" && open) {
         close();
@@ -86,23 +98,25 @@ export default function CommandPalette() {
     return () => window.clearTimeout(id);
   }, [open]);
 
-  // 输入防抖搜索（标题模糊匹配，全库最近优先）
+  // 输入防抖搜索（任务/目标/便签并发）
   useEffect(() => {
     if (!open) return;
     const term = q.trim();
     if (!term) {
-      setResults([]);
+      setResults({ tasks: [], goals: [], notes: [] });
       return;
     }
     const id = window.setTimeout(() => {
-      void useTaskStore
-        .getState()
-        .searchTasks(term)
-        .then((rows) => {
-          setResults(rows);
+      void Promise.all([
+        useTaskStore.getState().searchTasks(term),
+        goalService.searchTitles(term),
+        noteService.searchTitles(term),
+      ])
+        .then(([tasks, goals, notes]) => {
+          setResults({ tasks, goals, notes });
           setActive(0);
         })
-        .catch(() => setResults([]));
+        .catch(() => setResults({ tasks: [], goals: [], notes: [] }));
     }, 150);
     return () => window.clearTimeout(id);
   }, [q, open]);
@@ -123,8 +137,8 @@ export default function CommandPalette() {
     })),
     {
       id: "act-create",
-      title: "新建今日任务",
-      sub: "跳到今日并打开新建表单",
+      title: "新建任务",
+      sub: "Ctrl+N · 跳到今日并打开新建",
       icon: <Plus size={15} />,
       run: () => {
         app.setPage("today");
@@ -142,10 +156,10 @@ export default function CommandPalette() {
     },
   ];
 
-  const taskEntries: Entry[] = results.map((t) => ({
+  const taskEntries: Entry[] = results.tasks.map((t) => ({
     id: `task-${t.id}`,
     title: t.title,
-    sub: `${t.scheduledDate} · ${taskStatusText(t)}`,
+    sub: `任务 · ${t.scheduledDate} · ${taskStatusText(t)}`,
     muted: t.status !== "TODO",
     icon: (
       <span
@@ -166,7 +180,35 @@ export default function CommandPalette() {
     },
   }));
 
-  const entries: Entry[] = [...staticEntries, ...taskEntries];
+  const goalEntries: Entry[] = results.goals.map((g) => ({
+    id: `goal-${g.id}`,
+    title: g.title,
+    sub: `目标 · ${g.status === "completed" ? "已完成" : "进行中"}`,
+    muted: g.status === "completed",
+    icon: <Target size={15} />,
+    run: () => {
+      app.setPage("goals");
+    },
+  }));
+
+  const noteEntries: Entry[] = results.notes.map((n) => ({
+    id: `note-${n.id}`,
+    title: n.title,
+    sub: `便签 · ${n.status === "arranged" ? "已安排" : "未安排"}`,
+    icon: <StickyNote size={15} className="text-amber-500" />,
+    run: () => {
+      app.setPage("today");
+    },
+  }));
+
+  const entries: Entry[] = [
+    ...staticEntries,
+    ...taskEntries,
+    ...goalEntries,
+    ...noteEntries,
+  ];
+
+  const total = results.tasks.length + results.goals.length + results.notes.length;
 
   const onInputKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") {
@@ -190,7 +232,7 @@ export default function CommandPalette() {
       onClick={close}
     >
       <div
-        className="w-[480px] max-w-[92vw] overflow-hidden rounded-lg bg-white shadow-xl"
+        className="w-[500px] max-w-[92vw] overflow-hidden rounded-lg bg-white shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2 border-b border-neutral-100 px-3">
@@ -203,7 +245,7 @@ export default function CommandPalette() {
               setActive(0);
             }}
             onKeyDown={onInputKeyDown}
-            placeholder="跳转页面、新建任务，或输入关键词搜索任务…"
+            placeholder="跳转页面、新建任务，或搜索 任务/目标/便签…"
             className="w-full bg-transparent py-3 text-sm text-neutral-900 outline-none placeholder:text-neutral-400"
           />
           <span className="shrink-0 rounded border border-neutral-200 px-1 text-[10px] text-neutral-400">
@@ -236,9 +278,9 @@ export default function CommandPalette() {
               )}
             </button>
           ))}
-          {q.trim() !== "" && results.length === 0 && (
+          {q.trim() !== "" && total === 0 && (
             <div className="px-3 py-4 text-center text-xs text-neutral-400">
-              没有匹配的任务
+              没有匹配的结果
             </div>
           )}
         </div>

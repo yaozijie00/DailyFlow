@@ -141,10 +141,10 @@ export class StatisticsService {
     };
   }
 
-  /** [from, to) 内的汇总：总时长 / 走满数 / 事件数。 */
+  /** [from, to) 内的汇总：总时长 / 走满数 / 事件数（单条 SQL）。 */
   async getRangeStatistics(from: number, to: number): Promise<RangeStatistics> {
-    const rows = await this.focusSessions.listInRange(from, to);
-    return aggregateRange(rows);
+    const s = await this.focusSessions.summaryInRange(from, to);
+    return { totalSeconds: s.totalSeconds, completedCount: s.completedCount, eventCount: s.count };
   }
 
   /** [from, to) 内按类别聚合投入时长与次数，按时长降序；已删除类别归入「已删除类别」。 */
@@ -153,28 +153,21 @@ export class StatisticsService {
     to: number,
   ): Promise<CategoryStatistic[]> {
     const [rows, cats] = await Promise.all([
-      this.focusSessions.listInRange(from, to),
+      this.focusSessions.categoryAggregateInRange(from, to),
       this.categories.findAll(),
     ]);
     const nameById = new Map(cats.map((c) => [c.id, c.name]));
     const colorById = new Map(cats.map((c) => [c.id, c.color]));
-    const byId = new Map<number | null, { seconds: number; count: number }>();
-    for (const r of rows) {
-      const key = r.categoryId;
-      const cur = byId.get(key) ?? { seconds: 0, count: 0 };
-      cur.seconds += r.actualDuration;
-      cur.count += 1;
-      byId.set(key, cur);
-    }
     const result: CategoryStatistic[] = [];
-    for (const [categoryId, v] of byId.entries()) {
-      const known = categoryId != null && nameById.has(categoryId);
+    for (const r of rows) {
+      const cid = r.categoryId;
+      const known = cid != null && nameById.has(cid);
       result.push({
-        categoryId,
-        name: known ? nameById.get(categoryId)! : DELETED_CATEGORY_NAME,
-        color: known ? (colorById.get(categoryId) ?? NO_CATEGORY_COLOR) : NO_CATEGORY_COLOR,
-        seconds: v.seconds,
-        count: v.count,
+        categoryId: cid,
+        name: known ? nameById.get(cid)! : DELETED_CATEGORY_NAME,
+        color: known ? (colorById.get(cid) ?? NO_CATEGORY_COLOR) : NO_CATEGORY_COLOR,
+        seconds: r.seconds,
+        count: r.count,
       });
     }
     result.sort((a, b) => b.seconds - a.seconds);
@@ -183,26 +176,18 @@ export class StatisticsService {
 
   /** [from, to) 内按本地日期聚合，返回按日期升序。 */
   async getDailyStatistics(from: number, to: number): Promise<DailyStatistic[]> {
-    const rows = await this.focusSessions.listInRange(from, to);
-    const byDate = new Map<string, { seconds: number; completedCount: number }>();
-    for (const r of rows) {
-      const date = dateStringOf(r.startedAt);
-      const cur = byDate.get(date) ?? { seconds: 0, completedCount: 0 };
-      cur.seconds += r.actualDuration;
-      if (r.completed) cur.completedCount += 1;
-      byDate.set(date, cur);
-    }
-    return Array.from(byDate.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, v]) => ({ date, seconds: v.seconds, completedCount: v.completedCount }));
+    const rows = await this.focusSessions.dailyAggregateInRange(from, to);
+    return rows
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((r) => ({ date: r.date, seconds: r.seconds, completedCount: r.completedCount }));
   }
 
   /** [from, to) 内按开始小时聚合，返回完整 0..23（无数据为 0）。 */
   async getHourlyStatistics(from: number, to: number): Promise<HourlyStatistic[]> {
-    const rows = await this.focusSessions.listInRange(from, to);
+    const rows = await this.focusSessions.hourlyAggregateInRange(from, to);
     const buckets = new Array<number>(24).fill(0);
     for (const r of rows) {
-      buckets[new Date(r.startedAt).getHours()] += r.actualDuration;
+      if (r.hour >= 0 && r.hour < 24) buckets[r.hour] = r.seconds;
     }
     return buckets.map((seconds, hour) => ({ hour, seconds }));
   }
@@ -231,47 +216,38 @@ export class StatisticsService {
    * 涵盖 Focus 投入、任务完成、类别分布、每日趋势、平均值。
    */
   async getOverview(from: number, to: number): Promise<OverviewStatistics> {
-    const [rows, cats, created, completedRows, completedTasks] = await Promise.all([
-      this.focusSessions.listInRange(from, to),
-      this.categories.findAll(),
-      this.tasks.countCreatedInRange(from, to),
-      this.tasks.listCompletedInRange(from, to),
-      this.tasks.listCompletedTasksInRange(from, to),
-    ]);
+    const [summary, dailyRows, catRows, cats, created, completedRows, completedTasks] =
+      await Promise.all([
+        this.focusSessions.summaryInRange(from, to),
+        this.focusSessions.dailyAggregateInRange(from, to),
+        this.focusSessions.categoryAggregateInRange(from, to),
+        this.categories.findAll(),
+        this.tasks.countCreatedInRange(from, to),
+        this.tasks.listCompletedInRange(from, to),
+        this.tasks.listCompletedTasksInRange(from, to),
+      ]);
     const nameById = new Map(cats.map((c) => [c.id, c.name]));
     const colorById = new Map(cats.map((c) => [c.id, c.color]));
 
-    // Focus 维度
-    let totalSeconds = 0;
-    let completedFocusCount = 0;
-    const byDate = new Map<string, { seconds: number; completedCount: number }>();
-    const catMap = new Map<number | null, { seconds: number; count: number }>();
-    for (const r of rows) {
-      totalSeconds += r.actualDuration;
-      if (r.completed) completedFocusCount += 1;
-      const date = dateStringOf(r.startedAt);
-      const cur = byDate.get(date) ?? { seconds: 0, completedCount: 0 };
-      cur.seconds += r.actualDuration;
-      if (r.completed) cur.completedCount += 1;
-      byDate.set(date, cur);
-      const c = catMap.get(r.categoryId) ?? { seconds: 0, count: 0 };
-      c.seconds += r.actualDuration;
-      c.count += 1;
-      catMap.set(r.categoryId, c);
-    }
-    const dailyFocus = Array.from(byDate.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, v]) => ({ date, seconds: v.seconds, completedCount: v.completedCount }));
+    // Focus 维度（SQL 聚合结果，不再把会话全量拉到 JS）
+    const totalSeconds = summary.totalSeconds;
+    const sessionCount = summary.count;
+    const completedFocusCount = summary.completedCount;
+    const dailyFocus = dailyRows
+      .slice()
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map((r) => ({ date: r.date, seconds: r.seconds, completedCount: r.completedCount }));
 
     const categoryStats: CategoryStatistic[] = [];
-    for (const [categoryId, v] of catMap.entries()) {
-      const known = categoryId != null && nameById.has(categoryId);
+    for (const r of catRows) {
+      const cid = r.categoryId;
+      const known = cid != null && nameById.has(cid);
       categoryStats.push({
-        categoryId,
-        name: known ? nameById.get(categoryId)! : DELETED_CATEGORY_NAME,
-        color: known ? (colorById.get(categoryId) ?? NO_CATEGORY_COLOR) : NO_CATEGORY_COLOR,
-        seconds: v.seconds,
-        count: v.count,
+        categoryId: cid,
+        name: known ? nameById.get(cid)! : DELETED_CATEGORY_NAME,
+        color: known ? (colorById.get(cid) ?? NO_CATEGORY_COLOR) : NO_CATEGORY_COLOR,
+        seconds: r.seconds,
+        count: r.count,
       });
     }
     categoryStats.sort((a, b) => b.seconds - a.seconds);
@@ -316,9 +292,9 @@ export class StatisticsService {
     const days = Math.max(1, Math.ceil((to - from) / 86_400_000));
     return {
       totalSeconds,
-      sessionCount: rows.length,
+      sessionCount,
       completedFocusCount,
-      avgSessionSeconds: rows.length === 0 ? 0 : Math.round(totalSeconds / rows.length),
+      avgSessionSeconds: sessionCount === 0 ? 0 : Math.round(totalSeconds / sessionCount),
       avgDailySeconds: Math.round(totalSeconds / days),
       topCategory,
       taskCreated,

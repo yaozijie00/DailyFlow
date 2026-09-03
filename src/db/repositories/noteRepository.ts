@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, like } from "drizzle-orm";
 import type { Db } from "../db";
 import { notes } from "../schema";
 
@@ -106,5 +106,17 @@ export class NoteRepository {
   /** 以原 id 重建便签（撤销「删除便签」用）。 */
   async insertRestored(note: Note): Promise<void> {
     await this.db.insert(notes).values(note).run();
+  }
+
+  /** 标题模糊搜索（未完成便签，命令面板用）。 */
+  async searchActiveByTitle(query: string, limit = 10): Promise<Note[]> {
+    const q = `%${query.trim()}%`;
+    return this.db
+      .select()
+      .from(notes)
+      .where(and(inArray(notes.status, ["active", "arranged"]), like(notes.title, q)))
+      .orderBy(desc(notes.id))
+      .limit(limit)
+      .all();
   }
 }

@@ -12,6 +12,9 @@ import { undoManager } from "../lib/undoManager";
 
 const noteService = new NoteService(new NoteRepository(getDb()));
 
+/** 共享便签服务单例（命令面板搜索等只读查询复用）。 */
+export { noteService };
+
 interface NoteState {
   /** 未完成便签（active + arranged） */
   notes: Note[];

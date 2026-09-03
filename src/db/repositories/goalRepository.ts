@@ -1,4 +1,4 @@
-import { and, count, eq, inArray, isNotNull, ne, sql, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNotNull, like, ne, sql, type SQL } from "drizzle-orm";
 import type { Db } from "../db";
 import { goals, tasks, focusSessions } from "../schema";
 
@@ -253,5 +253,17 @@ export class GoalRepository {
   /** 解绑某目标下的任务（goal_id 置空）。 */
   async unlinkTasks(goalId: number): Promise<void> {
     await this.db.update(tasks).set({ goalId: null }).where(eq(tasks.goalId, goalId)).run();
+  }
+
+  /** 标题模糊搜索（命令面板用）：进行中优先、按更新时间倒序。 */
+  async searchByTitle(query: string, limit = 10): Promise<Goal[]> {
+    const q = `%${query.trim()}%`;
+    return this.db
+      .select()
+      .from(goals)
+      .where(like(goals.title, q))
+      .orderBy(goals.status, desc(goals.updatedAt))
+      .limit(limit)
+      .all();
   }
 }

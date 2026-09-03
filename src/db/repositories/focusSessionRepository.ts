@@ -184,6 +184,93 @@ export class FocusSessionRepository {
       .orderBy(desc(focusSessions.startedAt))
       .all();
   }
+
+  /* ---------- v1.7：SQL 级聚合（统计不下沉数据到 JS，10 万级会话不卡） ---------- */
+
+  /** [from, to) 单条 SQL 汇总：总秒 / 次数 / 走满数。 */
+  async summaryInRange(
+    from: number,
+    to: number,
+  ): Promise<{ totalSeconds: number; count: number; completedCount: number }> {
+    const rows = await this.db
+      .select({
+        totalSeconds: sql<number>`coalesce(sum(${focusSessions.actualDuration}), 0)`,
+        count: count(),
+        completedCount: sql<number>`coalesce(sum(case when ${focusSessions.completed} then 1 else 0 end), 0)`,
+      })
+      .from(focusSessions)
+      .where(and(gte(focusSessions.startedAt, from), lt(focusSessions.startedAt, to)))
+      .all();
+    const r = rows[0];
+    return {
+      totalSeconds: Number(r?.totalSeconds ?? 0),
+      count: r?.count ?? 0,
+      completedCount: Number(r?.completedCount ?? 0),
+    };
+  }
+
+  /** [from, to) 按本地日期 GROUP BY：每日总秒/走满数。 */
+  async dailyAggregateInRange(
+    from: number,
+    to: number,
+  ): Promise<Array<{ date: string; seconds: number; completedCount: number }>> {
+    const dateExpr = sql<string>`strftime('%Y-%m-%d', ${focusSessions.startedAt}/1000, 'unixepoch', 'localtime')`;
+    const rows = await this.db
+      .select({
+        date: dateExpr,
+        seconds: sql<number>`coalesce(sum(${focusSessions.actualDuration}), 0)`,
+        completedCount: sql<number>`coalesce(sum(case when ${focusSessions.completed} then 1 else 0 end), 0)`,
+      })
+      .from(focusSessions)
+      .where(and(gte(focusSessions.startedAt, from), lt(focusSessions.startedAt, to)))
+      .groupBy(dateExpr)
+      .all();
+    return rows.map((r) => ({
+      date: String(r.date),
+      seconds: Number(r.seconds),
+      completedCount: Number(r.completedCount),
+    }));
+  }
+
+  /** [from, to) 按本地小时 GROUP BY（0..23）。 */
+  async hourlyAggregateInRange(
+    from: number,
+    to: number,
+  ): Promise<Array<{ hour: number; seconds: number }>> {
+    const hourExpr = sql<number>`cast(strftime('%H', ${focusSessions.startedAt}/1000, 'unixepoch', 'localtime') as integer)`;
+    const rows = await this.db
+      .select({
+        hour: hourExpr,
+        seconds: sql<number>`coalesce(sum(${focusSessions.actualDuration}), 0)`,
+      })
+      .from(focusSessions)
+      .where(and(gte(focusSessions.startedAt, from), lt(focusSessions.startedAt, to)))
+      .groupBy(hourExpr)
+      .all();
+    return rows.map((r) => ({ hour: Number(r.hour), seconds: Number(r.seconds) }));
+  }
+
+  /** [from, to) 按类别 GROUP BY（category_id 快照；服务层负责名称映射）。 */
+  async categoryAggregateInRange(
+    from: number,
+    to: number,
+  ): Promise<Array<{ categoryId: number | null; seconds: number; count: number }>> {
+    const rows = await this.db
+      .select({
+        categoryId: focusSessions.categoryId,
+        seconds: sql<number>`coalesce(sum(${focusSessions.actualDuration}), 0)`,
+        count: count(),
+      })
+      .from(focusSessions)
+      .where(and(gte(focusSessions.startedAt, from), lt(focusSessions.startedAt, to)))
+      .groupBy(focusSessions.categoryId)
+      .all();
+    return rows.map((r) => ({
+      categoryId: r.categoryId,
+      seconds: Number(r.seconds),
+      count: r.count ?? 0,
+    }));
+  }
 }
 
 /** 会话 + 任务/分类名的明细（专注页「今日专注」列表用）。 */

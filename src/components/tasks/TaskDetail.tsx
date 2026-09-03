@@ -6,6 +6,8 @@ import { useTaskFocusStats } from "../../hooks/useTaskFocusStats";
 import { formatDuration, formatDateTime } from "../../lib/format";
 import { formatTimeRange } from "../../lib/timeline";
 import { TASK_STATUS_LABEL } from "../../lib/taskLabels";
+import { postponeTargets } from "../../lib/postpone";
+import { todayString } from "../../lib/date";
 
 export default function TaskDetail() {
   const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
@@ -16,6 +18,7 @@ export default function TaskDetail() {
   const cancelTask = useTaskStore((s) => s.cancelTask);
   const deleteTask = useTaskStore((s) => s.deleteTask);
   const updateTask = useTaskStore((s) => s.updateTask);
+  const selectTask = useTaskStore((s) => s.selectTask);
   const openEdit = useTaskStore((s) => s.openEdit);
 
   const [notesEditing, setNotesEditing] = useState(false);
@@ -146,6 +149,53 @@ export default function TaskDetail() {
           <p className="text-sm text-neutral-300">无</p>
         )}
       </div>
+
+      {/* 延期（Postpone）：改 scheduledDate，可撤销 */}
+      {!completed && !cancelled && (
+        <div className="mb-4 border-t border-neutral-100 pt-3">
+          <div className="mb-1.5 flex items-baseline justify-between">
+            <span className="text-sm text-neutral-500">延期到</span>
+            <span className="text-xs text-neutral-400">
+              当前：{task.scheduledDate}
+            </span>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {(
+              [
+                { key: "tomorrow", label: "明天", date: postponeTargets(todayString()).tomorrow },
+                { key: "weekend", label: "周末", date: postponeTargets(todayString()).weekend },
+                { key: "nextWeek", label: "下周", date: postponeTargets(todayString()).nextWeek },
+              ] as const
+            ).map((p) => (
+              <button
+                key={p.key}
+                title={p.date}
+                onClick={() => {
+                  void updateTask(task.id, { scheduledDate: p.date });
+                  selectTask(null);
+                }}
+                className="rounded-md border border-neutral-300 px-2.5 py-1 text-xs text-neutral-700 hover:border-neutral-500 hover:bg-neutral-50"
+              >
+                {p.label}
+                <span className="ml-1 text-neutral-400">
+                  {p.date.slice(5).replace("-", "/")}
+                </span>
+              </button>
+            ))}
+            <input
+              type="date"
+              value={task.scheduledDate}
+              onChange={(e) => {
+                if (!e.target.value) return;
+                void updateTask(task.id, { scheduledDate: e.target.value });
+                selectTask(null);
+              }}
+              className="rounded-md border border-neutral-300 px-2 py-1 text-xs outline-none focus:border-neutral-900"
+              title="自定义日期"
+            />
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {!completed && !cancelled && (

@@ -43,7 +43,7 @@ export const SHORTCUT_ACTION_LABELS: Record<ShortcutAction, string> = {
 
 export const DEFAULT_SHORTCUTS: ShortcutMap = {
   open_dailyflow: "Ctrl+Shift+D",
-  create_task: "Ctrl+Shift+T",
+  create_task: "Ctrl+N",
   pomodoro_toggle: "Ctrl+Space",
   complete_task: "Ctrl+Shift+Enter",
   open_today: "Ctrl+1",

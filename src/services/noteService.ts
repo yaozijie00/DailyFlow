@@ -39,6 +39,12 @@ export class NoteService {
     return this.notes.listCompleted();
   }
 
+  /** 标题模糊搜索（命令面板用，未完成便签）。 */
+  async searchTitles(query: string, limit?: number): Promise<Note[]> {
+    if (!query.trim()) return [];
+    return this.notes.searchActiveByTitle(query, limit);
+  }
+
   async create(input: CreateNoteInput): Promise<Note> {
     const note = await this.notes.create(input);
     if (!undoManager.applying) {

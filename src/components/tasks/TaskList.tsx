@@ -128,7 +128,7 @@ export default function TaskList() {
     >
       {tasks.length === 0 ? (
         <div className="rounded-md border border-dashed border-neutral-300 p-8 text-center text-sm text-neutral-400">
-          暂无任务，点击右上角「新建任务」开始规划
+          暂无任务，点击右上角「新建任务」或按 Ctrl+N 开始规划
         </div>
       ) : (
         <>
