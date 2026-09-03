@@ -31,34 +31,34 @@ export default function ProjectManager({ goals }: { goals: GoalWithProgress[] })
 
   return (
     <section className="space-y-2">
-      <div className="flex items-center gap-1.5 text-sm font-medium text-ink">
-        <FolderKanban size={15} className="text-ink-3" />
+      <div className="flex items-center gap-1.5 text-sm font-medium text-neutral-700">
+        <FolderKanban size={15} className="text-neutral-400" />
         目标项目
-        <span className="text-xs font-normal text-ink-3">
+        <span className="text-xs font-normal text-neutral-400">
           把任务归入项目，任务将自动归属于对应目标
         </span>
       </div>
       {goals.map((g) => {
         const list = projects.filter((p) => p.goalId === g.id);
         return (
-          <div key={g.id} className="rounded-md border border-line bg-surface p-3">
-            <div className="mb-2 text-xs font-medium text-ink-2">
+          <div key={g.id} className="rounded-md border border-neutral-200 bg-white p-3">
+            <div className="mb-2 text-xs font-medium text-neutral-600">
               {g.title}
-              <span className="ml-1.5 text-ink-3">{list.length} 个项目</span>
+              <span className="ml-1.5 text-neutral-400">{list.length} 个项目</span>
             </div>
             {list.length > 0 && (
               <div className="mb-2 flex flex-wrap gap-1.5">
                 {list.map((p) => (
                   <span
                     key={p.id}
-                    className="inline-flex items-center gap-1 rounded-md border border-line bg-raised px-2 py-0.5 text-xs text-ink"
+                    className="inline-flex items-center gap-1 rounded-md border border-neutral-200 bg-neutral-50 px-2 py-0.5 text-xs text-neutral-700"
                   >
                     {p.title}
                     <button
                       aria-label="删除项目"
                       title="删除项目（任务保留）"
                       onClick={() => void remove(p.id)}
-                      className="text-ink-3 hover:text-error"
+                      className="text-neutral-400 hover:text-red-500"
                     >
                       <X size={12} />
                     </button>
@@ -74,12 +74,12 @@ export default function ProjectManager({ goals }: { goals: GoalWithProgress[] })
                   if (e.key === "Enter") void add(g.id);
                 }}
                 placeholder={`添加项目到「${g.title}」`}
-                className="min-w-0 flex-1 rounded-md border border-line-strong px-2 py-1 text-xs outline-none focus:border-brand"
+                className="min-w-0 flex-1 rounded-md border border-neutral-300 px-2 py-1 text-xs outline-none focus:border-neutral-900"
               />
               <button
                 onClick={() => void add(g.id)}
                 disabled={!(drafts[g.id] ?? "").trim()}
-                className="flex shrink-0 items-center gap-0.5 rounded-md bg-brand px-2 py-1 text-xs text-white hover:bg-neutral-700 disabled:bg-line"
+                className="flex shrink-0 items-center gap-0.5 rounded-md bg-neutral-900 px-2 py-1 text-xs text-white hover:bg-neutral-700 disabled:bg-neutral-300"
               >
                 <Plus size={12} /> 添加
               </button>

@@ -7,7 +7,7 @@ import { formatDurationCompact } from "../../lib/format";
  */
 export function DailyTrendChart({ data }: { data: DailyStatistic[] }) {
   if (data.length === 0) {
-    return <p className="text-sm text-ink-3">暂无投入数据</p>;
+    return <p className="text-sm text-neutral-400">暂无投入数据</p>;
   }
   const W = 560;
   const H = 140;
@@ -45,7 +45,7 @@ export function DailyTrendChart({ data }: { data: DailyStatistic[] }) {
           </circle>
         ))}
       </svg>
-      <div className="mt-1 flex justify-between text-[10px] text-ink-3">
+      <div className="mt-1 flex justify-between text-[10px] text-neutral-400">
         <span>{data[0].date}</span>
         <span>{data[data.length - 1].date}</span>
       </div>

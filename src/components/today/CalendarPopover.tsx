@@ -68,16 +68,16 @@ export default function CalendarPopover({ selectedDate, onSelect, label }: Calen
     <div className="relative">
       <button
         onClick={openPanel}
-        className="flex items-center gap-1 rounded-md px-2 py-1 text-xl font-semibold text-ink transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
+        className="flex items-center gap-1 rounded-md px-2 py-1 text-xl font-semibold text-neutral-900 transition-colors hover:bg-neutral-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/30"
       >
         {label}
-        <ChevronDown size={16} className="text-ink-3" />
+        <ChevronDown size={16} className="text-neutral-400" />
       </button>
 
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full z-50 mt-1 w-64 rounded-md border border-line bg-surface p-3 shadow-lg">
+          <div className="absolute left-0 top-full z-50 mt-1 w-64 rounded-md border border-neutral-200 bg-white p-3 shadow-lg">
             {/* 历史快捷跳转（v1.7 History） */}
             <div className="mb-2 grid grid-cols-6 gap-1">
               {QUICK_ITEMS.map((q) => (
@@ -89,8 +89,8 @@ export default function CalendarPopover({ selectedDate, onSelect, label }: Calen
                   }}
                   className={`rounded px-1 py-1 text-xs transition-colors ${
                     q.date === selectedDate
-                      ? "bg-brand text-white"
-                      : "text-ink-2 hover:bg-canvas"
+                      ? "bg-neutral-900 text-white"
+                      : "text-neutral-600 hover:bg-neutral-100"
                   }`}
                 >
                   {q.label}
@@ -101,23 +101,23 @@ export default function CalendarPopover({ selectedDate, onSelect, label }: Calen
               <button
                 onClick={() => shiftMonth(-1)}
                 aria-label="上个月"
-                className="rounded p-1 text-ink-2 hover:bg-canvas"
+                className="rounded p-1 text-neutral-500 hover:bg-neutral-100"
               >
                 <ChevronLeft size={16} />
               </button>
-              <span className="text-sm font-medium text-ink">
+              <span className="text-sm font-medium text-neutral-900">
                 {monthLabel(viewYear, viewMonth)}
               </span>
               <button
                 onClick={() => shiftMonth(1)}
                 aria-label="下个月"
-                className="rounded p-1 text-ink-2 hover:bg-canvas"
+                className="rounded p-1 text-neutral-500 hover:bg-neutral-100"
               >
                 <ChevronRight size={16} />
               </button>
             </div>
 
-            <div className="grid grid-cols-7 text-center text-xs text-ink-3">
+            <div className="grid grid-cols-7 text-center text-xs text-neutral-400">
               {WEEKDAY_LABELS.map((w) => (
                 <span key={w} className="py-1">
                   {w}
@@ -137,12 +137,12 @@ export default function CalendarPopover({ selectedDate, onSelect, label }: Calen
                     }}
                     className={`flex h-8 items-center justify-center rounded text-sm transition-colors ${
                       selected
-                        ? "bg-brand font-medium text-white"
+                        ? "bg-neutral-900 font-medium text-white"
                         : cell.isToday
-                          ? "font-semibold text-ink ring-1 ring-inset ring-line-strong"
+                          ? "font-semibold text-neutral-900 ring-1 ring-inset ring-neutral-300"
                           : cell.inMonth
-                            ? "text-ink hover:bg-canvas"
-                            : "text-ink-3 hover:bg-raised"
+                            ? "text-neutral-700 hover:bg-neutral-100"
+                            : "text-neutral-300 hover:bg-neutral-50"
                     }`}
                   >
                     {cell.day}
@@ -156,7 +156,7 @@ export default function CalendarPopover({ selectedDate, onSelect, label }: Calen
                 onSelect(todayString());
                 setOpen(false);
               }}
-              className="mt-2 w-full rounded-md border border-line py-1.5 text-xs text-ink-2 hover:bg-canvas"
+              className="mt-2 w-full rounded-md border border-neutral-200 py-1.5 text-xs text-neutral-600 hover:bg-neutral-100"
             >
               返回今天
             </button>

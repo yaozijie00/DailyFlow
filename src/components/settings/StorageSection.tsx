@@ -54,12 +54,12 @@ export default function StorageSection() {
   ];
 
   return (
-    <div className="space-y-4 rounded-md border border-line bg-surface p-5">
-      {!loaded && <p className="text-sm text-ink-3">加载中…</p>}
+    <div className="space-y-4 rounded-md border border-neutral-200 bg-white p-5">
+      {!loaded && <p className="text-sm text-neutral-400">加载中…</p>}
       {loaded &&
         fields.map((f) => (
           <div key={f.key}>
-            <label className="block text-sm text-ink">{f.label}</label>
+            <label className="block text-sm text-neutral-700">{f.label}</label>
             <input
               value={paths[f.key]}
               onChange={(e) => {
@@ -68,13 +68,13 @@ export default function StorageSection() {
               }}
               placeholder="留空使用默认位置"
               className={`mt-1 w-full rounded-md border px-2 py-1.5 text-sm ${
-                errors[f.key] ? "border-red-400" : "border-line-strong"
+                errors[f.key] ? "border-red-400" : "border-neutral-300"
               }`}
             />
             {errors[f.key] ? (
-              <p className="mt-1 text-xs text-error">{errors[f.key]}</p>
+              <p className="mt-1 text-xs text-red-600">{errors[f.key]}</p>
             ) : (
-              <p className="mt-1 text-xs text-ink-3">{f.hint}</p>
+              <p className="mt-1 text-xs text-neutral-400">{f.hint}</p>
             )}
           </div>
         ))}
@@ -82,17 +82,17 @@ export default function StorageSection() {
         <button
           onClick={handleSave}
           disabled={!loaded}
-          className="rounded-md bg-brand px-4 py-2 text-sm text-white hover:bg-neutral-700 disabled:bg-line"
+          className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700 disabled:bg-neutral-300"
         >
           保存
         </button>
         {msg && (
-          <span className={`text-xs ${msg.type === "ok" ? "text-warn" : "text-error"}`}>
+          <span className={`text-xs ${msg.type === "ok" ? "text-amber-600" : "text-red-600"}`}>
             {msg.text}
           </span>
         )}
       </div>
-      <p className="text-xs text-ink-3">
+      <p className="text-xs text-neutral-400">
         修改后不会自动移动现有数据；新目录首次启动会创建全新数据库。如需保留旧数据，请手动复制原目录中的 dailyflow.db，或使用「Data」页的备份恢复。
       </p>
     </div>

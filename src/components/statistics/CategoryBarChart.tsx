@@ -24,13 +24,13 @@ export function CategoryBarChart({ data }: { data: CategoryStatistic[] }) {
                   className="h-2.5 w-2.5 shrink-0 rounded-sm"
                   style={{ backgroundColor: c.color }}
                 />
-                <span className="truncate text-ink">{c.name}</span>
+                <span className="truncate text-neutral-700">{c.name}</span>
               </span>
-              <span className="shrink-0 tabular-nums text-ink-2">
+              <span className="shrink-0 tabular-nums text-neutral-500">
                 {formatDurationCompact(c.seconds)}
               </span>
             </div>
-            <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-canvas">
+            <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-neutral-100">
               <div
                 className="h-full rounded-full transition-all"
                 style={{ width: `${pct}%`, backgroundColor: c.color }}

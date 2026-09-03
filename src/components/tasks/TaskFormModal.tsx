@@ -117,41 +117,41 @@ export default function TaskFormModal() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-96 rounded-lg bg-surface p-6 shadow-xl">
+      <div className="w-96 rounded-lg bg-white p-6 shadow-xl">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold">
             {editingTask ? "编辑任务" : "创建任务"}
           </h2>
-          <button onClick={close} className="text-ink-3 hover:text-ink-2">
+          <button onClick={close} className="text-neutral-400 hover:text-neutral-600">
             <X size={18} />
           </button>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           {hasDraft && (
             <div>
-              <label className="mb-1 block text-sm text-ink-2">任务时间</label>
-              <div className="rounded-md bg-canvas px-3 py-2 text-sm text-ink">
+              <label className="mb-1 block text-sm text-neutral-600">任务时间</label>
+              <div className="rounded-md bg-neutral-100 px-3 py-2 text-sm text-neutral-900">
                 {formatTimeRange(createDraft.plannedStart!, createDraft.plannedEnd!)}
               </div>
             </div>
           )}
 
           <div>
-            <label className="mb-1 block text-sm text-ink-2">任务名称</label>
+            <label className="mb-1 block text-sm text-neutral-600">任务名称</label>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               autoFocus
               placeholder="例如：写代码"
-              className="w-full rounded-md border border-line-strong px-3 py-2 text-sm outline-none focus:border-brand"
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm text-ink-2">类别</label>
+            <label className="mb-1 block text-sm text-neutral-600">类别</label>
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full rounded-md border border-line-strong px-3 py-2 text-sm outline-none focus:border-brand"
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
             >
               <option value="">无</option>
               {categories.map((c) => (
@@ -162,14 +162,14 @@ export default function TaskFormModal() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm text-ink-2">关联长期目标</label>
+            <label className="mb-1 block text-sm text-neutral-600">关联长期目标</label>
             <select
               value={goalId}
               onChange={(e) => {
                 setGoalId(e.target.value);
                 setProjectId(""); // 目标变更后项目需重新选择
               }}
-              className="w-full rounded-md border border-line-strong px-3 py-2 text-sm outline-none focus:border-brand"
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
             >
               <option value="">无</option>
               {goals.map((g) => (
@@ -180,7 +180,7 @@ export default function TaskFormModal() {
             </select>
           </div>
           <div>
-            <label className="mb-1 block text-sm text-ink-2">项目（可选）</label>
+            <label className="mb-1 block text-sm text-neutral-600">项目（可选）</label>
             <select
               value={projectId}
               onChange={(e) => {
@@ -192,7 +192,7 @@ export default function TaskFormModal() {
                   if (p?.goalId != null) setGoalId(String(p.goalId));
                 }
               }}
-              className="w-full rounded-md border border-line-strong px-3 py-2 text-sm outline-none focus:border-brand"
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
             >
               <option value="">无</option>
               {projects
@@ -205,28 +205,28 @@ export default function TaskFormModal() {
                 ))}
             </select>
             {goalId !== "" && projects.filter((p) => p.goalId === Number(goalId)).length === 0 && (
-              <p className="mt-1 text-[11px] text-ink-3">
+              <p className="mt-1 text-[11px] text-neutral-400">
                 该目标下暂无项目，可先到「长期」页创建
               </p>
             )}
           </div>
           <div>
-            <label className="mb-1 block text-sm text-ink-2">预计时间（分钟）</label>
+            <label className="mb-1 block text-sm text-neutral-600">预计时间（分钟）</label>
             <input
               type="number"
               min={0}
               value={estimatedMinutes}
               onChange={(e) => setEstimatedMinutes(e.target.value)}
               placeholder="例如：90"
-              className="w-full rounded-md border border-line-strong px-3 py-2 text-sm outline-none focus:border-brand"
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm text-ink-2">重复</label>
+            <label className="mb-1 block text-sm text-neutral-600">重复</label>
             <select
               value={repeatRule}
               onChange={(e) => setRepeatRule(e.target.value)}
-              className="w-full rounded-md border border-line-strong px-3 py-2 text-sm outline-none focus:border-brand"
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
             >
               {REPEAT_RULES.map((r) => (
                 <option key={r.value} value={r.value}>
@@ -234,31 +234,31 @@ export default function TaskFormModal() {
                 </option>
               ))}
             </select>
-            <p className="mt-1 text-[11px] text-ink-3">
+            <p className="mt-1 text-[11px] text-neutral-400">
               完成后自动生成下一次任务（每天/工作日/每周/每月）
             </p>
           </div>
           <div>
-            <label className="mb-1 block text-sm text-ink-2">备注</label>
+            <label className="mb-1 block text-sm text-neutral-600">备注</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="补充信息（可选）"
               rows={3}
-              className="w-full resize-none rounded-md border border-line-strong px-3 py-2 text-sm outline-none focus:border-brand"
+              className="w-full resize-none rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
             />
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"
               onClick={close}
-              className="rounded-md px-3 py-2 text-sm text-ink-2 hover:bg-canvas"
+              className="rounded-md px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-100"
             >
               取消
             </button>
             <button
               type="submit"
-              className="rounded-md bg-brand px-4 py-2 text-sm text-white hover:bg-neutral-700"
+              className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700"
             >
               {editingTask ? "保存" : "创建"}
             </button>

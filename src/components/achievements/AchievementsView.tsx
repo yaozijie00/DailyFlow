@@ -34,9 +34,9 @@ function remainingText(a: AchievementProgressView): string {
 
 function ProgressBar({ percentage }: { percentage: number }) {
   return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-canvas">
+    <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-100">
       <div
-        className="h-full rounded-full bg-brand"
+        className="h-full rounded-full bg-neutral-900"
         style={{ width: `${Math.max(2, percentage)}%` }}
       />
     </div>
@@ -54,32 +54,32 @@ function AchievementCard({
   return (
     <button
       onClick={onOpen}
-      className="flex flex-col gap-2 rounded-md border border-line bg-surface p-4 text-left transition-colors hover:border-line-strong hover:bg-raised"
+      className="flex flex-col gap-2 rounded-md border border-neutral-200 bg-white p-4 text-left transition-colors hover:border-neutral-300 hover:bg-neutral-50"
     >
       <div className="flex items-center gap-2">
         <span
           className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md ${
-            item.unlocked ? "bg-warn/20 text-warn" : "bg-canvas text-ink-2"
+            item.unlocked ? "bg-amber-100 text-amber-600" : "bg-neutral-100 text-neutral-500"
           }`}
         >
           {hidden ? <Trophy size={18} /> : <AchievementIcon name={item.icon} size={18} />}
         </span>
         <div className="min-w-0">
-          <div className="truncate text-sm font-medium text-ink">
+          <div className="truncate text-sm font-medium text-neutral-900">
             {hidden ? "？？？" : item.name}
           </div>
-          <div className="truncate text-xs text-ink-2">
+          <div className="truncate text-xs text-neutral-500">
             {hidden ? "达成后揭晓" : item.description}
           </div>
         </div>
       </div>
 
       {item.unlocked ? (
-        <div className="text-xs font-medium text-warn">✓ 已解锁</div>
+        <div className="text-xs font-medium text-amber-600">✓ 已解锁</div>
       ) : (
         <div className="space-y-1">
           <ProgressBar percentage={item.percentage} />
-          <div className="flex items-center justify-between text-xs text-ink-2">
+          <div className="flex items-center justify-between text-xs text-neutral-500">
             <span className="tabular-nums">
               {formatProgress(item.current, item.target, item.unit)}
             </span>
@@ -126,18 +126,18 @@ export default function AchievementsView() {
     <>
       {/* 顶部总览：已解锁 X / 共 Y · 完成度 */}
       {totals.total > 0 && (
-        <div className="flex items-center gap-4 rounded-md border border-line bg-surface px-4 py-3">
+        <div className="flex items-center gap-4 rounded-md border border-neutral-200 bg-white px-4 py-3">
           <div className="shrink-0">
-            <div className="text-lg font-semibold text-ink tabular-nums">
+            <div className="text-lg font-semibold text-neutral-900 tabular-nums">
               已解锁 {totals.unlocked}
-              <span className="text-sm font-normal text-ink-3"> / {totals.total}</span>
+              <span className="text-sm font-normal text-neutral-400"> / {totals.total}</span>
             </div>
-            <div className="text-xs text-ink-2">完成度 {unlockPct}%</div>
+            <div className="text-xs text-neutral-500">完成度 {unlockPct}%</div>
           </div>
           <div className="min-w-0 flex-1">
-            <div className="h-1.5 overflow-hidden rounded-full bg-canvas">
+            <div className="h-1.5 overflow-hidden rounded-full bg-neutral-100">
               <div
-                className="h-full rounded-full bg-warn/100"
+                className="h-full rounded-full bg-amber-500"
                 style={{ width: `${Math.max(2, unlockPct)}%` }}
               />
             </div>
@@ -146,15 +146,15 @@ export default function AchievementsView() {
       )}
 
       {/* 过滤 */}
-      <div className="flex rounded-md border border-line bg-surface p-0.5 self-start">
+      <div className="flex rounded-md border border-neutral-200 bg-white p-0.5 self-start">
         {FILTERS.map((f) => (
           <button
             key={f.key}
             onClick={() => setFilter(f.key)}
             className={`rounded px-3 py-1.5 text-sm transition-colors ${
               filter === f.key
-                ? "bg-brand text-white"
-                : "text-ink-2 hover:bg-canvas"
+                ? "bg-neutral-900 text-white"
+                : "text-neutral-600 hover:bg-neutral-100"
             }`}
           >
             {f.label}
@@ -163,7 +163,7 @@ export default function AchievementsView() {
       </div>
 
       {loading && items.length === 0 ? (
-        <div className="text-sm text-ink-3">加载中…</div>
+        <div className="text-sm text-neutral-400">加载中…</div>
       ) : visible.length === 0 ? (
         <EmptyState
           icon={<Trophy size={28} />}
@@ -194,28 +194,28 @@ export default function AchievementsView() {
           <div className="flex flex-col items-center gap-3 text-center">
             <span
               className={`flex h-16 w-16 items-center justify-center rounded-full ${
-                selected.unlocked ? "bg-warn/20 text-warn" : "bg-canvas text-ink-2"
+                selected.unlocked ? "bg-amber-100 text-amber-600" : "bg-neutral-100 text-neutral-500"
               }`}
             >
               <AchievementIcon name={selected.icon} size={30} />
             </span>
             <div>
-              <div className="text-lg font-semibold text-ink">{selected.name}</div>
-              <p className="mt-1 text-sm text-ink-2">{selected.description}</p>
+              <div className="text-lg font-semibold text-neutral-900">{selected.name}</div>
+              <p className="mt-1 text-sm text-neutral-500">{selected.description}</p>
             </div>
 
             {selected.unlocked ? (
-              <div className="text-sm font-medium text-warn">✓ 已解锁</div>
+              <div className="text-sm font-medium text-amber-600">✓ 已解锁</div>
             ) : (
               <div className="w-full max-w-xs space-y-2">
                 <ProgressBar percentage={selected.percentage} />
-                <div className="flex items-center justify-between text-sm text-ink-2">
+                <div className="flex items-center justify-between text-sm text-neutral-600">
                   <span className="tabular-nums">
                     {formatProgress(selected.current, selected.target, selected.unit)}
                   </span>
                   <span className="tabular-nums">{selected.percentage}%</span>
                 </div>
-                <div className="text-xs text-ink-3">{remainingText(selected)}</div>
+                <div className="text-xs text-neutral-400">{remainingText(selected)}</div>
               </div>
             )}
           </div>

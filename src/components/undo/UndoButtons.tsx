@@ -28,7 +28,7 @@ export default function UndoButtons() {
         disabled={!canUndo}
         aria-label="撤销"
         title={undoTitle}
-        className="rounded p-1 text-ink-2 transition-colors hover:bg-canvas disabled:opacity-30"
+        className="rounded p-1 text-neutral-500 transition-colors hover:bg-neutral-100 disabled:opacity-30"
       >
         <Undo2 size={14} />
       </button>
@@ -37,7 +37,7 @@ export default function UndoButtons() {
         disabled={!canRedo}
         aria-label="重做"
         title="重做（Ctrl+Shift+Z / Ctrl+Y）"
-        className="rounded p-1 text-ink-2 transition-colors hover:bg-canvas disabled:opacity-30"
+        className="rounded p-1 text-neutral-500 transition-colors hover:bg-neutral-100 disabled:opacity-30"
       >
         <Redo2 size={14} />
       </button>

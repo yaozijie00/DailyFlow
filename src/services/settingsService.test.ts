@@ -35,7 +35,6 @@ describe("SettingsService", () => {
       closeBehavior: "exit",
       closeBehaviorConfigured: false,
       undoHistoryLimit: 50,
-      density: "comfortable",
     });
     const s = await service.getSettings();
     expect(s).toEqual(DEFAULT_SETTINGS);
@@ -96,7 +95,6 @@ describe("SettingsService", () => {
       closeBehavior: "exit",
       closeBehaviorConfigured: false,
       undoHistoryLimit: 50,
-      density: "comfortable",
     });
   });
 

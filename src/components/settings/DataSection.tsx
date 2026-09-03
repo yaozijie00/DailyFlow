@@ -54,30 +54,30 @@ export default function DataSection() {
   };
 
   return (
-    <div className="mt-6 space-y-4 rounded-md border border-line bg-surface p-5">
+    <div className="mt-6 space-y-4 rounded-md border border-neutral-200 bg-white p-5">
       <h2 className="text-base font-semibold">数据</h2>
 
       {/* 导出备份 */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <div className="text-sm text-ink">导出备份</div>
-          <div className="text-xs text-ink-3">
+          <div className="text-sm text-neutral-700">导出备份</div>
+          <div className="text-xs text-neutral-400">
             生成 DailyFlow_Backup_YYYY-MM-DD.db（SQLite 完整快照）
           </div>
         </div>
         <button
           onClick={handleExport}
           disabled={busy}
-          className="flex items-center gap-1 rounded-md bg-brand px-3 py-1.5 text-sm text-white hover:bg-neutral-700 disabled:bg-line"
+          className="flex items-center gap-1 rounded-md bg-neutral-900 px-3 py-1.5 text-sm text-white hover:bg-neutral-700 disabled:bg-neutral-300"
         >
           <Download size={14} /> 导出备份
         </button>
       </div>
 
       {/* 恢复备份 */}
-      <div className="border-t border-line-soft pt-4">
-        <div className="text-sm text-ink">恢复备份</div>
-        <div className="mt-1 text-xs text-ink-3">
+      <div className="border-t border-neutral-100 pt-4">
+        <div className="text-sm text-neutral-700">恢复备份</div>
+        <div className="mt-1 text-xs text-neutral-400">
           从本地备份中选择一个文件恢复。恢复前会自动备份当前数据；备份版本与当前应用不一致时拒绝恢复。
         </div>
 
@@ -88,7 +88,7 @@ export default function DataSection() {
               setSelectedBackup(e.target.value);
               setConfirming(false);
             }}
-            className="min-w-0 flex-1 rounded-md border border-line-strong px-2 py-1.5 text-sm"
+            className="min-w-0 flex-1 rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
           >
             {backups.length === 0 && <option value="">暂无备份文件</option>}
             {backups.map((name) => (
@@ -100,14 +100,14 @@ export default function DataSection() {
           <button
             onClick={() => setConfirming(true)}
             disabled={busy || !selectedBackup}
-            className="flex items-center gap-1 rounded-md border border-line-strong px-3 py-1.5 text-sm text-ink hover:bg-canvas disabled:cursor-not-allowed disabled:bg-canvas disabled:text-ink-3"
+            className="flex items-center gap-1 rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-400"
           >
             <Upload size={14} /> 恢复
           </button>
         </div>
 
         {confirming && (
-          <div className="mt-3 rounded-md border border-warn/50 bg-warn/10 p-3 text-sm text-warn">
+          <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
             <div className="flex items-center gap-1 font-medium">
               <ShieldCheck size={14} /> 确认恢复
             </div>
@@ -119,14 +119,14 @@ export default function DataSection() {
               <button
                 onClick={handleRestore}
                 disabled={busy}
-                className="rounded-md bg-amber-600 px-3 py-1.5 text-xs text-white hover:bg-warn/100 disabled:bg-amber-300"
+                className="rounded-md bg-amber-600 px-3 py-1.5 text-xs text-white hover:bg-amber-500 disabled:bg-amber-300"
               >
                 {busy ? "恢复中…" : "确认恢复"}
               </button>
               <button
                 onClick={() => setConfirming(false)}
                 disabled={busy}
-                className="rounded-md border border-line-strong px-3 py-1.5 text-xs text-ink hover:bg-canvas"
+                className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs text-neutral-700 hover:bg-neutral-100"
               >
                 取消
               </button>
@@ -137,7 +137,7 @@ export default function DataSection() {
         {dataMsg && (
           <p
             className={`mt-3 text-xs ${
-              dataMsg.type === "ok" ? "text-success" : "text-error"
+              dataMsg.type === "ok" ? "text-green-600" : "text-red-600"
             }`}
           >
             {dataMsg.text}
