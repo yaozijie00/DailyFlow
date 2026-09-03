@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { Check, Pencil, Trash2, CornerDownRight } from "lucide-react";
 import { useTaskStore } from "../../stores/taskStore";
 import { useGoalStore } from "../../stores/goalStore";
+import { useProjectStore } from "../../stores/projectStore";
 import { useTaskFocusStats } from "../../hooks/useTaskFocusStats";
 import { formatDuration, formatDateTime } from "../../lib/format";
 import { formatTimeRange } from "../../lib/timeline";
@@ -14,7 +15,10 @@ export default function TaskDetail() {
   const tasks = useTaskStore((s) => s.tasks);
   const categories = useTaskStore((s) => s.categories);
   const goals = useGoalStore((s) => s.goals);
+  const projects = useProjectStore((s) => s.projects);
   const completeTask = useTaskStore((s) => s.completeTask);
+  const toggleComplete = useTaskStore((s) => s.toggleComplete);
+  const createSubtask = useTaskStore((s) => s.createSubtask);
   const cancelTask = useTaskStore((s) => s.cancelTask);
   const deleteTask = useTaskStore((s) => s.deleteTask);
   const updateTask = useTaskStore((s) => s.updateTask);
@@ -23,6 +27,7 @@ export default function TaskDetail() {
 
   const [notesEditing, setNotesEditing] = useState(false);
   const [notesDraft, setNotesDraft] = useState("");
+  const [childDraft, setChildDraft] = useState("");
 
   const task = tasks.find((t) => t.id === selectedTaskId);
   const focusStats = useTaskFocusStats(task?.id ?? null);
@@ -47,6 +52,20 @@ export default function TaskDetail() {
       : "无";
   const goalName =
     task.goalId != null ? (goals.find((g) => g.id === task.goalId)?.title ?? "无") : "无";
+  const projectName =
+    task.projectId != null
+      ? (projects.find((p) => p.id === task.projectId)?.title ?? "无")
+      : "无";
+  const children = task.parentId == null ? tasks.filter((t) => t.parentId === task.id) : [];
+  const doneChildren = children.filter((c) => c.status === "COMPLETED").length;
+  const parentTask = task.parentId != null ? tasks.find((t) => t.id === task.parentId) : undefined;
+
+  const addChild = async () => {
+    const t = childDraft.trim();
+    if (!t) return;
+    await createSubtask(task, t);
+    setChildDraft("");
+  };
   const completed = task.status === "COMPLETED";
   const cancelled = task.status === "CANCELLED";
 
@@ -62,6 +81,10 @@ export default function TaskDetail() {
         <div className="flex justify-between">
           <dt className="text-neutral-500">关联目标</dt>
           <dd className="text-neutral-900">{goalName}</dd>
+        </div>
+        <div className="flex justify-between">
+          <dt className="text-neutral-500">项目</dt>
+          <dd className="text-neutral-900">{projectName}</dd>
         </div>
         <div className="flex justify-between">
           <dt className="text-neutral-500">计划时间</dt>
@@ -149,6 +172,97 @@ export default function TaskDetail() {
           <p className="text-sm text-neutral-300">无</p>
         )}
       </div>
+
+      {/* 子任务（v1.8 拆分）：父任务下可加子项，勾选进度 */}
+      {!task.parentId && (
+        <div className="mb-4 border-t border-neutral-100 pt-3">
+          <div className="mb-1.5 flex items-center justify-between">
+            <span className="text-sm text-neutral-500">子任务（拆分）</span>
+            {children.length > 0 && (
+              <span className="text-xs tabular-nums text-neutral-400">
+                {doneChildren}/{children.length} 完成
+              </span>
+            )}
+          </div>
+          {children.length > 0 && (
+            <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-neutral-100">
+              <div
+                className="h-full rounded-full bg-neutral-800 transition-all"
+                style={{
+                  width: `${Math.round((doneChildren / children.length) * 100)}%`,
+                }}
+              />
+            </div>
+          )}
+          <ul className="space-y-1">
+            {children.map((c) => (
+              <li key={c.id} className="flex items-center gap-2 text-sm">
+                <button
+                  aria-label={`完成子任务 ${c.title}`}
+                  title={c.status === "COMPLETED" ? "恢复为待办" : "标记完成"}
+                  onClick={() => void toggleComplete(c.id)}
+                  className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                    c.status === "COMPLETED"
+                      ? "border-green-500 bg-green-500 text-white"
+                      : "border-neutral-300 hover:border-neutral-500"
+                  }`}
+                >
+                  {c.status === "COMPLETED" && <Check size={12} />}
+                </button>
+                <span
+                  className={`min-w-0 flex-1 truncate ${
+                    c.status === "COMPLETED"
+                      ? "text-neutral-400 line-through decoration-neutral-300"
+                      : "text-neutral-800"
+                  }`}
+                >
+                  {c.title}
+                </span>
+                <button
+                  aria-label="删除子任务"
+                  title="删除子任务"
+                  onClick={() => void deleteTask(c.id)}
+                  className="shrink-0 text-neutral-300 hover:text-red-500"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-2 flex gap-1.5">
+            <input
+              value={childDraft}
+              onChange={(e) => setChildDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void addChild();
+              }}
+              placeholder="拆分子任务：输入名称后回车"
+              className="min-w-0 flex-1 rounded-md border border-neutral-300 px-2 py-1 text-xs outline-none focus:border-neutral-900"
+            />
+            <button
+              onClick={() => void addChild()}
+              disabled={childDraft.trim().length === 0}
+              className="shrink-0 rounded-md bg-neutral-900 px-2.5 py-1 text-xs text-white hover:bg-neutral-700 disabled:bg-neutral-300"
+            >
+              添加子任务
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 子任务归属提示（当前是子任务时） */}
+      {task.parentId != null && parentTask && (
+        <div className="mb-4 flex items-center gap-1.5 border-t border-neutral-100 pt-3 text-xs text-neutral-500">
+          <CornerDownRight size={13} className="text-neutral-400" />
+          属于「{parentTask.title}」
+          <button
+            onClick={() => selectTask(parentTask.id)}
+            className="text-neutral-600 underline underline-offset-2 hover:text-neutral-900"
+          >
+            查看父任务
+          </button>
+        </div>
+      )}
 
       {/* 延期（Postpone）：改 scheduledDate，可撤销 */}
       {!completed && !cancelled && (

@@ -119,6 +119,10 @@ export default function TaskList() {
     return list;
   }, [tasks, statusFilter, categoryFilter]);
 
+  /** 「全部」无分类过滤时按父子分组展示：子任务折叠在父任务下，不单独成行。 */
+  const flatAll = statusFilter === "all" && categoryFilter === "";
+  const displayTasks = flatAll ? tasks.filter((t) => t.parentId == null) : filteredTasks;
+
   return (
     <div
       data-note-drop="tasklist"
@@ -163,16 +167,18 @@ export default function TaskList() {
             </select>
           </div>
 
-          {filteredTasks.length === 0 ? (
+          {displayTasks.length === 0 ? (
             <p className="rounded-md border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-400">
               无匹配的任务
             </p>
           ) : (
             <ul className="space-y-1">
-              {filteredTasks.map((task) => {
+              {displayTasks.map((task) => {
                 const done = task.status === "COMPLETED";
                 const cancelled = task.status === "CANCELLED";
                 const selected = task.id === selectedTaskId;
+                const childTasks = flatAll ? tasks.filter((t) => t.parentId === task.id) : [];
+                const childDone = childTasks.filter((c) => c.status === "COMPLETED").length;
                 return (
                   <li key={task.id}>
                     <div
@@ -233,6 +239,9 @@ export default function TaskList() {
                           {task.estimatedDuration != null
                             ? `${task.categoryId != null ? " · " : ""}${formatDuration(task.estimatedDuration)}`
                             : ""}
+                          {childTasks.length > 0
+                            ? `${task.categoryId != null || task.estimatedDuration != null ? " · " : ""}子任务 ${childDone}/${childTasks.length}`
+                            : ""}
                         </span>
                       </span>
                       <span className="shrink-0 text-xs text-neutral-400">
@@ -270,6 +279,53 @@ export default function TaskList() {
                         <GripVertical size={14} />
                       </span>
                     </div>
+
+                    {/* 子任务折叠区（全部视图） */}
+                    {childTasks.length > 0 && (
+                      <ul className="ml-5 mt-0.5 space-y-0.5 border-l border-neutral-100 pl-3">
+                        {childTasks.map((child) => {
+                          const childDone_ = child.status === "COMPLETED";
+                          return (
+                            <li key={child.id}>
+                              <div
+                                onClick={() => selectTask(child.id)}
+                                className={`flex cursor-pointer select-none items-center gap-2.5 rounded-md px-2.5 py-1.5 ${
+                                  child.id === selectedTaskId
+                                    ? "bg-neutral-100"
+                                    : "hover:bg-neutral-50"
+                                }`}
+                              >
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (child.status !== "CANCELLED") toggleComplete(child.id);
+                                  }}
+                                  aria-label={childDone_ ? "恢复为未完成" : "完成子任务"}
+                                  title={childDone_ ? "恢复为未完成" : "完成子任务"}
+                                  className="shrink-0 text-neutral-400 hover:text-green-600"
+                                >
+                                  {childDone_ ? (
+                                    <Check size={15} className="text-green-600" />
+                                  ) : (
+                                    <Circle size={15} />
+                                  )}
+                                </button>
+                                <span
+                                  className={`min-w-0 flex-1 truncate text-sm ${
+                                    child.status === "COMPLETED" ||
+                                    child.status === "CANCELLED"
+                                      ? "text-neutral-400 line-through decoration-neutral-300"
+                                      : "text-neutral-800"
+                                  }`}
+                                >
+                                  {child.title}
+                                </span>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
                   </li>
                 );
               })}

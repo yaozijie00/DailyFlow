@@ -61,6 +61,8 @@ interface TaskState {
     estimatedDuration?: number | null;
     categoryId?: number | null;
   }) => Promise<boolean>;
+  /** 拆分子任务（v1.8）：继承父任务日期/分类/目标/项目，挂到 parent_id 下 */
+  createSubtask: (parent: Task, title: string) => Promise<void>;
   setSelectedDate: (date: string) => void;
   goToToday: () => void;
   createTask: (input: TaskCreateInput) => Promise<void>;
@@ -195,6 +197,24 @@ export const useTaskStore = create<TaskState>((set, get) => ({
     } catch {
       fail("创建任务失败");
       return false;
+    }
+  },
+
+  createSubtask: async (parent, title) => {
+    const t = title.trim();
+    if (!t) return;
+    try {
+      await taskService.createTask({
+        title: t,
+        scheduledDate: parent.scheduledDate,
+        categoryId: parent.categoryId,
+        goalId: parent.goalId,
+        projectId: parent.projectId,
+        parentId: parent.id,
+      });
+      await get().load();
+    } catch {
+      fail("添加子任务失败");
     }
   },
 

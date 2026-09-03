@@ -33,6 +33,8 @@ function makeTask(id: number, title: string): Task {
     notes: null,
     goalId: null,
     repeatRule: "",
+    projectId: null,
+    parentId: null,
     sortOrder: 0,
     createdAt: 0,
     updatedAt: 0,

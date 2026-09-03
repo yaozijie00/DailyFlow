@@ -5,6 +5,7 @@ import { useGoalStore } from "../stores/goalStore";
 import type { GoalWithProgress } from "../db/repositories/goalRepository";
 import { PageHeader } from "../components/ui/PageHeader";
 import MonthView from "../components/goals/MonthView";
+import ProjectManager from "../components/goals/ProjectManager";
 import { formatDuration } from "../lib/format";
 
 interface GoalFormState {
@@ -196,6 +197,9 @@ export default function Goals() {
           onRequestCreate={createOnDates}
         />
       )}
+
+      {/* 目标下的项目管理（v1.8 Goal → Project） */}
+      {goals.length > 0 && <ProjectManager goals={goals} />}
 
       {/* 编辑弹窗 */}
       {editing && (

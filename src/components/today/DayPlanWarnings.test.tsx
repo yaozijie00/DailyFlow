@@ -42,6 +42,8 @@ function makeTask(
     createdAt: 0,
     updatedAt: 0,
     repeatRule: "",
+    projectId: null,
+    parentId: null,
   };
 }
 

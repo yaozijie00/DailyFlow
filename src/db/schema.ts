@@ -43,6 +43,14 @@ export const tasks = sqliteTable("tasks", {
   goalId: integer("goal_id").references(() => goals.id, { onDelete: "set null" }),
   /** 重复规则（v1.6.2）：'' 不重复 / daily / weekdays / weekly / monthly；完成自动生成下一实例 */
   repeatRule: text("repeat_rule").notNull().default(""),
+  /** 所属项目（v1.8 Goal→Project→Task；删除项目时置空） */
+  projectId: integer("project_id").references(() => projects.id, { onDelete: "set null" }),
+  /**
+   * 父任务（v1.8 Task Split；删除父任务时子任务保留并置空）。
+   * 注意：自引用外键在 drizzle 初始化期不可用，FK 由迁移 0016 建立，
+   * 删除置空行为由服务/仓库显式处理。
+   */
+  parentId: integer("parent_id"),
 });
 
 export const focusSessions = sqliteTable("focus_sessions", {
@@ -111,4 +119,19 @@ export const goals = sqliteTable("goals", {
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
   completedAt: integer("completed_at"),
+});
+
+/**
+ * 项目（v1.8 Product Structure）：Goal 下的执行单元。
+ * 关系：goals 1 ── * projects 1 ── * tasks（tasks.project_id）；
+ * 目标进度仍按 tasks.goal_id 聚合（任务选项目时联动所属目标）。
+ */
+export const projects = sqliteTable("projects", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  title: text("title").notNull(),
+  /** 所属长期目标（删除目标时保留项目并置空） */
+  goalId: integer("goal_id").references(() => goals.id, { onDelete: "set null" }),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
 });

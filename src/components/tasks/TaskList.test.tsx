@@ -64,6 +64,8 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     sortOrder: 0,
     goalId: null,
     repeatRule: "",
+    projectId: null,
+    parentId: null,
     ...overrides,
   };
 }
@@ -149,6 +151,20 @@ describe("TaskList", () => {
   it("无任务时显示空状态提示", () => {
     render(<TaskList />);
     expect(screen.getByText(/暂无任务/)).toBeTruthy();
+  });
+
+  it("子任务折叠在父任务下展示（全部视图不单独成行）", () => {
+    mockState.tasks = [
+      makeTask({ id: 1, title: "制作作品集" }),
+      makeTask({ id: 2, title: "整理截图", parentId: 1 }),
+      makeTask({ id: 3, title: "独立任务" }),
+    ];
+    render(<TaskList />);
+    // 父任务只出现一次；子任务可见但不再作为独立顶层行
+    expect(screen.getAllByText("制作作品集")).toHaveLength(1);
+    expect(screen.getByText("整理截图")).toBeTruthy();
+    expect(screen.getByText("独立任务")).toBeTruthy();
+    expect(screen.getByText(/子任务 0\/1/)).toBeTruthy();
   });
 
   describe("convertNoteToTask（便签 → 今日任务）", () => {

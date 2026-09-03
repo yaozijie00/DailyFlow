@@ -33,6 +33,10 @@ vi.mock("../../stores/goalStore", () => ({
 vi.mock("../../stores/pomodoroStore", () => ({
   usePomodoroStore: (selector: (s: unknown) => unknown) => selector({ focusVersion: 0 }),
 }));
+vi.mock("../../stores/projectStore", () => ({
+  useProjectStore: (selector: (s: unknown) => unknown) =>
+    selector({ projects: [] as { id: number; title: string }[] }),
+}));
 
 function makeTask(overrides: Partial<Task> = {}): Task {
   return {
@@ -52,6 +56,8 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     sortOrder: 0,
     goalId: null,
     repeatRule: "",
+    projectId: null,
+    parentId: null,
     ...overrides,
   };
 }

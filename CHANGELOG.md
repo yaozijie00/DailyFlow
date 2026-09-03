@@ -1,5 +1,24 @@
 # Changelog
 
+## DailyFlow 1.8.0
+
+### Features（v1.8 Product Structure：Goal → Project → Task）
+
+- 新增「项目」二级：目标下可创建/重命名/删除项目（迁移 0015：projects 表 + tasks.project_id）
+- 任务归属项目：任务表单「项目」下拉按目标过滤，选项目自动联动所属目标；任务详情显示「项目」
+- 长期页「目标项目」管理区：每个进行中目标下列出其项目并可添加/删除（删除保留任务、可撤销）
+- 项目创建/重命名/删除全部接入 Undo（删除还原含任务关联）
+- 任务拆分（Task Split，迁移 0016：tasks.parent_id）：
+  - 任务详情「子任务」区：添加子任务（继承父任务日期/分类/目标/项目）、勾选完成/恢复、删除、进度条 x/y
+  - 任务列表分组展示：全部视图下子任务折叠在父任务下（不单独成行），父行显示「子任务 x/y」进度
+- 目标进度口径不变（仍按 tasks.goal_id 聚合）；删除父任务时子任务保留并置空
+
+### Technical
+
+- ProjectRepository/ProjectService/useProjectStore；ProjectWithGoal（含所属目标标题左连）
+- 拆分撤销：创建子任务即入撤销栈（撤销删除子任务不影响父任务）
+- 迁移 0015 / 0016；测试 583/583 全绿（项目管理与拆分分组用例）
+
 ## DailyFlow 1.7.0
 
 ### Features（v1.7 Core Stability）

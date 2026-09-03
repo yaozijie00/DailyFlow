@@ -209,4 +209,26 @@ describe("TaskService Undo 集成（数据与 SQLite 一致）", () => {
     expect(again).toHaveLength(1);
     expect(again[0].id).toBe(origId);
   });
+
+  it("拆分子任务：创建（带 parentId）→ 撤销删除子任务且父任务保留", async () => {
+    const parent = await tasks.create({ title: "制作作品集", scheduledDate: "2026-08-27" });
+    const child = await svc.createTask({
+      title: "整理截图",
+      scheduledDate: "2026-08-27",
+      parentId: parent.id,
+    });
+    expect(child.parentId).toBe(parent.id);
+
+    const children = (await tasks.findByDate("2026-08-27")).filter(
+      (t) => t.parentId === parent.id,
+    );
+    expect(children).toHaveLength(1);
+
+    await undoManager.undo(); // 撤销子任务创建（不影响父任务）
+    const after = (await tasks.findByDate("2026-08-27")).filter(
+      (t) => t.parentId === parent.id,
+    );
+    expect(after).toHaveLength(0);
+    expect(await tasks.findById(parent.id)).not.toBeNull();
+  });
 });

@@ -17,6 +17,10 @@ export interface CreateTaskInput {
   notes?: string | null;
   /** 关联的长期目标（可空） */
   goalId?: number | null;
+  /** 所属项目（v1.8 Goal→Project→Task；可空） */
+  projectId?: number | null;
+  /** 父任务 id（v1.8 拆分；可空） */
+  parentId?: number | null;
   /** 重复规则（'' 不重复 / daily / weekdays / weekly / monthly） */
   repeatRule?: string;
 }
@@ -44,6 +48,8 @@ export class TaskRepository {
         completedAt: input.completedAt ?? null,
         notes: input.notes ?? null,
         goalId: input.goalId ?? null,
+        projectId: input.projectId ?? null,
+        parentId: input.parentId ?? null,
         repeatRule: input.repeatRule ?? "",
       })
       .returning()

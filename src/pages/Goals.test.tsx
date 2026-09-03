@@ -29,6 +29,22 @@ vi.mock("../stores/appStore", () => ({
     selector({ dbStatus: "ready", pushToast: vi.fn() }),
 }));
 
+const projectState = vi.hoisted(() => ({
+  projects: [] as { id: number; goalId: number | null; title: string; goalTitle: string | null }[],
+  loading: false,
+  load: vi.fn(),
+  create: vi.fn(),
+  rename: vi.fn(),
+  remove: vi.fn(),
+}));
+
+vi.mock("../stores/projectStore", () => ({
+  useProjectStore: Object.assign(
+    (selector: (s: unknown) => unknown) => selector(projectState),
+    { getState: () => projectState },
+  ),
+}));
+
 function makeGoal(overrides: Partial<GoalWithProgress> = {}): GoalWithProgress {
   return {
     id: 1,
@@ -61,6 +77,10 @@ describe("Goals 页面（长期月视图）", () => {
     mockState.complete.mockClear();
     mockState.restore.mockClear();
     mockState.remove.mockClear();
+    projectState.projects = [];
+    projectState.load.mockClear();
+    projectState.create.mockClear();
+    projectState.remove.mockClear();
   });
 
   it("无目标时显示空状态（月历网格内置引导）", () => {
@@ -113,7 +133,7 @@ describe("Goals 页面（长期月视图）", () => {
     mockState.goals = [makeGoal({ startDate: null, deadline: null, title: "没有日期" })];
     render(<Goals />);
     expect(screen.getByText(/未安排日期/)).toBeTruthy();
-    expect(screen.getByText("没有日期")).toBeTruthy();
+    expect(screen.getAllByText("没有日期").length).toBeGreaterThan(0);
   });
 
   it("已完成目标折叠区可展开", () => {
@@ -144,5 +164,25 @@ describe("Goals 页面（长期月视图）", () => {
     fireEvent.click(screen.getByText(/已完成（1）/));
     fireEvent.click(screen.getByLabelText("删除已完成任务"));
     expect(mockState.remove).toHaveBeenCalledWith(9);
+  });
+
+  it("目标下可添加项目", () => {
+    mockState.goals = [makeGoal()];
+    projectState.create.mockResolvedValue(true);
+    render(<Goals />);
+    expect(screen.getByText("目标项目")).toBeTruthy();
+    fireEvent.change(screen.getByPlaceholderText(/添加项目到/), {
+      target: { value: "PCG 学习" },
+    });
+    fireEvent.click(screen.getByText("添加"));
+    expect(projectState.create).toHaveBeenCalledWith(1, "PCG 学习");
+  });
+
+  it("项目可删除（撤销兜底）", () => {
+    mockState.goals = [makeGoal()];
+    projectState.projects = [{ id: 7, goalId: 1, title: "PCG 学习", goalTitle: null }];
+    render(<Goals />);
+    fireEvent.click(screen.getByLabelText("删除项目"));
+    expect(projectState.remove).toHaveBeenCalledWith(7);
   });
 });

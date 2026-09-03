@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { X } from "lucide-react";
 import { useTaskStore } from "../../stores/taskStore";
 import { useGoalStore } from "../../stores/goalStore";
+import { useProjectStore } from "../../stores/projectStore";
 import { formatTimeRange } from "../../lib/timeline";
 import { REPEAT_RULES } from "../../lib/repeat";
 
@@ -12,6 +13,7 @@ export default function TaskFormModal() {
   const tasks = useTaskStore((s) => s.tasks);
   const categories = useTaskStore((s) => s.categories);
   const goals = useGoalStore((s) => s.goals);
+  const projects = useProjectStore((s) => s.projects);
   const createTask = useTaskStore((s) => s.createTask);
   const updateTask = useTaskStore((s) => s.updateTask);
   const closeCreate = useTaskStore((s) => s.closeCreate);
@@ -27,15 +29,24 @@ export default function TaskFormModal() {
   const [title, setTitle] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [goalId, setGoalId] = useState("");
+  const [projectId, setProjectId] = useState("");
   const [estimatedMinutes, setEstimatedMinutes] = useState("");
   const [notes, setNotes] = useState("");
   const [repeatRule, setRepeatRule] = useState("");
+
+  // 打开表单时按需加载项目（长期页可先建项目）
+  useEffect(() => {
+    if (open && useProjectStore.getState().projects.length === 0) {
+      void useProjectStore.getState().load();
+    }
+  }, [open]);
 
   useEffect(() => {
     if (editingTask) {
       setTitle(editingTask.title);
       setCategoryId(editingTask.categoryId != null ? String(editingTask.categoryId) : "");
       setGoalId(editingTask.goalId != null ? String(editingTask.goalId) : "");
+      setProjectId(editingTask.projectId != null ? String(editingTask.projectId) : "");
       // 用十进制分钟展示，避免子分钟精度丢失（如 90 秒 → "1.5"）
       setEstimatedMinutes(
         editingTask.estimatedDuration != null
@@ -48,6 +59,7 @@ export default function TaskFormModal() {
       setTitle("");
       setCategoryId("");
       setGoalId("");
+      setProjectId("");
       setEstimatedMinutes(
         String((createDraft.plannedEnd! - createDraft.plannedStart!) / 60000),
       );
@@ -57,6 +69,7 @@ export default function TaskFormModal() {
       setTitle("");
       setCategoryId("");
       setGoalId("");
+      setProjectId("");
       setEstimatedMinutes("");
       setNotes("");
       setRepeatRule("");
@@ -80,6 +93,7 @@ export default function TaskFormModal() {
       title: trimmed,
       categoryId: categoryId === "" ? null : Number(categoryId),
       goalId: goalId === "" ? null : Number(goalId),
+      projectId: projectId === "" ? null : Number(projectId),
       estimatedDuration:
         estimated == null || Number.isNaN(estimated) || estimated < 0
           ? null
@@ -151,7 +165,10 @@ export default function TaskFormModal() {
             <label className="mb-1 block text-sm text-neutral-600">关联长期目标</label>
             <select
               value={goalId}
-              onChange={(e) => setGoalId(e.target.value)}
+              onChange={(e) => {
+                setGoalId(e.target.value);
+                setProjectId(""); // 目标变更后项目需重新选择
+              }}
               className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
             >
               <option value="">无</option>
@@ -161,6 +178,37 @@ export default function TaskFormModal() {
                 </option>
               ))}
             </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-neutral-600">项目（可选）</label>
+            <select
+              value={projectId}
+              onChange={(e) => {
+                const v = e.target.value;
+                setProjectId(v);
+                // 选项目时自动补全所属目标（未选目标的情况）
+                if (v !== "" && goalId === "") {
+                  const p = projects.find((x) => x.id === Number(v));
+                  if (p?.goalId != null) setGoalId(String(p.goalId));
+                }
+              }}
+              className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
+            >
+              <option value="">无</option>
+              {projects
+                .filter((p) => (goalId === "" ? true : p.goalId === Number(goalId)))
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.title}
+                    {goalId === "" && p.goalTitle ? `（${p.goalTitle}）` : ""}
+                  </option>
+                ))}
+            </select>
+            {goalId !== "" && projects.filter((p) => p.goalId === Number(goalId)).length === 0 && (
+              <p className="mt-1 text-[11px] text-neutral-400">
+                该目标下暂无项目，可先到「长期」页创建
+              </p>
+            )}
           </div>
           <div>
             <label className="mb-1 block text-sm text-neutral-600">预计时间（分钟）</label>

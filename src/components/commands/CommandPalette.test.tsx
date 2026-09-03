@@ -47,6 +47,8 @@ function makeTask(id: number, title: string, scheduledDate = "2026-08-27"): Task
     notes: null,
     goalId: null,
     repeatRule: "",
+    projectId: null,
+    parentId: null,
     sortOrder: 0,
     createdAt: 0,
     updatedAt: 0,
