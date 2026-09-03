@@ -69,14 +69,14 @@ function NoteItem({ note }: { note: Note }) {
       onMouseDown={beginNoteDrag}
       className={`group flex cursor-grab items-start gap-1.5 rounded-md border px-2 py-1.5 transition-colors ${
         arranged
-          ? "border-dashed border-neutral-200 bg-neutral-50 opacity-70"
-          : "border-neutral-200 bg-white hover:border-neutral-300"
+          ? "border-dashed border-line bg-raised opacity-70"
+          : "border-line bg-surface hover:border-line-strong"
       }`}
       title={arranged ? "已安排到今日（不可再次拖拽）" : "按住拖动到今日任务列表或时间轴"}
     >
       <StickyNote
         size={14}
-        className={`mt-0.5 shrink-0 ${arranged ? "text-neutral-400" : "text-amber-500"}`}
+        className={`mt-0.5 shrink-0 ${arranged ? "text-ink-3" : "text-warn"}`}
       />
       {editing ? (
         <input
@@ -91,7 +91,7 @@ function NoteItem({ note }: { note: Note }) {
             }
           }}
           onBlur={saveEdit}
-          className="min-w-0 flex-1 rounded border border-neutral-300 px-1 py-0.5 text-sm"
+          className="min-w-0 flex-1 rounded border border-line-strong px-1 py-0.5 text-sm"
         />
       ) : (
         <button
@@ -100,7 +100,7 @@ function NoteItem({ note }: { note: Note }) {
             setEditing(true);
           }}
           className={`min-w-0 flex-1 truncate text-left text-sm ${
-            arranged ? "text-neutral-500 line-through decoration-neutral-300" : "text-neutral-800"
+            arranged ? "text-ink-2 line-through decoration-neutral-300" : "text-ink"
           }`}
         >
           {note.title}
@@ -112,7 +112,7 @@ function NoteItem({ note }: { note: Note }) {
             onClick={() => void update(note.id, { status: "active" })}
             aria-label="还原便签"
             title="还原为未安排便签"
-            className="rounded p-0.5 text-neutral-400 hover:bg-amber-50 hover:text-amber-600"
+            className="rounded p-0.5 text-ink-3 hover:bg-warn/10 hover:text-warn"
           >
             <RotateCcw size={14} />
           </button>
@@ -122,7 +122,7 @@ function NoteItem({ note }: { note: Note }) {
             onClick={() => void complete(note.id)}
             aria-label="完成便签"
             title="完成（保留历史）"
-            className="rounded p-0.5 text-neutral-400 hover:bg-green-50 hover:text-green-600"
+            className="rounded p-0.5 text-ink-3 hover:bg-success/10 hover:text-success"
           >
             <Check size={14} />
           </button>
@@ -131,7 +131,7 @@ function NoteItem({ note }: { note: Note }) {
           onClick={() => void remove(note.id)}
           aria-label="删除便签"
           title="删除"
-          className="rounded p-0.5 text-neutral-400 hover:bg-red-50 hover:text-red-600"
+          className="rounded p-0.5 text-ink-3 hover:bg-error/10 hover:text-error"
         >
           <X size={14} />
         </button>
@@ -197,14 +197,14 @@ export default function NoteList() {
   return (
     <div
       data-note-drop="notelist"
-      className={`rounded-md border-t border-neutral-200 pt-2 transition-shadow ${
+      className={`rounded-md border-t border-line pt-2 transition-shadow ${
         taskOver ? "shadow-[inset_0_0_0_2px_#f59e0b66]" : ""
       }`}
     >
-      <div className="mb-1.5 flex items-center gap-1 text-xs text-neutral-500">
-        <StickyNote size={12} className="text-amber-500" />
+      <div className="mb-1.5 flex items-center gap-1 text-xs text-ink-2">
+        <StickyNote size={12} className="text-warn" />
         <span className="font-medium">便签</span>
-        <span className="truncate text-neutral-400">暂时没安排时间，但不能忘记</span>
+        <span className="truncate text-ink-3">暂时没安排时间，但不能忘记</span>
       </div>
 
       <div className="mb-1.5 flex items-center gap-1.5">
@@ -215,12 +215,12 @@ export default function NoteList() {
             if (e.key === "Enter") void submit();
           }}
           placeholder="记下想法，回车保存"
-          className="min-w-0 flex-1 rounded-md border border-neutral-300 px-2 py-1 text-xs"
+          className="min-w-0 flex-1 rounded-md border border-line-strong px-2 py-1 text-xs"
         />
         <button
           onClick={() => void submit()}
           disabled={!canSubmit}
-          className="flex shrink-0 items-center justify-center rounded-md bg-neutral-900 px-1.5 py-1 text-white hover:bg-neutral-700 disabled:bg-neutral-300"
+          className="flex shrink-0 items-center justify-center rounded-md bg-brand px-1.5 py-1 text-white hover:bg-neutral-700 disabled:bg-line"
           aria-label="添加便签"
         >
           <Plus size={14} />
@@ -228,7 +228,7 @@ export default function NoteList() {
       </div>
 
       {notes.length === 0 ? (
-        <p className="rounded-md border border-dashed border-neutral-300 p-4 text-center text-xs text-neutral-400">
+        <p className="rounded-md border border-dashed border-line-strong p-4 text-center text-xs text-ink-3">
           还没有便签，把想法记下来
         </p>
       ) : (
@@ -241,16 +241,16 @@ export default function NoteList() {
             </ul>
           )}
           {activeNotes.length === 0 && arrangedNotes.length > 0 && (
-            <p className="pb-1 text-center text-[11px] text-neutral-400">便签都已安排为任务</p>
+            <p className="pb-1 text-center text-[11px] text-ink-3">便签都已安排为任务</p>
           )}
 
           {/* 已安排便签：默认折叠，可展开逐项还原/删除，或一键清理（可撤销） */}
           {arrangedNotes.length > 0 && (
-            <div className="mt-1.5 border-t border-dashed border-neutral-200 pt-1.5">
+            <div className="mt-1.5 border-t border-dashed border-line pt-1.5">
               <div className="flex items-center justify-between">
                 <button
                   onClick={() => setShowArranged((v) => !v)}
-                  className="flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-600"
+                  className="flex items-center gap-1 text-xs text-ink-3 hover:text-ink-2"
                 >
                   <span className="inline-block w-3 text-center">
                     {showArranged ? "▾" : "▸"}
@@ -260,7 +260,7 @@ export default function NoteList() {
                 {showArranged && (
                   <button
                     onClick={() => void clearArranged()}
-                    className="text-[11px] text-neutral-400 underline underline-offset-2 hover:text-neutral-600"
+                    className="text-[11px] text-ink-3 underline underline-offset-2 hover:text-ink-2"
                   >
                     全部清理
                   </button>

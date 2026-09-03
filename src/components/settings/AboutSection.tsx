@@ -10,18 +10,18 @@ export default function AboutSection() {
   }, []);
 
   return (
-    <div className="space-y-4 rounded-md border border-neutral-200 bg-white p-5">
+    <div className="space-y-4 rounded-md border border-line bg-surface p-5">
       <div>
-        <div className="text-lg font-semibold text-neutral-900">DailyFlow</div>
-        <div className="mt-0.5 text-sm text-neutral-500">
+        <div className="text-lg font-semibold text-ink">DailyFlow</div>
+        <div className="mt-0.5 text-sm text-ink-2">
           本地优先的个人时间管理与专注工具
         </div>
       </div>
       <div className="flex items-center justify-between text-sm">
-        <span className="text-neutral-500">当前版本</span>
-        <span className="text-neutral-900">V{appVersion || "…"}</span>
+        <span className="text-ink-2">当前版本</span>
+        <span className="text-ink">V{appVersion || "…"}</span>
       </div>
-      <p className="text-xs text-neutral-400">
+      <p className="text-xs text-ink-3">
         数据完全存储在本地 SQLite，无需账号、无需联网。
       </p>
     </div>

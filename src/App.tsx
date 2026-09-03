@@ -36,6 +36,12 @@ function App() {
     undoManager.setMaxHistory(undoLimit);
   }, [undoLimit]);
 
+  // 界面密度：写入 <html data-density>，供全局 CSS 变量（nav-row/task-row 密度）
+  const density = useSettingsStore((s) => s.settings.density);
+  useEffect(() => {
+    document.documentElement.dataset.density = density;
+  }, [density]);
+
   // 窗口行为（关闭拦截 / 托盘「开始暂停专注」）监听
   useEffect(() => initWindowBehavior(), []);
 

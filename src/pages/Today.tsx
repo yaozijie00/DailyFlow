@@ -191,17 +191,17 @@ export default function Today() {
         <aside className="flex w-64 shrink-0 flex-col pr-3">
           <div className="min-h-0 flex-1 overflow-y-auto">
             <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-sm font-medium text-neutral-600">今日任务</h2>
+              <h2 className="text-sm font-medium text-ink-2">今日任务</h2>
               <button
                 onClick={() => openCreate()}
-                className="flex items-center gap-1 rounded-md bg-neutral-900 px-2 py-1 text-xs text-white hover:bg-neutral-700"
+                className="flex items-center gap-1 rounded-md bg-brand px-2 py-1 text-xs text-white hover:bg-neutral-700"
               >
                 <Plus size={14} /> 新建
               </button>
             </div>
             <QuickAddTask />
             {loading ? (
-              <div className="text-sm text-neutral-400">加载中…</div>
+              <div className="text-sm text-ink-3">加载中…</div>
             ) : (
               <TaskList />
             )}
@@ -213,7 +213,7 @@ export default function Today() {
         </aside>
 
         {/* 中：时间轴（自身负责滚动） */}
-        <main className="min-w-0 min-h-0 flex-1 overflow-hidden rounded-md border border-neutral-200 bg-white">
+        <main className="min-w-0 min-h-0 flex-1 overflow-hidden rounded-md border border-line bg-surface">
           <Timeline />
         </main>
 
@@ -229,7 +229,7 @@ export default function Today() {
               title="拖动调整宽度，双击恢复默认"
               className="group flex w-3 shrink-0 cursor-col-resize items-center justify-center"
             >
-              <div className="h-full w-px bg-neutral-200 transition-colors group-hover:bg-neutral-400" />
+              <div className="h-full w-px bg-raised-2 transition-colors group-hover:bg-neutral-400" />
             </div>
             <aside style={{ width: detailWidth }} className="shrink-0 overflow-y-auto">
               <TaskDetail />

@@ -108,7 +108,7 @@ export default function Goals() {
               if (!showCreate) setForm(emptyForm());
               setShowCreate((v) => !v);
             }}
-            className="flex items-center gap-1 rounded-md bg-neutral-900 px-3 py-2 text-sm text-white hover:bg-neutral-700"
+            className="flex items-center gap-1 rounded-md bg-brand px-3 py-2 text-sm text-white hover:bg-neutral-700"
           >
             <Plus size={16} />
             新建
@@ -119,40 +119,40 @@ export default function Goals() {
       {showCreate && (
         <form
           onSubmit={submitCreate}
-          className="flex flex-col gap-2 rounded-md border border-neutral-200 bg-white p-4"
+          className="flex flex-col gap-2 rounded-md border border-line bg-surface p-4"
         >
           <input
             autoFocus
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
             placeholder="名称，例如：完成 DailyFlow V2"
-            className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
+            className="w-full rounded-md border border-line-strong px-3 py-2 text-sm outline-none focus:border-brand"
           />
           <textarea
             value={form.description}
             onChange={(e) => setForm({ ...form, description: e.target.value })}
             placeholder="补充说明（可选）"
             rows={2}
-            className="w-full resize-none rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
+            className="w-full resize-none rounded-md border border-line-strong px-3 py-2 text-sm outline-none focus:border-brand"
           />
           <div className="flex flex-wrap items-center gap-2">
             <input
               type="date"
               value={form.startDate}
               onChange={(e) => setForm({ ...form, startDate: e.target.value })}
-              className="rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+              className="rounded-md border border-line-strong px-2 py-1.5 text-sm"
             />
-            <span className="text-sm text-neutral-400">至</span>
+            <span className="text-sm text-ink-3">至</span>
             <input
               type="date"
               value={form.deadline}
               onChange={(e) => setForm({ ...form, deadline: e.target.value })}
-              className="rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+              className="rounded-md border border-line-strong px-2 py-1.5 text-sm"
             />
             <select
               value={form.priority}
               onChange={(e) => setForm({ ...form, priority: e.target.value as GoalFormState["priority"] })}
-              className="rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+              className="rounded-md border border-line-strong px-2 py-1.5 text-sm"
             >
               <option value="high">高优先级</option>
               <option value="medium">中优先级</option>
@@ -165,21 +165,21 @@ export default function Goals() {
               value={form.manualProgress}
               onChange={(e) => setForm({ ...form, manualProgress: e.target.value })}
               placeholder="进度%（留空自动）"
-              className="w-28 rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+              className="w-28 rounded-md border border-line-strong px-2 py-1.5 text-sm"
             />
           </div>
           <div className="flex justify-end gap-2">
             <button
               type="button"
               onClick={() => setShowCreate(false)}
-              className="rounded-md px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-100"
+              className="rounded-md px-3 py-2 text-sm text-ink-2 hover:bg-canvas"
             >
               取消
             </button>
             <button
               type="submit"
               disabled={form.title.trim().length === 0}
-              className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700 disabled:opacity-40"
+              className="rounded-md bg-brand px-4 py-2 text-sm text-white hover:bg-neutral-700 disabled:opacity-40"
             >
               添加
             </button>
@@ -188,7 +188,7 @@ export default function Goals() {
       )}
 
       {loading && goals.length === 0 ? (
-        <div className="text-sm text-neutral-400">加载中…</div>
+        <div className="text-sm text-ink-3">加载中…</div>
       ) : (
         <MonthView
           goals={goals}
@@ -204,42 +204,42 @@ export default function Goals() {
       {/* 编辑弹窗 */}
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-96 rounded-lg bg-white p-6 shadow-xl">
-            <h2 className="mb-4 text-lg font-semibold text-neutral-900">编辑长期任务</h2>
+          <div className="w-96 rounded-lg bg-surface p-6 shadow-xl">
+            <h2 className="mb-4 text-lg font-semibold text-ink">编辑长期任务</h2>
             <form onSubmit={submitEdit} className="space-y-3">
               <input
                 autoFocus
                 value={editForm.title}
                 onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
+                className="w-full rounded-md border border-line-strong px-3 py-2 text-sm outline-none focus:border-brand"
               />
               <textarea
                 value={editForm.description}
                 onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
                 placeholder="补充说明（可选）"
                 rows={2}
-                className="w-full resize-none rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
+                className="w-full resize-none rounded-md border border-line-strong px-3 py-2 text-sm outline-none focus:border-brand"
               />
               <div className="flex items-center gap-2">
                 <input
                   type="date"
                   value={editForm.startDate}
                   onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })}
-                  className="flex-1 rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+                  className="flex-1 rounded-md border border-line-strong px-2 py-1.5 text-sm"
                 />
-                <span className="text-sm text-neutral-400">至</span>
+                <span className="text-sm text-ink-3">至</span>
                 <input
                   type="date"
                   value={editForm.deadline}
                   onChange={(e) => setEditForm({ ...editForm, deadline: e.target.value })}
-                  className="flex-1 rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+                  className="flex-1 rounded-md border border-line-strong px-2 py-1.5 text-sm"
                 />
               </div>
               <div className="flex items-center gap-2">
                 <select
                   value={editForm.priority}
                   onChange={(e) => setEditForm({ ...editForm, priority: e.target.value as GoalFormState["priority"] })}
-                  className="flex-1 rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+                  className="flex-1 rounded-md border border-line-strong px-2 py-1.5 text-sm"
                 >
                   <option value="high">高优先级</option>
                   <option value="medium">中优先级</option>
@@ -252,10 +252,10 @@ export default function Goals() {
                   value={editForm.manualProgress}
                   onChange={(e) => setEditForm({ ...editForm, manualProgress: e.target.value })}
                   placeholder="进度%（留空自动）"
-                  className="flex-1 rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+                  className="flex-1 rounded-md border border-line-strong px-2 py-1.5 text-sm"
                 />
               </div>
-              <div className="text-xs text-neutral-500">
+              <div className="text-xs text-ink-2">
                 进度：{editing.progressPercent}% · 关联任务 {editing.completedTasks}/{editing.totalTasks} · 专注投入 {formatDuration(editing.focusSeconds) || "0分钟"}
               </div>
               <div className="flex items-center justify-between pt-1">
@@ -265,7 +265,7 @@ export default function Goals() {
                     void complete(editing.id);
                     setEditing(null);
                   }}
-                  className="flex items-center gap-1 rounded-md border border-green-200 px-3 py-1.5 text-sm text-green-600 hover:bg-green-50"
+                  className="flex items-center gap-1 rounded-md border border-success/40 px-3 py-1.5 text-sm text-success hover:bg-success/10"
                 >
                   <Check size={14} /> 完成
                 </button>
@@ -275,7 +275,7 @@ export default function Goals() {
                     void remove(editing.id);
                     setEditing(null);
                   }}
-                  className="flex items-center gap-1 rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50"
+                  className="flex items-center gap-1 rounded-md border border-error/40 px-3 py-1.5 text-sm text-error hover:bg-error/10"
                 >
                   <Trash2 size={14} /> 删除
                 </button>
@@ -283,13 +283,13 @@ export default function Goals() {
                   <button
                     type="button"
                     onClick={() => setEditing(null)}
-                    className="rounded-md px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100"
+                    className="rounded-md px-3 py-1.5 text-sm text-ink-2 hover:bg-canvas"
                   >
                     取消
                   </button>
                   <button
                     type="submit"
-                    className="rounded-md bg-neutral-900 px-4 py-1.5 text-sm text-white hover:bg-neutral-700"
+                    className="rounded-md bg-brand px-4 py-1.5 text-sm text-white hover:bg-neutral-700"
                   >
                     保存
                   </button>
@@ -304,7 +304,7 @@ export default function Goals() {
         <div className="mt-2">
           <button
             onClick={() => setShowCompleted((v) => !v)}
-            className="text-sm text-neutral-500 hover:text-neutral-700"
+            className="text-sm text-ink-2 hover:text-ink"
           >
             {showCompleted ? "▾" : "▸"} 已完成（{completedGoals.length}）
           </button>
@@ -313,14 +313,14 @@ export default function Goals() {
               {completedGoals.map((g) => (
                 <div
                   key={g.id}
-                  className="group flex items-center gap-2 rounded-md border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-500"
+                  className="group flex items-center gap-2 rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink-2"
                 >
-                  <Check size={14} className="shrink-0 text-green-600" />
+                  <Check size={14} className="shrink-0 text-success" />
                   <span className="min-w-0 flex-1 truncate line-through decoration-neutral-300">
                     {g.title}
                   </span>
                   {g.deadline && (
-                    <span className="hidden shrink-0 text-xs text-neutral-400 sm:block">
+                    <span className="hidden shrink-0 text-xs text-ink-3 sm:block">
                       {g.deadline}
                     </span>
                   )}
@@ -329,7 +329,7 @@ export default function Goals() {
                       onClick={() => void restore(g.id)}
                       aria-label="恢复长期任务"
                       title="恢复为进行中（误完成可修正）"
-                      className="rounded p-0.5 text-neutral-400 hover:bg-green-50 hover:text-green-600"
+                      className="rounded p-0.5 text-ink-3 hover:bg-success/10 hover:text-success"
                     >
                       <RotateCcw size={14} />
                     </button>
@@ -337,7 +337,7 @@ export default function Goals() {
                       onClick={() => void remove(g.id)}
                       aria-label="删除已完成任务"
                       title="删除（可撤销）"
-                      className="rounded p-0.5 text-neutral-400 hover:bg-red-50 hover:text-red-600"
+                      className="rounded p-0.5 text-ink-3 hover:bg-error/10 hover:text-error"
                     >
                       <Trash2 size={14} />
                     </button>

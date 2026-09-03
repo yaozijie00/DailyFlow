@@ -48,16 +48,16 @@ export default function CloseBehaviorDialog() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-[26rem] rounded-lg bg-white p-6 shadow-xl">
-        <h2 className="text-lg font-semibold text-neutral-900">
+      <div className="w-[26rem] rounded-lg bg-surface p-6 shadow-xl">
+        <h2 className="text-lg font-semibold text-ink">
           {isFirst ? "关闭 DailyFlow" : "退出 DailyFlow"}
         </h2>
 
         {isFirst ? (
           <>
-            <p className="mt-2 text-sm text-neutral-500">你希望关闭窗口后：</p>
+            <p className="mt-2 text-sm text-ink-2">你希望关闭窗口后：</p>
             <div className="mt-3 space-y-2 text-sm">
-              <label className="flex cursor-pointer items-center gap-2 text-neutral-700">
+              <label className="flex cursor-pointer items-center gap-2 text-ink">
                 <input
                   type="radio"
                   name="close-behavior"
@@ -67,7 +67,7 @@ export default function CloseBehaviorDialog() {
                 />
                 退出 DailyFlow
               </label>
-              <label className="flex cursor-pointer items-center gap-2 text-neutral-700">
+              <label className="flex cursor-pointer items-center gap-2 text-ink">
                 <input
                   type="radio"
                   name="close-behavior"
@@ -78,7 +78,7 @@ export default function CloseBehaviorDialog() {
                 隐藏到系统托盘，继续运行
               </label>
             </div>
-            <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm text-neutral-500">
+            <label className="mt-4 flex cursor-pointer items-center gap-2 text-sm text-ink-2">
               <input
                 type="checkbox"
                 checked={remember}
@@ -89,7 +89,7 @@ export default function CloseBehaviorDialog() {
             </label>
           </>
         ) : (
-          <p className="mt-2 text-sm text-neutral-600">
+          <p className="mt-2 text-sm text-ink-2">
             当前正在进行专注，退出后本次专注将被结束。
           </p>
         )}
@@ -97,13 +97,13 @@ export default function CloseBehaviorDialog() {
         <div className="mt-6 flex justify-end gap-2">
           <button
             onClick={closeCloseDialog}
-            className="rounded-md px-4 py-2 text-sm text-neutral-600 hover:bg-neutral-100"
+            className="rounded-md px-4 py-2 text-sm text-ink-2 hover:bg-canvas"
           >
             取消
           </button>
           <button
             onClick={isFirst ? () => void confirmFirst() : confirmExit}
-            className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700"
+            className="rounded-md bg-brand px-4 py-2 text-sm text-white hover:bg-neutral-700"
           >
             {isFirst ? "确定" : "继续退出"}
           </button>

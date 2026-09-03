@@ -234,34 +234,34 @@ export default function MonthView({ goals, onEdit, onMoveRange, onRequestCreate 
         <button
           onClick={() => goMonth(-1)}
           aria-label="上个月"
-          className="rounded-md border border-neutral-300 p-1.5 text-neutral-600 hover:bg-neutral-100"
+          className="rounded-md border border-line-strong p-1.5 text-ink-2 hover:bg-canvas"
         >
           <ChevronLeft size={16} />
         </button>
-        <span className="min-w-28 text-center text-sm font-medium text-neutral-900">
+        <span className="min-w-28 text-center text-sm font-medium text-ink">
           {monthLabel(year, month)}
         </span>
         <button
           onClick={() => goMonth(1)}
           aria-label="下个月"
-          className="rounded-md border border-neutral-300 p-1.5 text-neutral-600 hover:bg-neutral-100"
+          className="rounded-md border border-line-strong p-1.5 text-ink-2 hover:bg-canvas"
         >
           <ChevronRight size={16} />
         </button>
         <button
           onClick={goToday}
-          className="rounded-md border border-neutral-300 px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-100"
+          className="rounded-md border border-line-strong px-2 py-1 text-xs text-ink-2 hover:bg-canvas"
         >
           本月
         </button>
       </div>
 
       {/* 周表头 */}
-      <div className="flex rounded-t-md border border-b-0 border-neutral-200 bg-white">
+      <div className="flex rounded-t-md border border-b-0 border-line bg-surface">
         {WEEKDAY_NAMES.map((w) => (
           <div
             key={w}
-            className="flex-1 border-l border-neutral-100 py-1 text-center text-xs font-medium text-neutral-500 first:border-l-0"
+            className="flex-1 border-l border-line-soft py-1 text-center text-xs font-medium text-ink-2 first:border-l-0"
           >
             {w}
           </div>
@@ -271,7 +271,7 @@ export default function MonthView({ goals, onEdit, onMoveRange, onRequestCreate 
       {/* 月历网格：7 列 × 4~6 行，整月一屏可见（无横向滚动） */}
       <div
         ref={gridRef}
-        className="relative overflow-hidden rounded-b-md border border-neutral-200 bg-white select-none"
+        className="relative overflow-hidden rounded-b-md border border-line bg-surface select-none"
       >
         {weeks.map((week, wi) => {
           const { rows, laneOf, overflow } = weekSegs(week);
@@ -284,7 +284,7 @@ export default function MonthView({ goals, onEdit, onMoveRange, onRequestCreate 
           return (
             <div
               key={wi}
-              className="relative border-t border-neutral-200 first:border-t-0"
+              className="relative border-t border-line first:border-t-0"
               style={{ height: rowH }}
             >
               {/* 日期列背景 + 日号（今天/周末/邻月/圈选高亮） */}
@@ -298,20 +298,20 @@ export default function MonthView({ goals, onEdit, onMoveRange, onRequestCreate 
                     <div
                       key={c.date}
                       onMouseDown={(e) => startDayDrag(e, week, ci)}
-                      className={`relative flex-1 cursor-pointer border-l border-neutral-100 first:border-l-0 ${
-                        c.isToday ? "bg-amber-50" : c.isWeekend ? "bg-neutral-50" : ""
-                      } ${c.inMonth ? "" : "bg-neutral-50/50"} ${
-                        inRange ? "bg-amber-100/80 ring-1 ring-inset ring-amber-300" : ""
+                      className={`relative flex-1 cursor-pointer border-l border-line-soft first:border-l-0 ${
+                        c.isToday ? "bg-warn/10" : c.isWeekend ? "bg-raised" : ""
+                      } ${c.inMonth ? "" : "bg-raised/50"} ${
+                        inRange ? "bg-warn/20 ring-1 ring-inset ring-warn/60" : ""
                       }`}
                       style={{ height: rowH }}
                     >
                       <div
                         className={`pt-1 text-center text-xs font-medium ${
                           c.isToday
-                            ? "text-amber-700"
+                            ? "text-warn"
                             : c.inMonth
-                              ? "text-neutral-700"
-                              : "text-neutral-300"
+                              ? "text-ink"
+                              : "text-ink-3"
                         }`}
                       >
                         {c.day}
@@ -339,7 +339,7 @@ export default function MonthView({ goals, onEdit, onMoveRange, onRequestCreate 
                     }}
                     aria-label="编辑长期任务"
                     title={`${goal.title}：${goal.startDate} ~ ${goal.deadline}（拖动移动，边缘调整起止）`}
-                    className="absolute z-10 flex cursor-grab items-center overflow-hidden rounded-sm bg-neutral-900/10 hover:bg-neutral-900/20 active:cursor-grabbing"
+                    className="absolute z-10 flex cursor-grab items-center overflow-hidden rounded-sm bg-brand/10 hover:bg-brand/20 active:cursor-grabbing"
                     style={{
                       left: `${(seg.startCol / 7) * 100}%`,
                       width: `${((seg.endCol - seg.startCol + 1) / 7) * 100}%`,
@@ -348,7 +348,7 @@ export default function MonthView({ goals, onEdit, onMoveRange, onRequestCreate 
                     }}
                   >
                     <div
-                      className="absolute inset-y-0 left-0 bg-neutral-900/60"
+                      className="absolute inset-y-0 left-0 bg-brand/60"
                       style={{ width: `${seg.progressPercent}%` }}
                     />
                     {seg.startsGoal && (
@@ -365,7 +365,7 @@ export default function MonthView({ goals, onEdit, onMoveRange, onRequestCreate 
                         title="拖动调整结束日期"
                       />
                     )}
-                    <span className="relative z-10 truncate px-1.5 text-[10px] text-neutral-900">
+                    <span className="relative z-10 truncate px-1.5 text-[10px] text-ink">
                       {seg.title}
                     </span>
                   </div>
@@ -381,7 +381,7 @@ export default function MonthView({ goals, onEdit, onMoveRange, onRequestCreate 
                       e.stopPropagation();
                       setDayDetail(week.cells[ci].date);
                     }}
-                    className="absolute z-10 cursor-pointer rounded px-1 text-center text-[10px] text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600"
+                    className="absolute z-10 cursor-pointer rounded px-1 text-center text-[10px] text-ink-3 hover:bg-canvas hover:text-ink-2"
                     style={{
                       left: `${(ci / 7) * 100}%`,
                       width: `${100 / 7}%`,
@@ -399,7 +399,7 @@ export default function MonthView({ goals, onEdit, onMoveRange, onRequestCreate 
 
         {/* 空月提示：无任何排期任务时引导点击日期新建 */}
         {arranged.length === 0 && unscheduled.length === 0 && (
-          <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-sm text-neutral-400">
+          <div className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-sm text-ink-3">
             本月暂无排期任务，点击任意日期新建
           </div>
         )}
@@ -407,14 +407,14 @@ export default function MonthView({ goals, onEdit, onMoveRange, onRequestCreate 
 
       {/* 未安排（无日期范围） */}
       {unscheduled.length > 0 && (
-        <div className="rounded-md border border-dashed border-neutral-200 p-3">
-          <div className="mb-1 text-xs text-neutral-400">未安排日期</div>
+        <div className="rounded-md border border-dashed border-line p-3">
+          <div className="mb-1 text-xs text-ink-3">未安排日期</div>
           <div className="flex flex-wrap gap-2">
             {unscheduled.map((g) => (
               <button
                 key={g.id}
                 onClick={() => onEdit(g)}
-                className="rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-700 hover:border-neutral-300"
+                className="rounded-md border border-line bg-surface px-2 py-1 text-xs text-ink hover:border-line-strong"
               >
                 {g.title}
               </button>
@@ -430,10 +430,10 @@ export default function MonthView({ goals, onEdit, onMoveRange, onRequestCreate 
           onMouseDown={() => setDayDetail(null)}
         >
           <div
-            className="w-80 rounded-lg bg-white p-4 shadow-xl"
+            className="w-80 rounded-lg bg-surface p-4 shadow-xl"
             onMouseDown={(e) => e.stopPropagation()}
           >
-            <h3 className="mb-3 text-sm font-semibold text-neutral-900">
+            <h3 className="mb-3 text-sm font-semibold text-ink">
               {dayDetail}（{detailGoals.length} 项）
             </h3>
             <div className="max-h-72 space-y-1 overflow-y-auto">
@@ -444,13 +444,13 @@ export default function MonthView({ goals, onEdit, onMoveRange, onRequestCreate 
                     setDayDetail(null);
                     onEdit(g);
                   }}
-                  className="flex w-full items-center gap-2 rounded-md border border-neutral-100 px-2 py-1.5 text-left text-xs hover:bg-neutral-50"
+                  className="flex w-full items-center gap-2 rounded-md border border-line-soft px-2 py-1.5 text-left text-xs hover:bg-raised"
                 >
-                  <span className="min-w-0 flex-1 truncate text-neutral-800">{g.title}</span>
-                  <span className="shrink-0 text-neutral-400">
+                  <span className="min-w-0 flex-1 truncate text-ink">{g.title}</span>
+                  <span className="shrink-0 text-ink-3">
                     {g.startDate?.slice(5)}~{g.deadline?.slice(5)}
                   </span>
-                  <span className="shrink-0 font-medium text-neutral-600">{g.progressPercent}%</span>
+                  <span className="shrink-0 font-medium text-ink-2">{g.progressPercent}%</span>
                 </button>
               ))}
             </div>
@@ -460,7 +460,7 @@ export default function MonthView({ goals, onEdit, onMoveRange, onRequestCreate 
                 setDayDetail(null);
                 onRequestCreate(d, d);
               }}
-              className="mt-3 flex w-full items-center justify-center gap-1 rounded-md border border-neutral-200 py-1.5 text-xs text-neutral-700 hover:bg-neutral-50"
+              className="mt-3 flex w-full items-center justify-center gap-1 rounded-md border border-line py-1.5 text-xs text-ink hover:bg-raised"
             >
               <Plus size={12} /> 在此日新建长期任务
             </button>

@@ -38,10 +38,10 @@ export default function PomodoroSection() {
   };
 
   return (
-    <div className="space-y-4 rounded-md border border-neutral-200 bg-white p-5">
+    <div className="space-y-4 rounded-md border border-line bg-surface p-5">
       {fields.map((f) => (
         <div key={f.key} className="flex items-center justify-between gap-4">
-          <label className="text-sm text-neutral-700">{f.label}</label>
+          <label className="text-sm text-ink">{f.label}</label>
           <div className="flex items-center gap-2">
             <input
               type="number"
@@ -49,23 +49,23 @@ export default function PomodoroSection() {
               max={f.max}
               value={draft[f.key]}
               onChange={(e) => setDraft((d) => ({ ...d, [f.key]: Number(e.target.value) }))}
-              className="w-20 rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+              className="w-20 rounded-md border border-line-strong px-2 py-1.5 text-sm"
             />
-            <span className="text-sm text-neutral-500">{f.unit}</span>
+            <span className="text-sm text-ink-2">{f.unit}</span>
           </div>
         </div>
       ))}
-      <p className="text-xs text-neutral-400">
+      <p className="text-xs text-ink-3">
         休息循环（短休息 / 长休息 / 长休息间隔）已接入计时流程。
       </p>
       <div className="flex items-center gap-3 pt-1">
         <button
           onClick={handleSave}
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700"
+          className="rounded-md bg-brand px-4 py-2 text-sm text-white hover:bg-neutral-700"
         >
           保存
         </button>
-        {saved && <span className="text-sm text-green-600">已保存</span>}
+        {saved && <span className="text-sm text-success">已保存</span>}
       </div>
     </div>
   );

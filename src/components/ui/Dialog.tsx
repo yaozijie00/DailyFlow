@@ -62,14 +62,14 @@ export function Dialog({
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl outline-none"
+        className="w-full max-w-md rounded-lg bg-surface p-6 shadow-xl outline-none"
       >
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-neutral-900">{title}</h2>
+          <h2 className="text-lg font-semibold text-ink">{title}</h2>
           <button
             onClick={onClose}
             aria-label="关闭"
-            className="rounded-md p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/30"
+            className="rounded-md p-1 text-ink-3 transition-colors hover:bg-canvas hover:text-ink-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/30"
           >
             <X size={18} />
           </button>

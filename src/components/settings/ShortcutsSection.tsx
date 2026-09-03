@@ -52,12 +52,12 @@ export default function ShortcutsSection() {
   };
 
   return (
-    <div className="space-y-3 rounded-md border border-neutral-200 bg-white p-5">
+    <div className="space-y-3 rounded-md border border-line bg-surface p-5">
       {SHORTCUT_ACTIONS.map((action) => (
         <div key={action} className="flex items-center justify-between gap-3">
           <div>
-            <div className="text-sm text-neutral-700">{SHORTCUT_ACTION_LABELS[action]}</div>
-            <div className="font-mono text-xs text-neutral-500">
+            <div className="text-sm text-ink">{SHORTCUT_ACTION_LABELS[action]}</div>
+            <div className="font-mono text-xs text-ink-2">
               {shortcuts[action] || "（未设置）"}
             </div>
           </div>
@@ -72,7 +72,7 @@ export default function ShortcutsSection() {
             ) : (
               <button
                 onClick={() => handleRecord(action)}
-                className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100"
+                className="rounded-md border border-line-strong px-3 py-1.5 text-sm text-ink hover:bg-canvas"
               >
                 修改
               </button>
@@ -80,7 +80,7 @@ export default function ShortcutsSection() {
             {shortcuts[action] !== "" && (
               <button
                 onClick={() => handleClear(action)}
-                className="rounded-md border border-neutral-300 px-2 py-1.5 text-xs text-neutral-500 hover:bg-neutral-100"
+                className="rounded-md border border-line-strong px-2 py-1.5 text-xs text-ink-2 hover:bg-canvas"
               >
                 清除
               </button>
@@ -88,21 +88,21 @@ export default function ShortcutsSection() {
           </div>
         </div>
       ))}
-      <div className="flex items-center gap-3 border-t border-neutral-100 pt-3">
+      <div className="flex items-center gap-3 border-t border-line-soft pt-3">
         <button
           onClick={handleReset}
           disabled={isDefaultShortcuts(shortcuts)}
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700 disabled:bg-neutral-300"
+          className="rounded-md bg-brand px-4 py-2 text-sm text-white hover:bg-neutral-700 disabled:bg-line"
         >
           恢复默认值
         </button>
         {msg && (
-          <span className={`text-xs ${msg.type === "ok" ? "text-green-600" : "text-red-600"}`}>
+          <span className={`text-xs ${msg.type === "ok" ? "text-success" : "text-error"}`}>
             {msg.text}
           </span>
         )}
       </div>
-      <p className="text-xs text-neutral-400">
+      <p className="text-xs text-ink-3">
         快捷键在应用窗口聚焦时生效；在输入框中不会触发。
       </p>
     </div>

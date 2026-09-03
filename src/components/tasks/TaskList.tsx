@@ -131,7 +131,7 @@ export default function TaskList() {
       }`}
     >
       {tasks.length === 0 ? (
-        <div className="rounded-md border border-dashed border-neutral-300 p-8 text-center text-sm text-neutral-400">
+        <div className="rounded-md border border-dashed border-line-strong p-8 text-center text-sm text-ink-3">
           暂无任务，点击右上角「新建任务」或按 Ctrl+N 开始规划
         </div>
       ) : (
@@ -145,8 +145,8 @@ export default function TaskList() {
                   onClick={() => setStatusFilter(f.key)}
                   className={`rounded px-2 py-1 text-xs transition-colors ${
                     statusFilter === f.key
-                      ? "bg-neutral-900 text-white"
-                      : "text-neutral-500 hover:bg-neutral-100"
+                      ? "bg-brand text-white"
+                      : "text-ink-2 hover:bg-canvas"
                   }`}
                 >
                   {f.label}
@@ -156,7 +156,7 @@ export default function TaskList() {
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-full rounded-md border border-neutral-300 px-2 py-1 text-xs text-neutral-600"
+              className="w-full rounded-md border border-line-strong px-2 py-1 text-xs text-ink-2"
             >
               <option value="">全部分类</option>
               {categories.map((c) => (
@@ -168,7 +168,7 @@ export default function TaskList() {
           </div>
 
           {displayTasks.length === 0 ? (
-            <p className="rounded-md border border-dashed border-neutral-300 p-6 text-center text-sm text-neutral-400">
+            <p className="rounded-md border border-dashed border-line-strong p-6 text-center text-sm text-ink-3">
               无匹配的任务
             </p>
           ) : (
@@ -190,10 +190,10 @@ export default function TaskList() {
                         }
                         selectTask(task.id);
                       }}
-                      className={`flex cursor-pointer select-none items-center gap-3 rounded-md border px-3 py-2 ${
+                      className={`task-row flex cursor-pointer select-none items-center gap-3 rounded-md border px-3 py-2 ${
                         selected
-                          ? "border-neutral-900 bg-neutral-50"
-                          : "border-transparent hover:bg-neutral-100"
+                          ? "border-brand bg-raised"
+                          : "border-transparent hover:bg-canvas"
                       }`}
                     >
                       <button
@@ -201,12 +201,12 @@ export default function TaskList() {
                           e.stopPropagation();
                           if (!cancelled) toggleComplete(task.id);
                         }}
-                        className="text-neutral-400 hover:text-green-600"
+                        className="text-ink-3 hover:text-success"
                         aria-label={done ? "恢复为未完成" : "完成任务"}
                         title={done ? "恢复为未完成" : "完成任务"}
                       >
                         {done ? (
-                          <Check size={18} className="text-green-600" />
+                          <Check size={18} className="text-success" />
                         ) : (
                           <Circle size={18} />
                         )}
@@ -225,14 +225,14 @@ export default function TaskList() {
                           <span
                             className={`block truncate text-sm ${
                               done || cancelled
-                                ? "text-neutral-400 line-through"
-                                : "text-neutral-900"
+                                ? "text-ink-3 line-through"
+                                : "text-ink"
                             }`}
                           >
                             {task.title}
                           </span>
                         </span>
-                        <span className="block truncate text-xs text-neutral-500">
+                        <span className="block truncate text-xs text-ink-2">
                           {task.categoryId != null
                             ? (categoryMap.get(task.categoryId) ?? "")
                             : ""}
@@ -244,13 +244,13 @@ export default function TaskList() {
                             : ""}
                         </span>
                       </span>
-                      <span className="shrink-0 text-xs text-neutral-400">
+                      <span className="shrink-0 text-xs text-ink-3">
                         {TASK_STATUS_LABEL[task.status] ?? task.status}
                       </span>
                       {/* 转为便签手柄（拖到便签区） */}
                       <span
                         onMouseDown={(e) => startTaskToNoteDrag(e, task.id)}
-                        className="shrink-0 cursor-grab text-neutral-300 transition-colors hover:text-amber-500"
+                        className="shrink-0 cursor-grab text-ink-3 transition-colors hover:text-warn"
                         title="拖到便签区转为便签"
                         aria-label="转为便签"
                       >
@@ -273,7 +273,7 @@ export default function TaskList() {
                             moveTask(fromId, task.id);
                           }
                         }}
-                        className="shrink-0 cursor-grab text-neutral-300 transition-colors hover:text-neutral-500"
+                        className="shrink-0 cursor-grab text-ink-3 transition-colors hover:text-ink-2"
                         title="拖动调整顺序"
                       >
                         <GripVertical size={14} />
@@ -282,7 +282,7 @@ export default function TaskList() {
 
                     {/* 子任务折叠区（全部视图） */}
                     {childTasks.length > 0 && (
-                      <ul className="ml-5 mt-0.5 space-y-0.5 border-l border-neutral-100 pl-3">
+                      <ul className="ml-5 mt-0.5 space-y-0.5 border-l border-line-soft pl-3">
                         {childTasks.map((child) => {
                           const childDone_ = child.status === "COMPLETED";
                           return (
@@ -291,8 +291,8 @@ export default function TaskList() {
                                 onClick={() => selectTask(child.id)}
                                 className={`flex cursor-pointer select-none items-center gap-2.5 rounded-md px-2.5 py-1.5 ${
                                   child.id === selectedTaskId
-                                    ? "bg-neutral-100"
-                                    : "hover:bg-neutral-50"
+                                    ? "bg-canvas"
+                                    : "hover:bg-raised"
                                 }`}
                               >
                                 <button
@@ -302,10 +302,10 @@ export default function TaskList() {
                                   }}
                                   aria-label={childDone_ ? "恢复为未完成" : "完成子任务"}
                                   title={childDone_ ? "恢复为未完成" : "完成子任务"}
-                                  className="shrink-0 text-neutral-400 hover:text-green-600"
+                                  className="shrink-0 text-ink-3 hover:text-success"
                                 >
                                   {childDone_ ? (
-                                    <Check size={15} className="text-green-600" />
+                                    <Check size={15} className="text-success" />
                                   ) : (
                                     <Circle size={15} />
                                   )}
@@ -314,8 +314,8 @@ export default function TaskList() {
                                   className={`min-w-0 flex-1 truncate text-sm ${
                                     child.status === "COMPLETED" ||
                                     child.status === "CANCELLED"
-                                      ? "text-neutral-400 line-through decoration-neutral-300"
-                                      : "text-neutral-800"
+                                      ? "text-ink-3 line-through decoration-neutral-300"
+                                      : "text-ink"
                                   }`}
                                 >
                                   {child.title}

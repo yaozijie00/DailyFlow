@@ -1,1 +1,133 @@
 @import "tailwindcss";
+
+/* ===== DailyFlow Design Tokens（Calm Productivity / Dark Matte） =====
+ * 色板严格遵循视觉规范：深色哑光基础 + 柔和冷蓝强调。
+ * Tailwind v4：@theme 生成的 --color-* 自动映射为 bg-*/text-*/border-* 等工具类。
+ */
+@theme {
+  /* 基础表面 */
+  --color-canvas: #0b0d10; /* 页面背景 Background */
+  --color-surface: #12161b; /* 卡片 Surface */
+  --color-raised: #181d23; /* 抬升 Elevated */
+  --color-raised-2: #1e242c; /* 次级抬升（次级按钮/悬停面） */
+  --color-line: #252b33; /* 边框 Border */
+  --color-line-soft: #1c2129; /* 弱分隔 */
+  --color-line-strong: #333c47; /* 输入框/强边框 */
+
+  /* 文字 */
+  --color-ink: #eceff2; /* Primary */
+  --color-ink-2: #9ba3ae; /* Secondary */
+  --color-ink-3: #68717d; /* Muted */
+
+  /* 品牌强调（克制：当前任务/主按钮/Focus/当前时间/选中/进度/交互态） */
+  --color-brand: #4a90e2;
+
+  /* 语义色（状态同时有 Icon/文字/形状表达，不单靠颜色） */
+  --color-success: #34c759;
+  --color-warn: #f5a623;
+  --color-error: #ff5c5c;
+  --color-insight: #9b7fe8;
+
+  /* 字体（系统优先） */
+  --font-sans: "Segoe UI", "Microsoft YaHei", Inter, system-ui, sans-serif;
+}
+
+/* ===== 基础 ===== */
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  html,
+  body {
+    height: 100%;
+  }
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--color-brand) 35%, transparent);
+    color: var(--color-ink);
+  }
+  /* 暗色细滚动条 */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: var(--color-line);
+    border-radius: 6px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+/* ===== Focus Quiet Mode 柔光 ===== */
+.focus-glow {
+  background:
+    radial-gradient(120% 90% at 50% 8%, color-mix(in srgb, var(--color-brand) 12%, transparent), transparent 62%),
+    var(--color-surface);
+}
+
+/* ===== Toast 入场（Quiet Reward / 轻反馈） ===== */
+@keyframes df-toast {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.df-toast {
+  animation: df-toast 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes df-reward {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.4;
+  }
+  60% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.df-reward {
+  animation: df-reward 0.7s ease;
+}
+
+/* ===== Density（紧凑 / 舒适 / 宽松） ===== */
+:root {
+  --r-row: 8px; /* 行内垂直留白（默认舒适） */
+  --r-card: 14px;
+}
+[data-density="compact"] {
+  --r-row: 4px;
+  --r-card: 10px;
+}
+[data-density="comfortable"] {
+  --r-row: 8px;
+  --r-card: 14px;
+}
+[data-density="spacious"] {
+  --r-row: 12px;
+  --r-card: 18px;
+}
+.nav-row {
+  padding-block: var(--r-row);
+}
+.task-row {
+  padding-block: var(--r-row);
+}

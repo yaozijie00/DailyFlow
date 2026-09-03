@@ -14,9 +14,9 @@ function stateLabel(state: string, phase: string): string {
 }
 
 const PRIMARY_BTN =
-  "flex flex-1 items-center justify-center gap-1 rounded-md bg-neutral-900 px-3 py-2 text-sm text-white hover:bg-neutral-700";
+  "flex flex-1 items-center justify-center gap-1 rounded-md bg-brand px-3 py-2 text-sm text-white hover:bg-neutral-700";
 const SECONDARY_BTN =
-  "flex flex-1 items-center justify-center gap-1 rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100";
+  "flex flex-1 items-center justify-center gap-1 rounded-md border border-line-strong px-3 py-2 text-sm text-ink hover:bg-canvas";
 
 /** 专注页的番茄钟面板：任务选择 → 专注/休息循环 → 结果。 */
 export default function PomodoroPanel() {
@@ -121,15 +121,15 @@ export default function PomodoroPanel() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-2xl rounded-md border border-neutral-200 bg-white p-8">
+    <div className="focus-glow mx-auto w-full max-w-2xl rounded-md border border-line p-8">
       {/* 阶段 + 任务 */}
       <div className="mb-4">
-        <div className="text-xs text-neutral-500">{isBreak ? "休息" : "专注任务"}</div>
+        <div className="text-xs text-ink-2">{isBreak ? "休息" : "专注任务"}</div>
         {snapshot.state === "IDLE" && !isBreak ? (
           <select
             value={selectedId}
             onChange={(e) => setSelectedId(e.target.value)}
-            className="mt-1 w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+            className="mt-1 w-full rounded-md border border-line-strong px-2 py-1.5 text-sm"
           >
             <option value="">请选择任务</option>
             {selectableTasks.map((t) => (
@@ -139,7 +139,7 @@ export default function PomodoroPanel() {
             ))}
           </select>
         ) : (
-          <div className="mt-1 truncate text-base font-medium text-neutral-900">
+          <div className="mt-1 truncate text-base font-medium text-ink">
             {isBreak
               ? phase === "long_break"
                 ? "长休息"
@@ -151,9 +151,9 @@ export default function PomodoroPanel() {
 
       {/* 开始前的时长与番茄目标设置（仅 IDLE 专注阶段显示；写入与 Settings 同一数据源） */}
       {snapshot.state === "IDLE" && !isBreak && (
-        <div className="mb-4 space-y-2 rounded-md bg-neutral-50 p-3">
+        <div className="mb-4 space-y-2 rounded-md bg-raised p-3">
           <div className="flex items-center gap-3 text-sm">
-            <span className="w-14 shrink-0 text-neutral-500">专注时长</span>
+            <span className="w-14 shrink-0 text-ink-2">专注时长</span>
             <input
               type="range"
               min={15}
@@ -183,7 +183,7 @@ export default function PomodoroPanel() {
                 onKeyDown={handleDurationKey}
                 onBlur={() => setEditingDuration(false)}
                 aria-label="专注时长分钟数"
-                className="w-16 shrink-0 rounded-md border border-neutral-300 px-1.5 py-0.5 text-right text-sm"
+                className="w-16 shrink-0 rounded-md border border-line-strong px-1.5 py-0.5 text-right text-sm"
               />
             ) : (
               <button
@@ -192,7 +192,7 @@ export default function PomodoroPanel() {
                   setEditingDuration(true);
                 }}
                 title="点击输入分钟数（Enter 确认，ESC 取消）"
-                className="w-16 shrink-0 rounded-md border border-neutral-200 px-1.5 py-0.5 text-sm tabular-nums text-neutral-900 hover:bg-neutral-100"
+                className="w-16 shrink-0 rounded-md border border-line px-1.5 py-0.5 text-sm tabular-nums text-ink hover:bg-canvas"
               >
                 {sliderValue} 分钟
               </button>
@@ -200,7 +200,7 @@ export default function PomodoroPanel() {
           </div>
 
           <div className="flex items-center gap-3 text-sm">
-            <span className="w-14 shrink-0 text-neutral-500">番茄目标</span>
+            <span className="w-14 shrink-0 text-ink-2">番茄目标</span>
             <div className="flex items-center gap-1" aria-label="番茄目标">
               {Array.from({ length: focusCountGoal }).map((_, i) => (
                 <span key={i} className="h-2.5 w-2.5 rounded-full bg-red-300" />
@@ -209,18 +209,18 @@ export default function PomodoroPanel() {
             <button
               onClick={() => setFocusCountGoal(focusCountGoal - 1)}
               aria-label="减少番茄目标"
-              className="flex h-6 w-6 items-center justify-center rounded-md border border-neutral-300 text-neutral-700 transition-colors hover:bg-neutral-100"
+              className="flex h-6 w-6 items-center justify-center rounded-md border border-line-strong text-ink transition-colors hover:bg-canvas"
             >
               −
             </button>
             <button
               onClick={() => setFocusCountGoal(focusCountGoal + 1)}
               aria-label="增加番茄目标"
-              className="flex h-6 w-6 items-center justify-center rounded-md border border-neutral-300 text-neutral-700 transition-colors hover:bg-neutral-100"
+              className="flex h-6 w-6 items-center justify-center rounded-md border border-line-strong text-ink transition-colors hover:bg-canvas"
             >
               ＋
             </button>
-            <span className="text-xs text-neutral-400">目标 {focusCountGoal} 个</span>
+            <span className="text-xs text-ink-3">目标 {focusCountGoal} 个</span>
           </div>
         </div>
       )}
@@ -229,7 +229,7 @@ export default function PomodoroPanel() {
       {showResult ? (
         isBreak ? (
           <div className="space-y-4">
-            <div className="flex items-center gap-2 text-green-700">
+            <div className="flex items-center gap-2 text-success">
               <CheckCircle2 size={20} />
               <span className="text-lg font-semibold">休息结束</span>
             </div>
@@ -241,7 +241,7 @@ export default function PomodoroPanel() {
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="flex items-center gap-2 text-green-700">
+            <div className="flex items-center gap-2 text-success">
               <CheckCircle2 size={20} />
               <span className="text-lg font-semibold">
                 {completed ? "专注完成" : "专注结束"}
@@ -249,14 +249,14 @@ export default function PomodoroPanel() {
             </div>
             <dl className="space-y-1 text-sm">
               <div className="flex justify-between">
-                <dt className="text-neutral-500">本次专注</dt>
-                <dd className="font-medium text-neutral-900">
+                <dt className="text-ink-2">本次专注</dt>
+                <dd className="font-medium text-ink">
                   {formatDuration(Math.round(snapshot.elapsedMs / 1000)) || "0分钟"}
                 </dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-neutral-500">任务</dt>
-                <dd className="max-w-[16rem] truncate text-neutral-900">
+                <dt className="text-ink-2">任务</dt>
+                <dd className="max-w-[16rem] truncate text-ink">
                   {task?.title ?? restoredTaskTitle ?? "未选择任务"}
                 </dd>
               </div>
@@ -281,22 +281,22 @@ export default function PomodoroPanel() {
         <>
           {/* 剩余时间 + 进度 + 状态 */}
           <div className="mb-2 text-center">
-            <div className="text-7xl font-semibold tabular-nums text-neutral-900">
+            <div className="text-7xl font-semibold tabular-nums text-ink">
               {/* 未开始时跟随滑块实时显示；运行/暂停/休息用真实剩余时间 */}
               {formatTimer(idle ? sliderValue * 60_000 : snapshot.remainingMs)}
             </div>
-            <div className="mt-1 text-sm text-neutral-500">
+            <div className="mt-1 text-sm text-ink-2">
               {stateLabel(snapshot.state, phase)}
             </div>
           </div>
 
-          <div className="mb-1 h-2 overflow-hidden rounded-full bg-neutral-200">
+          <div className="mb-1 h-2 overflow-hidden rounded-full bg-raised-2">
             <div
-              className="h-full bg-neutral-900"
+              className="h-full bg-brand"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
-          <div className="mb-4 flex items-center justify-between text-xs text-neutral-500">
+          <div className="mb-4 flex items-center justify-between text-xs text-ink-2">
             <span>进度 {progressPercent}%</span>
             <span>
               本轮 {completedFocusCount} / {focusCountGoal} 个番茄
@@ -309,7 +309,7 @@ export default function PomodoroPanel() {
               <button
                 disabled={!selectedId || selectableTasks.length === 0}
                 onClick={handleStart}
-                className="flex flex-1 items-center justify-center gap-1 rounded-md bg-neutral-900 px-3 py-2 text-sm text-white hover:bg-neutral-700 disabled:cursor-not-allowed disabled:bg-neutral-300"
+                className="flex flex-1 items-center justify-center gap-1 rounded-md bg-brand px-3 py-2 text-sm text-white hover:bg-neutral-700 disabled:cursor-not-allowed disabled:bg-line"
               >
                 <Play size={14} /> 开始（{sliderValue} 分钟）
               </button>
@@ -331,7 +331,7 @@ export default function PomodoroPanel() {
                     <button
                       onClick={abandonFocus}
                       title="放弃本次专注并返回重新选择任务（不记录）"
-                      className="rounded-md px-2 py-1.5 text-xs text-neutral-500 transition-colors hover:bg-neutral-100"
+                      className="rounded-md px-2 py-1.5 text-xs text-ink-2 transition-colors hover:bg-canvas"
                     >
                       重新选择
                     </button>
@@ -356,7 +356,7 @@ export default function PomodoroPanel() {
                     <button
                       onClick={abandonFocus}
                       title="放弃本次专注并返回重新选择任务（不记录）"
-                      className="rounded-md px-2 py-1.5 text-xs text-neutral-500 transition-colors hover:bg-neutral-100"
+                      className="rounded-md px-2 py-1.5 text-xs text-ink-2 transition-colors hover:bg-canvas"
                     >
                       重新选择
                     </button>
@@ -367,7 +367,7 @@ export default function PomodoroPanel() {
           </div>
 
           {snapshot.state === "IDLE" && !isBreak && selectableTasks.length === 0 && (
-            <p className="mt-3 text-xs text-neutral-400">
+            <p className="mt-3 text-xs text-ink-3">
               今日暂无待办任务，请先到「今日」页创建任务。
             </p>
           )}

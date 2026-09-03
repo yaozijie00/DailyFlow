@@ -73,12 +73,12 @@ export default function DayPlanWarnings() {
   return (
     <div className="space-y-2">
       {conflicts.length > 0 && (
-        <div className="rounded-md border border-red-200 bg-red-50/80 p-3 text-sm text-red-700">
+        <div className="rounded-md border border-error/40 bg-error/10/80 p-3 text-sm text-error">
           <div className="mb-1 flex items-center gap-1.5 font-medium">
             <AlertTriangle size={14} />
             时间冲突（{conflicts.length} 处）——拖动时间块可调整
           </div>
-          <ul className="space-y-0.5 text-xs text-red-600/90">
+          <ul className="space-y-0.5 text-xs text-error/90">
             {conflicts.slice(0, 4).map((c, i) => (
               <li key={i}>
                 「{c.a.title}」与「{c.b.title}」时间段重叠
@@ -90,7 +90,7 @@ export default function DayPlanWarnings() {
       )}
 
       {overload > 0 && (
-        <div className="rounded-md border border-amber-200 bg-amber-50/80 p-3 text-sm text-amber-800">
+        <div className="rounded-md border border-warn/40 bg-warn/10 p-3 text-sm text-warn">
           <div className="mb-1 flex items-center gap-1.5 font-medium">
             <CalendarClock size={14} />
             今日计划共 {formatDurationCompact(totalPlanMinutes * 60)}，超出建议容量{" "}
@@ -108,7 +108,7 @@ export default function DayPlanWarnings() {
               .map((t) => (
                 <div
                   key={t.id}
-                  className="flex items-center gap-2 text-xs text-amber-700/90"
+                  className="flex items-center gap-2 text-xs text-warn/90"
                 >
                   <span className="min-w-0 flex-1 truncate">{t.title}</span>
                   <span className="shrink-0 tabular-nums">
@@ -116,7 +116,7 @@ export default function DayPlanWarnings() {
                   </span>
                   <button
                     onClick={() => void updateTask(t.id, { scheduledDate: tomorrowKey() })}
-                    className="shrink-0 rounded border border-amber-300 px-1.5 py-0.5 hover:bg-amber-100"
+                    className="shrink-0 rounded border border-warn/50 px-1.5 py-0.5 hover:bg-warn/20"
                   >
                     移到明天
                   </button>

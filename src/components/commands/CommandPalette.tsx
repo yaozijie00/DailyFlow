@@ -165,9 +165,9 @@ export default function CommandPalette() {
       <span
         className={`h-2 w-2 rounded-full ${
           t.status === "COMPLETED"
-            ? "bg-green-500"
+            ? "bg-success/100"
             : t.status === "CANCELLED"
-              ? "bg-neutral-300"
+              ? "bg-line"
               : "bg-neutral-800"
         }`}
       />
@@ -195,7 +195,7 @@ export default function CommandPalette() {
     id: `note-${n.id}`,
     title: n.title,
     sub: `便签 · ${n.status === "arranged" ? "已安排" : "未安排"}`,
-    icon: <StickyNote size={15} className="text-amber-500" />,
+    icon: <StickyNote size={15} className="text-warn" />,
     run: () => {
       app.setPage("today");
     },
@@ -232,11 +232,11 @@ export default function CommandPalette() {
       onClick={close}
     >
       <div
-        className="w-[500px] max-w-[92vw] overflow-hidden rounded-lg bg-white shadow-xl"
+        className="w-[500px] max-w-[92vw] overflow-hidden rounded-lg bg-surface shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-2 border-b border-neutral-100 px-3">
-          <Search size={15} className="shrink-0 text-neutral-400" />
+        <div className="flex items-center gap-2 border-b border-line-soft px-3">
+          <Search size={15} className="shrink-0 text-ink-3" />
           <input
             ref={inputRef}
             value={q}
@@ -246,9 +246,9 @@ export default function CommandPalette() {
             }}
             onKeyDown={onInputKeyDown}
             placeholder="跳转页面、新建任务，或搜索 任务/目标/便签…"
-            className="w-full bg-transparent py-3 text-sm text-neutral-900 outline-none placeholder:text-neutral-400"
+            className="w-full bg-transparent py-3 text-sm text-ink outline-none placeholder:text-ink-3"
           />
-          <span className="shrink-0 rounded border border-neutral-200 px-1 text-[10px] text-neutral-400">
+          <span className="shrink-0 rounded border border-line px-1 text-[10px] text-ink-3">
             Esc
           </span>
         </div>
@@ -264,28 +264,28 @@ export default function CommandPalette() {
                 close();
               }}
               className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-sm ${
-                active === i ? "bg-neutral-100" : ""
+                active === i ? "bg-canvas" : ""
               }`}
             >
-              <span className="shrink-0 text-neutral-500">{entry.icon}</span>
+              <span className="shrink-0 text-ink-2">{entry.icon}</span>
               <span
-                className={`min-w-0 flex-1 truncate ${entry.muted ? "text-neutral-400" : "text-neutral-800"}`}
+                className={`min-w-0 flex-1 truncate ${entry.muted ? "text-ink-3" : "text-ink"}`}
               >
                 {entry.title}
               </span>
               {entry.sub && (
-                <span className="shrink-0 text-xs text-neutral-400">{entry.sub}</span>
+                <span className="shrink-0 text-xs text-ink-3">{entry.sub}</span>
               )}
             </button>
           ))}
           {q.trim() !== "" && total === 0 && (
-            <div className="px-3 py-4 text-center text-xs text-neutral-400">
+            <div className="px-3 py-4 text-center text-xs text-ink-3">
               没有匹配的结果
             </div>
           )}
         </div>
 
-        <div className="flex items-center gap-3 border-t border-neutral-100 px-3 py-1.5 text-[10px] text-neutral-400">
+        <div className="flex items-center gap-3 border-t border-line-soft px-3 py-1.5 text-[10px] text-ink-3">
           <span>↑↓ 选择</span>
           <span>Enter 打开</span>
           <span>Esc 关闭</span>

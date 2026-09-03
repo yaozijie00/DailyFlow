@@ -25,12 +25,12 @@ export default function QuickAddTask() {
             if (e.key === "Enter") void submit();
           }}
           placeholder="快速添加任务，回车创建"
-          className="w-full rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+          className="w-full rounded-md border border-line-strong px-2 py-1.5 text-sm"
         />
         <button
           onClick={() => void submit()}
           disabled={!canSubmit}
-          className="flex shrink-0 items-center justify-center rounded-md bg-neutral-900 px-2 py-1.5 text-sm text-white hover:bg-neutral-700 disabled:bg-neutral-300"
+          className="flex shrink-0 items-center justify-center rounded-md bg-brand px-2 py-1.5 text-sm text-white hover:bg-neutral-700 disabled:bg-line"
           aria-label="添加任务"
         >
           <Plus size={14} />

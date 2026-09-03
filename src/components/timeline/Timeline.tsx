@@ -541,21 +541,21 @@ export default function Timeline() {
   return (
     <div ref={scrollRef} className="h-full overflow-auto">
       {/* 缩放控制（sticky 固定顶部，滚动时保持可见） */}
-      <div className="sticky top-0 z-40 flex items-center justify-end gap-1 border-b border-neutral-100 bg-white/95 px-2 py-1">
-        <span className="text-xs text-neutral-400">缩放</span>
+      <div className="sticky top-0 z-40 flex items-center justify-end gap-1 border-b border-line-soft bg-surface/95 px-2 py-1">
+        <span className="text-xs text-ink-3">缩放</span>
         <button
           onClick={() => zoom(-1)}
-          className="rounded border border-neutral-200 px-1.5 text-xs text-neutral-500 hover:bg-neutral-100"
+          className="rounded border border-line px-1.5 text-xs text-ink-2 hover:bg-canvas"
           aria-label="缩小时间轴"
         >
           −
         </button>
-        <span className="w-8 text-center text-xs tabular-nums text-neutral-600">
+        <span className="w-8 text-center text-xs tabular-nums text-ink-2">
           {pxPerMinute.toFixed(1)}
         </span>
         <button
           onClick={() => zoom(1)}
-          className="rounded border border-neutral-200 px-1.5 text-xs text-neutral-500 hover:bg-neutral-100"
+          className="rounded border border-line px-1.5 text-xs text-ink-2 hover:bg-canvas"
           aria-label="放大时间轴"
         >
           ＋
@@ -567,12 +567,12 @@ export default function Timeline() {
         style={{ height: totalHeight, minWidth: Math.max(maxLaneCount * MIN_LANE_WIDTH, 0) }}
       >
         {/* 左侧时间刻度（sticky 固定左侧，不随横向滚动移走） */}
-        <div className="sticky left-0 z-10 w-14 shrink-0 bg-white">
+        <div className="sticky left-0 z-10 w-14 shrink-0 bg-surface">
           {/* 非整点 15 分钟刻度线（浅色，辅助判断非整点时刻） */}
           {quarterTicks.map((m) => (
             <div
               key={m}
-              className="absolute right-0 h-2 w-3 border-t border-neutral-300/80"
+              className="absolute right-0 h-2 w-3 border-t border-line-strong/80"
               style={{ top: minutesToY(m, pxPerMinute) }}
             />
           ))}
@@ -580,7 +580,7 @@ export default function Timeline() {
           {hours.map((m) => (
             <span
               key={m}
-              className="absolute right-2 -translate-y-1/2 text-xs font-medium tabular-nums text-neutral-500"
+              className="absolute right-2 -translate-y-1/2 text-xs font-medium tabular-nums text-ink-2"
               style={{ top: minutesToY(m, pxPerMinute) }}
             >
               {formatMinutes(m)}
@@ -597,11 +597,11 @@ export default function Timeline() {
         >
             {/* 范围外灰色（早于开始 / 晚于结束） */}
             <div
-              className="pointer-events-none absolute left-0 right-0 bg-neutral-100/70"
+              className="pointer-events-none absolute left-0 right-0 bg-canvas/70"
               style={{ top: 0, height: minutesToY(effStart, pxPerMinute) }}
             />
             <div
-              className="pointer-events-none absolute left-0 right-0 bg-neutral-100/70"
+              className="pointer-events-none absolute left-0 right-0 bg-canvas/70"
               style={{
                 top: minutesToY(effEnd, pxPerMinute),
                 height: totalHeight - minutesToY(effEnd, pxPerMinute),
@@ -612,7 +612,7 @@ export default function Timeline() {
             {minorTicks.map((m) => (
               <div
                 key={m}
-                className="absolute left-0 right-0 border-t border-neutral-100"
+                className="absolute left-0 right-0 border-t border-line-soft"
                 style={{ top: minutesToY(m, pxPerMinute) }}
               />
             ))}
@@ -621,7 +621,7 @@ export default function Timeline() {
             {hours.map((m) => (
               <div
                 key={m}
-                className="absolute left-0 right-0 border-t border-neutral-200"
+                className="absolute left-0 right-0 border-t border-line"
                 style={{ top: minutesToY(m, pxPerMinute) }}
               />
             ))}
@@ -706,15 +706,15 @@ export default function Timeline() {
                     isRemoving
                       ? "bg-red-200 text-red-900 ring-2 ring-red-500"
                       : state === "running"
-                        ? "text-neutral-900 ring-2 ring-blue-400/80"
+                        ? "text-ink ring-2 ring-blue-400/80"
                         : state === "completed"
-                          ? "text-neutral-900/80 opacity-75"
+                          ? "text-ink/80 opacity-75"
                           : state === "cancelled"
                             ? "opacity-40"
-                            : "text-neutral-900 hover:brightness-95"
+                            : "text-ink hover:brightness-95"
                   } ${
                     selected
-                      ? "z-10 ring-2 ring-neutral-900/40"
+                      ? "z-10 ring-2 ring-brand/40"
                       : ""
                   } ${laneStyle ? "" : "left-1 right-1"}`}
                   style={{
@@ -743,7 +743,7 @@ export default function Timeline() {
                         <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-blue-500" />
                       )}
                       {state === "completed" && (
-                        <span className="shrink-0 text-[10px] font-medium text-green-600">✓</span>
+                        <span className="shrink-0 text-[10px] font-medium text-success">✓</span>
                       )}
                       <span
                         className={`truncate ${
@@ -756,7 +756,7 @@ export default function Timeline() {
                       </span>
                       <span
                         onMouseDown={(e) => startTaskToNoteDrag(e, task.id)}
-                        className="ml-auto shrink-0 cursor-grab text-neutral-400 opacity-0 transition-opacity hover:text-amber-600 group-hover:opacity-100"
+                        className="ml-auto shrink-0 cursor-grab text-ink-3 opacity-0 transition-opacity hover:text-warn group-hover:opacity-100"
                         title="拖到便签区转为便签"
                         aria-label="转为便签"
                       >
@@ -765,13 +765,13 @@ export default function Timeline() {
                     </div>
                     {/* 时间行（块够高时显示开始-结束） */}
                     {info.showTime && (
-                      <div className="mt-0.5 truncate text-[10px] leading-tight tabular-nums text-neutral-600">
+                      <div className="mt-0.5 truncate text-[10px] leading-tight tabular-nums text-ink-2">
                         {formatTimeRange(startMs, endMs)}
                       </div>
                     )}
                     {/* 描述行（块足够高且有备注时显示） */}
                     {info.showNotes && task.notes && (
-                      <div className="mt-0.5 truncate text-[10px] leading-tight text-neutral-500">
+                      <div className="mt-0.5 truncate text-[10px] leading-tight text-ink-2">
                         {task.notes}
                       </div>
                     )}
@@ -792,7 +792,7 @@ export default function Timeline() {
                   )}
                   {/* 拖出提示（松开将移出时间轴，任务保留） */}
                   {isRemoving && (
-                    <span className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded bg-red-500 px-1 text-[10px] font-medium text-white">
+                    <span className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded bg-error/100 px-1 text-[10px] font-medium text-white">
                       松开移出时间轴
                     </span>
                   )}
@@ -849,7 +849,7 @@ export default function Timeline() {
                       right: "0.25rem",
                     }}
                   >
-                    <span className="absolute left-0 -translate-y-full whitespace-nowrap bg-amber-500 px-1 text-[10px] text-white">
+                    <span className="absolute left-0 -translate-y-full whitespace-nowrap bg-warn/100 px-1 text-[10px] text-white">
                       {notePreview.title ?? "便签"} ·{" "}
                       {formatTimeRange(notePreview.startMs, notePreview.endMs)}
                     </span>
@@ -880,7 +880,7 @@ export default function Timeline() {
                 className="pointer-events-none absolute left-0 right-0 z-10 border-t-2 border-red-400/70"
                 style={{ top: timeToY(now, pxPerMinute) }}
               >
-                <span className="absolute left-0 -translate-y-full rounded-sm bg-red-500/90 px-1 text-[10px] font-medium text-white">
+                <span className="absolute left-0 -translate-y-full rounded-sm bg-error/100/90 px-1 text-[10px] font-medium text-white">
                   {nowLabel}
                 </span>
               </div>
@@ -888,7 +888,7 @@ export default function Timeline() {
 
             {/* 该时段重叠过多提示 */}
             {maxLaneCount > 6 && (
-              <div className="pointer-events-none absolute left-1/2 top-1 z-30 -translate-x-1/2 rounded bg-amber-100 px-2 py-0.5 text-[10px] text-amber-800">
+              <div className="pointer-events-none absolute left-1/2 top-1 z-30 -translate-x-1/2 rounded bg-warn/20 px-2 py-0.5 text-[10px] text-warn">
                 该时段重叠过多
               </div>
             )}

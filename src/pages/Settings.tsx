@@ -45,8 +45,8 @@ export default function Settings() {
             onClick={() => setTab(t.id)}
             className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
               tab === t.id
-                ? "bg-neutral-900 text-white"
-                : "text-neutral-600 hover:bg-neutral-100"
+                ? "bg-brand text-white"
+                : "text-ink-2 hover:bg-canvas"
             }`}
           >
             {t.label}

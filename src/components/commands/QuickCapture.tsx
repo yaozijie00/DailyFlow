@@ -79,11 +79,11 @@ export default function QuickCapture() {
       onClick={close}
     >
       <div
-        className="w-[560px] max-w-[92vw] overflow-hidden rounded-lg bg-white shadow-xl"
+        className="w-[560px] max-w-[92vw] overflow-hidden rounded-lg bg-surface shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-2 border-b border-neutral-100 px-3">
-          <Zap size={15} className="shrink-0 text-amber-500" />
+        <div className="flex items-center gap-2 border-b border-line-soft px-3">
+          <Zap size={15} className="shrink-0 text-warn" />
           <input
             ref={inputRef}
             value={q}
@@ -92,17 +92,17 @@ export default function QuickCapture() {
               if (e.key === "Enter") void submit();
             }}
             placeholder="快速捕获：明天 14:00 1.5h #开发 写设计文档（回车创建）"
-            className="w-full bg-transparent py-3 text-sm text-neutral-900 outline-none placeholder:text-neutral-400"
+            className="w-full bg-transparent py-3 text-sm text-ink outline-none placeholder:text-ink-3"
           />
-          <span className="shrink-0 rounded border border-neutral-200 px-1 text-[10px] text-neutral-400">
+          <span className="shrink-0 rounded border border-line px-1 text-[10px] text-ink-3">
             Esc
           </span>
         </div>
 
-        <div className="min-h-11 px-3 py-2 text-xs text-neutral-500">
+        <div className="min-h-11 px-3 py-2 text-xs text-ink-2">
           {parsed ? (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span className="flex items-center gap-1 text-amber-700">
+              <span className="flex items-center gap-1 text-warn">
                 <CalendarDays size={12} />
                 {parsed.scheduledDate === todayString()
                   ? "今天"
@@ -117,11 +117,11 @@ export default function QuickCapture() {
               {parsed.estimatedDuration != null && (
                 <span>{Math.round(parsed.estimatedDuration / 60)} 分钟</span>
               )}
-              {catName && <span className="text-neutral-600">#{catName}</span>}
-              <span className="font-medium text-neutral-800">{parsed.title}</span>
+              {catName && <span className="text-ink-2">#{catName}</span>}
+              <span className="font-medium text-ink">{parsed.title}</span>
             </div>
           ) : (
-            <span className="text-neutral-400">
+            <span className="text-ink-3">
               例：明天 14:00 1.5h #开发 写设计文档 · 支持 今天/周X/MM-DD/9月28日
             </span>
           )}
