@@ -42,7 +42,12 @@ export default function PomodoroPanel() {
   const pomodoroDurationMinutes = useSettingsStore(
     (s) => s.settings.pomodoroDurationMinutes,
   );
-  const updateSettings = useSettingsStore((s) => s.update);
+  const shortBreakMinutes = useSettingsStore((s) => s.settings.shortBreakMinutes);
+  const focusMinutesOverride = usePomodoroStore((s) => s.focusMinutesOverride);
+  const breakMinutesOverride = usePomodoroStore((s) => s.breakMinutesOverride);
+  const setFocusMinutesOverride = usePomodoroStore((s) => s.setFocusMinutesOverride);
+  const setBreakMinutesOverride = usePomodoroStore((s) => s.setBreakMinutesOverride);
+  const clearFocusOverrides = usePomodoroStore((s) => s.clearFocusOverrides);
   const focusCountGoal = usePomodoroStore((s) => s.focusCountGoal);
   const setFocusCountGoal = usePomodoroStore((s) => s.setFocusCountGoal);
   const pendingTaskId = usePomodoroStore((s) => s.pendingTaskId);
@@ -51,8 +56,10 @@ export default function PomodoroPanel() {
   const [selectedId, setSelectedId] = useState("");
   const [editingDuration, setEditingDuration] = useState(false);
   const [durationDraft, setDurationDraft] = useState("");
-  /** 滑块本地实时值（拖动时立即反映数字，松手才写入设置） */
   const [sliderValue, setSliderValue] = useState(pomodoroDurationMinutes);
+
+  /** 本次实际休息（覆盖优先，其次 Settings 默认） */
+  const effectiveBreak = breakMinutesOverride ?? shortBreakMinutes;
 
   // 双击时间轴任务预选：回到 IDLE 时自动选中（时长由用户自选，不自动推算）
   useEffect(() => {
@@ -62,16 +69,16 @@ export default function PomodoroPanel() {
     }
   }, [snapshot.state, pendingTaskId, setPendingTaskId]);
 
-  // 设置变更（Settings 页/数字输入）后同步滑块本地值
+  // 设置默认值或本次覆盖变化后同步滑块本地值（本次覆盖优先）
   useEffect(() => {
-    setSliderValue(pomodoroDurationMinutes);
-  }, [pomodoroDurationMinutes]);
+    setSliderValue(focusMinutesOverride ?? pomodoroDurationMinutes);
+  }, [focusMinutesOverride, pomodoroDurationMinutes]);
 
-  /** 数字输入确认：非法值（非数字 / 越界 15-120）不保存，保持原设置。 */
+  /** 数字输入确认：非法值（非数字 / 越界 15-120）不保存，仅作为「本次」覆盖。 */
   function commitDuration() {
     const n = parseDurationMinutes(durationDraft);
     if (n != null) {
-      void updateSettings({ pomodoroDurationMinutes: n });
+      setFocusMinutesOverride(n);
     }
     setEditingDuration(false);
   }
@@ -149,7 +156,7 @@ export default function PomodoroPanel() {
         )}
       </div>
 
-      {/* 开始前的时长与番茄目标设置（仅 IDLE 专注阶段显示；写入与 Settings 同一数据源） */}
+      {/* 开始前的本次参数（仅 IDLE 专注阶段显示；只作用于本次，不写回 Settings 默认值） */}
       {snapshot.state === "IDLE" && !isBreak && (
         <div className="mb-4 space-y-2 rounded-md bg-neutral-50 p-3">
           <div className="flex items-center gap-3 text-sm">
@@ -162,11 +169,11 @@ export default function PomodoroPanel() {
               value={sliderValue}
               onChange={(e) => setSliderValue(Number(e.target.value))}
               onPointerUp={(e) =>
-                void updateSettings({ pomodoroDurationMinutes: Number(e.currentTarget.value) })
+                setFocusMinutesOverride(Number(e.currentTarget.value))
               }
               onKeyUp={(e) => {
                 if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
-                  void updateSettings({ pomodoroDurationMinutes: Number(e.currentTarget.value) });
+                  setFocusMinutesOverride(Number(e.currentTarget.value));
                 }
               }}
               aria-label="专注时长滑块"
@@ -222,6 +229,37 @@ export default function PomodoroPanel() {
             </button>
             <span className="text-xs text-neutral-400">目标 {focusCountGoal} 个</span>
           </div>
+
+          {/* 本次休息时长（±5 分钟） */}
+          <div className="flex items-center gap-3 text-sm">
+            <span className="w-14 shrink-0 text-neutral-500">休息时长</span>
+            <button
+              onClick={() => setBreakMinutesOverride(Math.max(1, effectiveBreak - 5))}
+              aria-label="减少休息时长"
+              className="flex h-6 w-6 items-center justify-center rounded-md border border-neutral-300 text-neutral-700 transition-colors hover:bg-neutral-100"
+            >
+              −
+            </button>
+            <span className="w-10 text-center tabular-nums text-neutral-900">
+              {effectiveBreak} 分
+            </span>
+            <button
+              onClick={() => setBreakMinutesOverride(Math.min(60, effectiveBreak + 5))}
+              aria-label="增加休息时长"
+              className="flex h-6 w-6 items-center justify-center rounded-md border border-neutral-300 text-neutral-700 transition-colors hover:bg-neutral-100"
+            >
+              ＋
+            </button>
+            <button
+              onClick={clearFocusOverrides}
+              className="ml-auto text-xs text-neutral-400 underline underline-offset-2 hover:text-neutral-600"
+            >
+              恢复默认
+            </button>
+          </div>
+          <p className="text-[11px] text-neutral-400">
+            以上只作用于本次专注；默认值在「设置 → 专注」中调整。
+          </p>
         </div>
       )}
 

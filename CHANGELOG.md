@@ -1,5 +1,29 @@
 # Changelog
 
+## DailyFlow 2.1.0
+
+### Features（2.0.x 产品优化：A Focus 双层参数 / B 设置·快捷键 / C 课程表 / D 成就 2.0 / 布局梳理）
+
+- A · Focus 双层参数：专注页开始前的时长/休息调整只作用于「本次」，不再回写全局默认；「恢复默认」一键还原；默认番茄目标改为 1 个（进入即可开始）
+- A · 本次循环计划随会话落库（迁移 0018：focus_sessions 新增 planned_break_minutes / planned_break_count / planned_pomodoro_count），统计可比对「计划 vs 实际」
+- B · 设置页标签重组：原「专注」页签并入新增「默认」Tab（默认执行参数：决定「我通常怎么专注」）；快捷键默认位调整：长期 Ctrl+3（新增动作）、统计 Ctrl+4、成就 Ctrl+5、设置 Ctrl+,
+- C · 课程表（迁移 0017 courses + weekly_slots、0019 tasks.course_id）：
+  - 长期页新增「课程表」：周一～周日周视图（08:00–22:00）+ 课程库；课程关联分类取色/标签；点格子添加 60 分钟安排
+  - 课程块可拖拽改星期与开始时间（15 分钟吸附），hover 调整时长 ±30 分/删除；课程与时段增删改全部接入 Undo
+  - 今日页「今日课程」：查看「今天」时按课程表列出应上课，一键「加入今日」生成带计划时间的课程任务（可撤销，删除课程时任务归属置空）
+  - 周进度汇总：每门课「本周已完成 / 应出时段」（getWeekProgress，周一～周日口径）
+- D · 成就 2.0：
+  - 新条件类型：task_streak_days（连续执行天数，允许 1 天空窗）、night_sessions（23:00 后完成的专注）、estimate_streak（连续「预计误差 ≤15%」的完成）、course_tasks_completed（累计完成课程任务）、undo_daily（当日撤销次数）
+  - 新增成就链：连续执行 3/7/14 天、课程链（第一堂课 / 累计 10 节）及夜间专注 / 计划准确 / 撤回大师等探索成就；成就定义按分类拆分 JSON，成就页新增分类页签（专注/任务/连续/复盘/课程/探索…）
+- 浅色布局梳理：导航选中态改为浅底 + 左侧指示条；统一 PageHeader / EmptyState 层级与间距；今日页左栏加宽（w-72）与统一间距；统计 / 设置页放宽一档（max-w 4xl / 3xl）
+
+### Technical
+
+- 迁移 0017 / 0018 / 0019（幂等；既有库自动补齐列）；Schema 同步 courses / weekly_slots / planned_* / course_id
+- lib/schedule.ts（周视图坐标换算）+ lib/courseToday.ts（当日应上课推导，含单测）；courseRepository / courseService / courseStore
+- achievementService：computeTaskStreak（宽限 1 天）/ computeEstimateStreak（含单测）；undoManager 每日撤销计数（todayUndoCount，跨日自动归零）
+- 测试 605/605 全绿；版本 2.1.0
+
 ## DailyFlow 2.0.0
 
 ### Features（v2.0 Complete：闭环收口）

@@ -21,6 +21,10 @@ export interface CreateFocusSessionInput {
   actualDuration?: number;
   endedAt?: number | null;
   completed?: boolean;
+  /** 本次循环计划（2.0.x 双层参数） */
+  plannedBreakMinutes?: number | null;
+  plannedBreakCount?: number | null;
+  plannedPomodoroCount?: number | null;
 }
 
 export type UpdateFocusSessionInput = Partial<CreateFocusSessionInput>;
@@ -40,6 +44,9 @@ export class FocusSessionRepository {
         endedAt: input.endedAt ?? null,
         completed: input.completed ?? false,
         createdAt: Date.now(),
+        plannedBreakMinutes: input.plannedBreakMinutes ?? null,
+        plannedBreakCount: input.plannedBreakCount ?? null,
+        plannedPomodoroCount: input.plannedPomodoroCount ?? null,
       })
       .returning()
       .all();

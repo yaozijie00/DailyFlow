@@ -334,7 +334,12 @@ describe("专注持久化（B2/B9）", () => {
   it("startFocus 调用 focus.start 并记录 sessionId", async () => {
     const { store, focus } = makeStore();
     store.getState().startFocus(7);
-    expect(focus.start).toHaveBeenCalledWith(7, 25 * 60); // 1500 秒
+    // 2.0.x：随 session 落库本次循环计划（休息/次数/番茄数）
+    expect(focus.start).toHaveBeenCalledWith(7, 25 * 60, {
+      breakMinutes: 5,
+      breakCount: 4,
+      pomodoroCount: 1,
+    }); // 1500 秒 + 计划
     await vi.waitFor(() => expect(store.getState().sessionId).toBe(1));
   });
 
@@ -443,9 +448,9 @@ describe("竞态守卫（B7：非法转换不再抛错）", () => {
 });
 
 describe("setFocusCountGoal（本轮番茄目标）", () => {
-  it("默认目标为 4，可增减", () => {
+  it("默认目标为 1（2.0.x：进入即可开始），可增减", () => {
     const { store } = makeStore();
-    expect(store.getState().focusCountGoal).toBe(4);
+    expect(store.getState().focusCountGoal).toBe(1);
     store.getState().setFocusCountGoal(6);
     expect(store.getState().focusCountGoal).toBe(6);
     store.getState().setFocusCountGoal(2);

@@ -31,6 +31,7 @@ const task: Task = {
   repeatRule: "",
   projectId: null,
   parentId: null,
+  courseId: null,
 };
 
 beforeEach(() => {
@@ -40,7 +41,9 @@ beforeEach(() => {
     taskId: null,
     phase: "focus",
     completedFocusCount: 0,
-    focusCountGoal: 4,
+    focusCountGoal: 1,
+    focusMinutesOverride: null,
+    breakMinutesOverride: null,
     taskTitle: null,
     showResult: false,
     snapshot: {
@@ -70,10 +73,10 @@ describe("PomodoroPanel 时长与番茄目标设置", () => {
     expect(screen.getByLabelText("番茄目标")).toBeTruthy();
     expect(screen.getByLabelText("减少番茄目标")).toBeTruthy();
     expect(screen.getByLabelText("增加番茄目标")).toBeTruthy();
-    expect(screen.getByText(/目标 4 个/)).toBeTruthy();
+    expect(screen.getByText(/目标 1 个/)).toBeTruthy();
   });
 
-  it("点击分钟数进入输入框，Enter 合法值更新设置（Settings 同源）", () => {
+  it("点击分钟数输入并 Enter：只写本次覆盖，不改 Settings 默认值", () => {
     const updateSpy = vi
       .spyOn(useSettingsStore.getState(), "update")
       .mockResolvedValue(undefined);
@@ -82,35 +85,31 @@ describe("PomodoroPanel 时长与番茄目标设置", () => {
     const input = screen.getByLabelText("专注时长分钟数") as HTMLInputElement;
     fireEvent.change(input, { target: { value: "45" } });
     fireEvent.keyDown(input, { key: "Enter" });
-    expect(updateSpy).toHaveBeenCalledWith({ pomodoroDurationMinutes: 45 });
+    expect(usePomodoroStore.getState().focusMinutesOverride).toBe(45); // 本次覆盖
+    expect(updateSpy).not.toHaveBeenCalled(); // 默认值未被污染
     // 输入框关闭，回到显示
     expect(screen.queryByLabelText("专注时长分钟数")).toBeNull();
+    expect(screen.getByText("45 分钟")).toBeTruthy();
   });
 
   it("Enter 非法值（越界 10）不保存，输入框关闭", () => {
-    const updateSpy = vi
-      .spyOn(useSettingsStore.getState(), "update")
-      .mockResolvedValue(undefined);
     render(<PomodoroPanel />);
     fireEvent.click(screen.getByText("25 分钟"));
     const input = screen.getByLabelText("专注时长分钟数") as HTMLInputElement;
     fireEvent.change(input, { target: { value: "10" } });
     fireEvent.keyDown(input, { key: "Enter" });
-    expect(updateSpy).not.toHaveBeenCalled();
+    expect(usePomodoroStore.getState().focusMinutesOverride).toBeNull();
     expect(screen.queryByLabelText("专注时长分钟数")).toBeNull();
     expect(screen.getByText("25 分钟")).toBeTruthy(); // 保持原值
   });
 
   it("Enter 非数字不保存", () => {
-    const updateSpy = vi
-      .spyOn(useSettingsStore.getState(), "update")
-      .mockResolvedValue(undefined);
     render(<PomodoroPanel />);
     fireEvent.click(screen.getByText("25 分钟"));
     const input = screen.getByLabelText("专注时长分钟数") as HTMLInputElement;
     fireEvent.change(input, { target: { value: "abc" } });
     fireEvent.keyDown(input, { key: "Enter" });
-    expect(updateSpy).not.toHaveBeenCalled();
+    expect(usePomodoroStore.getState().focusMinutesOverride).toBeNull();
   });
 
   it("ESC 取消编辑，不保存", () => {
@@ -129,10 +128,10 @@ describe("PomodoroPanel 时长与番茄目标设置", () => {
   it("增减番茄目标（夹取 1..12）", () => {
     render(<PomodoroPanel />);
     fireEvent.click(screen.getByLabelText("增加番茄目标"));
-    expect(usePomodoroStore.getState().focusCountGoal).toBe(5);
+    expect(usePomodoroStore.getState().focusCountGoal).toBe(2);
     fireEvent.click(screen.getByLabelText("减少番茄目标"));
     fireEvent.click(screen.getByLabelText("减少番茄目标"));
-    expect(usePomodoroStore.getState().focusCountGoal).toBe(3);
+    expect(usePomodoroStore.getState().focusCountGoal).toBe(1);
   });
 });
 

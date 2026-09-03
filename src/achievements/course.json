@@ -1,0 +1,28 @@
+[
+  {
+    "id": "course-first",
+    "name": "第一堂课",
+    "description": "完成第一节课程任务",
+    "icon": "BookOpen",
+    "category": "course",
+    "condition": { "type": "course_tasks_completed", "target": 1 },
+    "reward": null,
+    "hidden": false,
+    "enabled": true,
+    "chainId": "course-complete",
+    "order": 1
+  },
+  {
+    "id": "course-10",
+    "name": "课程达人",
+    "description": "累计完成 10 节课程任务",
+    "icon": "GraduationCap",
+    "category": "course",
+    "condition": { "type": "course_tasks_completed", "target": 10 },
+    "reward": null,
+    "hidden": false,
+    "enabled": true,
+    "chainId": "course-complete",
+    "order": 2
+  }
+]

@@ -93,6 +93,7 @@ export class UndoManager {
   async undo(): Promise<boolean> {
     const action = this.undoStack.pop();
     if (!action) return false;
+    bumpDailyUndo();
     this.applying = true;
     try {
       await action.undo();
@@ -171,6 +172,25 @@ export class UndoManager {
 }
 
 export const undoManager = new UndoManager();
+
+/* 每日撤销计数（行为探索成就「撤回大师」）：本地日期变化自动清零。 */
+let undoDateKey = "";
+let undoCount = 0;
+function bumpDailyUndo(): void {
+  const d = new Date();
+  const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  if (key !== undoDateKey) {
+    undoDateKey = key;
+    undoCount = 0;
+  }
+  undoCount += 1;
+}
+/** 今天已执行撤销次数（跨日自动归零）。 */
+export function todayUndoCount(): number {
+  const d = new Date();
+  const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  return key === undoDateKey ? undoCount : 0;
+}
 
 /**
  * 任务可撤销字段。排除派生/累计字段：

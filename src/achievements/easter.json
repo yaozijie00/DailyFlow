@@ -1,0 +1,15 @@
+[
+  {
+    "id": "undo-master",
+    "name": "撤回大师",
+    "description": "一天内使用 10 次撤销",
+    "icon": "Undo2",
+    "category": "explore",
+    "condition": { "type": "undo_daily", "target": 10 },
+    "reward": null,
+    "hidden": true,
+    "enabled": true,
+    "chainId": null,
+    "order": 0
+  }
+]

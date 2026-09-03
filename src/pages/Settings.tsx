@@ -13,20 +13,20 @@ import AboutSection from "../components/settings/AboutSection";
 type Tab =
   | "general"
   | "appearance"
+  | "defaults"
   | "categories"
   | "shortcuts"
   | "notifications"
-  | "pomodoro"
   | "data"
   | "about";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "general", label: "通用" },
   { id: "appearance", label: "外观" },
+  { id: "defaults", label: "默认" },
   { id: "categories", label: "分类" },
   { id: "shortcuts", label: "快捷键" },
   { id: "notifications", label: "通知" },
-  { id: "pomodoro", label: "专注" },
   { id: "data", label: "数据" },
   { id: "about", label: "关于" },
 ];
@@ -35,7 +35,7 @@ export default function Settings() {
   const [tab, setTab] = useState<Tab>("general");
 
   return (
-    <div className="mx-auto w-full max-w-2xl">
+    <div className="mx-auto w-full max-w-3xl">
       <PageHeader title="设置" description="修改后立即保存到本地数据库，重启后依然生效。" />
 
       <nav className="mb-4 flex flex-wrap gap-1">
@@ -56,10 +56,17 @@ export default function Settings() {
 
       {tab === "general" && <GeneralSection />}
       {tab === "appearance" && <AppearanceSection />}
+      {tab === "defaults" && (
+        <div className="space-y-4">
+          <p className="text-xs text-neutral-500">
+            默认执行参数：决定“我通常怎么专注”。专注页内的时长/休息调整只作用于本次，不回写这里的默认值。
+          </p>
+          <PomodoroSection />
+        </div>
+      )}
       {tab === "categories" && <CategoriesSection />}
       {tab === "shortcuts" && <ShortcutsSection />}
       {tab === "notifications" && <NotificationSection />}
-      {tab === "pomodoro" && <PomodoroSection />}
       {tab === "data" && (
         <div className="space-y-4">
           <StorageSection />

@@ -14,6 +14,7 @@ import Timeline from "../components/timeline/Timeline";
 import TodaySummary from "../components/today/TodaySummary";
 import TodayFestival from "../components/today/TodayFestival";
 import OverdueBanner from "../components/today/OverdueBanner";
+import TodayCourses from "../components/today/TodayCourses";
 import DayPlanWarnings from "../components/today/DayPlanWarnings";
 import NoteList from "../components/notes/NoteList";
 import CalendarPopover from "../components/today/CalendarPopover";
@@ -148,7 +149,7 @@ export default function Today() {
   }
 
   return (
-    <div className="flex h-full flex-col gap-4">
+    <div className="flex h-full flex-col gap-5">
       <PageHeader
         title={
           <CalendarPopover
@@ -183,14 +184,17 @@ export default function Today() {
         <TodaySummary />
       </div>
 
+      {/* 今日课程（课程表 → Today，仅查看「今天」时显示） */}
+      {selectedDate === todayString() && <TodayCourses />}
+
       {/* 今日计划警告：时间冲突 / 日程超载（含移明天快捷） */}
       <DayPlanWarnings />
 
       <div className="flex min-h-0 flex-1" ref={containerRef}>
         {/* 左：任务列表 + 便签（持久区域） */}
-        <aside className="flex w-64 shrink-0 flex-col pr-3">
+        <aside className="flex w-72 shrink-0 flex-col pr-4">
           <div className="min-h-0 flex-1 overflow-y-auto">
-            <div className="mb-2 flex items-center justify-between">
+            <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-medium text-neutral-600">今日任务</h2>
               <button
                 onClick={() => openCreate()}

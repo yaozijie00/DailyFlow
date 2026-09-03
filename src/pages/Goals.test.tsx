@@ -45,6 +45,30 @@ vi.mock("../stores/projectStore", () => ({
   ),
 }));
 
+const courseState = vi.hoisted(() => ({
+  courses: [] as { id: number; title: string }[],
+  slots: [] as unknown[],
+  loading: false,
+  load: vi.fn(),
+  createCourse: vi.fn(),
+  deleteCourse: vi.fn(),
+  addSlot: vi.fn(),
+  moveSlot: vi.fn(),
+  deleteSlot: vi.fn(),
+}));
+
+const courseServiceMock = vi.hoisted(() => ({
+  getWeekProgress: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock("../stores/courseStore", () => ({
+  useCourseStore: Object.assign(
+    (selector: (s: unknown) => unknown) => selector(courseState),
+    { getState: () => courseState },
+  ),
+  courseService: courseServiceMock,
+}));
+
 function makeGoal(overrides: Partial<GoalWithProgress> = {}): GoalWithProgress {
   return {
     id: 1,
@@ -81,6 +105,14 @@ describe("Goals 页面（长期月视图）", () => {
     projectState.load.mockClear();
     projectState.create.mockClear();
     projectState.remove.mockClear();
+    courseState.courses = [];
+    courseState.slots = [];
+    courseState.load.mockClear();
+    courseState.createCourse.mockClear();
+    courseState.deleteCourse.mockClear();
+    courseState.addSlot.mockClear();
+    courseState.moveSlot.mockClear();
+    courseState.deleteSlot.mockClear();
   });
 
   it("无目标时显示空状态（月历网格内置引导）", () => {

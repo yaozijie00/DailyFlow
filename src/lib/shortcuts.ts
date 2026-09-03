@@ -5,6 +5,7 @@ export type ShortcutAction =
   | "complete_task"
   | "open_today"
   | "open_focus"
+  | "open_goals"
   | "open_statistics"
   | "open_achievements"
   | "open_settings"
@@ -20,6 +21,7 @@ export const SHORTCUT_ACTIONS: ShortcutAction[] = [
   "complete_task",
   "open_today",
   "open_focus",
+  "open_goals",
   "open_statistics",
   "open_achievements",
   "open_settings",
@@ -34,6 +36,7 @@ export const SHORTCUT_ACTION_LABELS: Record<ShortcutAction, string> = {
   complete_task: "完成选中任务",
   open_today: "打开今日",
   open_focus: "打开专注",
+  open_goals: "打开长期",
   open_statistics: "打开统计",
   open_achievements: "打开成就",
   open_settings: "打开设置",
@@ -48,9 +51,10 @@ export const DEFAULT_SHORTCUTS: ShortcutMap = {
   complete_task: "Ctrl+Shift+Enter",
   open_today: "Ctrl+1",
   open_focus: "Ctrl+2",
-  open_statistics: "Ctrl+5",
-  open_achievements: "Ctrl+6",
-  open_settings: "Ctrl+4",
+  open_goals: "Ctrl+3",
+  open_statistics: "Ctrl+4",
+  open_achievements: "Ctrl+5",
+  open_settings: "Ctrl+,",
   undo: "Ctrl+Z",
   redo: "Ctrl+Shift+Z",
 };

@@ -48,6 +48,7 @@ const task: Task = {
   repeatRule: "",
   projectId: null,
   parentId: null,
+  courseId: null,
 };
 
 beforeEach(() => {

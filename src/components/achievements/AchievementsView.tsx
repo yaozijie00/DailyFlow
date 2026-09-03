@@ -18,6 +18,22 @@ const FILTERS: { key: AchievementFilter; label: string }[] = [
   { key: "hidden", label: "隐藏" },
 ];
 
+/** 成就分组中文名（2.0.x 分类页签；未命中回退原始 category）。 */
+const GROUP_LABELS: Record<string, string> = {
+  focus: "专注",
+  tasks: "任务",
+  continuity: "连续",
+  execution: "执行",
+  review: "复盘",
+  basic: "基础",
+  productivity: "生产力",
+  category: "彩蛋",
+  special: "特殊",
+  course: "课程",
+  plan: "计划",
+  explore: "探索",
+};
+
 function remainingText(a: AchievementProgressView): string {
   const left = Math.max(0, a.target - a.current);
   switch (a.unit) {
@@ -103,6 +119,7 @@ export default function AchievementsView() {
   const setFilter = useAchievementStore((s) => s.setFilter);
   const totals = useAchievementStore((s) => s.totals);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [group, setGroup] = useState("");
 
   useEffect(() => {
     if (dbStatus === "ready") {
@@ -111,7 +128,7 @@ export default function AchievementsView() {
   }, [dbStatus]);
 
   // 全部 = 全部可见项；已解锁/未解锁 = 按状态；隐藏 = 未解锁的隐藏成就（???）
-  const visible =
+  const statusVisible =
     filter === "all"
       ? items
       : filter === "unlocked"
@@ -119,6 +136,10 @@ export default function AchievementsView() {
         : filter === "locked"
           ? items.filter((i) => !i.unlocked)
           : items.filter((i) => !i.unlocked && i.hidden);
+  // 分组页签（2.0.x）：按成就分类过滤
+  const groups = Array.from(new Set(items.map((i) => i.category)))
+    .sort((a, b) => (GROUP_LABELS[a] ?? a).localeCompare(GROUP_LABELS[b] ?? b));
+  const visible = group === "" ? statusVisible : statusVisible.filter((i) => i.category === group);
   const selected = items.find((i) => i.id === selectedId) ?? null;
   const unlockPct = totals.total === 0 ? 0 : Math.round((totals.unlocked / totals.total) * 100);
 
@@ -161,6 +182,35 @@ export default function AchievementsView() {
           </button>
         ))}
       </div>
+
+      {/* 分组页签（2.0.x）：专注/任务/连续/复盘/彩蛋… */}
+      {groups.length > 1 && (
+        <div className="flex flex-wrap items-center gap-1">
+          <button
+            onClick={() => setGroup("")}
+            className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
+              group === ""
+                ? "border-neutral-900 bg-neutral-900 text-white"
+                : "border-neutral-200 text-neutral-600 hover:bg-neutral-100"
+            }`}
+          >
+            全部
+          </button>
+          {groups.map((g) => (
+            <button
+              key={g}
+              onClick={() => setGroup(group === g ? "" : g)}
+              className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
+                group === g
+                  ? "border-neutral-900 bg-neutral-900 text-white"
+                  : "border-neutral-200 text-neutral-600 hover:bg-neutral-100"
+              }`}
+            >
+              {GROUP_LABELS[g] ?? g}
+            </button>
+          ))}
+        </div>
+      )}
 
       {loading && items.length === 0 ? (
         <div className="text-sm text-neutral-400">加载中…</div>

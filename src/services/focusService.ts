@@ -25,14 +25,21 @@ export class FocusService {
     private readonly now: () => number = Date.now,
   ) {}
 
-  /** 开始专注：写入进行中会话（快照任务类别）并记录 active_focus。 */
-  async start(taskId: number, plannedDurationSeconds: number): Promise<FocusSession> {
+  /** 开始专注：写入进行中会话（快照任务类别 + 本次循环计划）并记录 active_focus。 */
+  async start(
+    taskId: number,
+    plannedDurationSeconds: number,
+    plan?: { breakMinutes?: number | null; breakCount?: number | null; pomodoroCount?: number | null },
+  ): Promise<FocusSession> {
     const task = await this.tasks.findById(taskId);
     const session = await this.sessions.create({
       taskId,
       categoryId: task?.categoryId ?? null,
       plannedDuration: plannedDurationSeconds,
       startedAt: this.now(),
+      plannedBreakMinutes: plan?.breakMinutes ?? null,
+      plannedBreakCount: plan?.breakCount ?? null,
+      plannedPomodoroCount: plan?.pomodoroCount ?? null,
     });
     await this.settings.set(
       ACTIVE_FOCUS_KEY,

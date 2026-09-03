@@ -38,6 +38,9 @@ export function dispatchShortcut(action: ShortcutAction): void {
     case "open_focus":
       app.setPage("focus");
       break;
+    case "open_goals":
+      app.setPage("goals");
+      break;
     case "open_statistics":
       useStatisticsStore.getState().setTab("statistics");
       app.setPage("statistics");

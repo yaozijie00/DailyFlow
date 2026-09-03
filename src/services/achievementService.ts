@@ -3,6 +3,7 @@ import { CategoryRepository } from "../db/repositories/categoryRepository";
 import { TaskRepository } from "../db/repositories/taskRepository";
 import { AchievementProgressRepository } from "../db/repositories/achievementProgressRepository";
 import { dateStringOf } from "../lib/date";
+import { todayUndoCount } from "../lib/undoManager";
 import {
   ConditionEngine,
   type AchievementContext,
@@ -38,6 +39,60 @@ export function computeStreakDays(
   while (completedDays.has(dateStringOf(cursor.getTime()))) {
     streak += 1;
     cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
+/**
+ * 连续执行天数（2.0.x）：每天 ≥1 个完成任务，允许 `grace` 天空窗不打断。
+ * 从今天起往回数有完成的天数；连续两天无完成则停止（宽限机制：鼓励稳定而非打卡压力）。
+ */
+export function computeTaskStreak(
+  taskDays: Set<string>,
+  today: string,
+  grace = 1,
+): number {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(today);
+  if (!m) return 0;
+  const cursor = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  let streak = 0;
+  let missing = 0;
+  let ended = false;
+  while (!ended) {
+    const key = dateStringOf(cursor.getTime());
+    if (taskDays.has(key)) {
+      streak += 1;
+      missing = 0;
+    } else {
+      missing += 1;
+      if (missing > grace) ended = true;
+    }
+    if (!ended) cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
+export interface EstimateSample {
+  estimatedSeconds: number;
+  actualSeconds: number;
+  completedAt: number | null;
+}
+
+/** 连续「预计误差 ≤ tolerance」的完成次数（计划准确性；按完成时间倒序数）。 */
+export function computeEstimateStreak(
+  tasks: EstimateSample[],
+  tolerance = 0.15,
+): number {
+  const sorted = tasks
+    .filter((t) => t.estimatedSeconds > 0 && t.actualSeconds > 0)
+    .sort((a, b) => (b.completedAt ?? 0) - (a.completedAt ?? 0));
+  let streak = 0;
+  for (const t of sorted) {
+    if (Math.abs(t.actualSeconds - t.estimatedSeconds) <= tolerance * t.estimatedSeconds) {
+      streak += 1;
+    } else {
+      break;
+    }
   }
   return streak;
 }
@@ -91,6 +146,10 @@ export class AchievementService {
     for (const v of dailyByDate.values()) {
       if (v > maxDailyDurationSeconds) maxDailyDurationSeconds = v;
     }
+    // 行为探索：23:00 后完成（走满）的专注次数
+    const nightFocusCount = rows.filter(
+      (r) => r.completed && new Date(r.startedAt).getHours() >= 23,
+    ).length;
 
     // 任务维度（不含已取消；计划 = plannedStart != null）
     let completedTasks = 0;
@@ -111,6 +170,20 @@ export class AchievementService {
     for (const v of completedByDate.values()) {
       if (v > maxDailyCompletedTasks) maxDailyCompletedTasks = v;
     }
+    const taskDays = new Set(completedByDate.keys());
+    const taskStreakDays = computeTaskStreak(taskDays, dateStringOf(Date.now()), 1);
+    const estimateAccurateStreak = computeEstimateStreak(
+      allTasks
+        .filter((t) => t.status === "COMPLETED")
+        .map((t) => ({
+          estimatedSeconds: t.estimatedDuration ?? 0,
+          actualSeconds: t.actualDuration ?? 0,
+          completedAt: t.completedAt ?? t.updatedAt,
+        })),
+    );
+    const courseTasksCompleted = allTasks.filter(
+      (t) => t.status === "COMPLETED" && t.courseId != null,
+    ).length;
 
     return {
       completedCount,
@@ -126,6 +199,11 @@ export class AchievementService {
       categoryNames: cats.map((c) => c.name),
       createdTasks: allTasks.length,
       weeklyReviewStreak,
+      taskStreakDays,
+      nightFocusCount,
+      estimateAccurateStreak,
+      courseTasksCompleted,
+      undoCountToday: todayUndoCount(),
     };
   }
 

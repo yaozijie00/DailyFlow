@@ -1,0 +1,41 @@
+[
+  {
+    "id": "estimate-streak-5",
+    "name": "时间预言家",
+    "description": "连续 5 次任务实际耗时与计划误差 ≤15%",
+    "icon": "Target",
+    "category": "plan",
+    "condition": { "type": "estimate_streak", "target": 5 },
+    "reward": null,
+    "hidden": false,
+    "enabled": true,
+    "chainId": "estimate-accuracy",
+    "order": 1
+  },
+  {
+    "id": "estimate-streak-10",
+    "name": "越来越准确",
+    "description": "连续 10 次任务实际耗时与计划误差 ≤15%",
+    "icon": "Crosshair",
+    "category": "plan",
+    "condition": { "type": "estimate_streak", "target": 10 },
+    "reward": null,
+    "hidden": true,
+    "enabled": true,
+    "chainId": "estimate-accuracy",
+    "order": 2
+  },
+  {
+    "id": "night-owl",
+    "name": "夜猫子",
+    "description": "在 23:00 后完成 3 次专注",
+    "icon": "Moon",
+    "category": "explore",
+    "condition": { "type": "night_sessions", "target": 3 },
+    "reward": null,
+    "hidden": true,
+    "enabled": true,
+    "chainId": null,
+    "order": 0
+  }
+]

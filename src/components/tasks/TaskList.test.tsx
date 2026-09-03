@@ -66,6 +66,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     repeatRule: "",
     projectId: null,
     parentId: null,
+    courseId: null,
     ...overrides,
   };
 }

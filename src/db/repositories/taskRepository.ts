@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, like, lt, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, like, lte, lt, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { tasks } from "../schema";
 
@@ -21,6 +21,8 @@ export interface CreateTaskInput {
   projectId?: number | null;
   /** 父任务 id（v1.8 拆分；可空） */
   parentId?: number | null;
+  /** 归属课程（2.0.x；可空） */
+  courseId?: number | null;
   /** 重复规则（'' 不重复 / daily / weekdays / weekly / monthly） */
   repeatRule?: string;
 }
@@ -50,6 +52,7 @@ export class TaskRepository {
         goalId: input.goalId ?? null,
         projectId: input.projectId ?? null,
         parentId: input.parentId ?? null,
+        courseId: input.courseId ?? null,
         repeatRule: input.repeatRule ?? "",
       })
       .returning()
@@ -226,5 +229,27 @@ export class TaskRepository {
       .orderBy(desc(tasks.scheduledDate), desc(tasks.id))
       .limit(limit)
       .all();
+  }
+
+  /** 某课程在 [fromDate, toDate] 内「已完成」任务的日期（2.0.x 课程完成状态）。 */
+  async findCompletedDatesByCourse(
+    courseId: number,
+    fromDate: string,
+    toDate: string,
+  ): Promise<string[]> {
+    const rows = await this.db
+      .select({ scheduledDate: tasks.scheduledDate })
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.courseId, courseId),
+          eq(tasks.status, "COMPLETED"),
+          gte(tasks.scheduledDate, fromDate),
+          lte(tasks.scheduledDate, toDate),
+        ),
+      )
+      .groupBy(tasks.scheduledDate)
+      .all();
+    return rows.map((r) => r.scheduledDate);
   }
 }

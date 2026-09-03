@@ -1,0 +1,54 @@
+[
+  {
+    "id": "task-streak-3",
+    "name": "三日不断",
+    "description": "连续 3 天完成任务（允许 1 天宽限）",
+    "icon": "Flame",
+    "category": "continuity",
+    "condition": { "type": "task_streak_days", "target": 3 },
+    "reward": null,
+    "hidden": false,
+    "enabled": true,
+    "chainId": "task-streak",
+    "order": 1
+  },
+  {
+    "id": "task-streak-7",
+    "name": "七日坚持",
+    "description": "连续 7 天完成任务（允许 1 天宽限）",
+    "icon": "CalendarCheck",
+    "category": "continuity",
+    "condition": { "type": "task_streak_days", "target": 7 },
+    "reward": null,
+    "hidden": false,
+    "enabled": true,
+    "chainId": "task-streak",
+    "order": 2
+  },
+  {
+    "id": "task-streak-14",
+    "name": "两周节奏",
+    "description": "连续 14 天保持执行（允许 1 天宽限）",
+    "icon": "CalendarDays",
+    "category": "continuity",
+    "condition": { "type": "task_streak_days", "target": 14 },
+    "reward": null,
+    "hidden": false,
+    "enabled": true,
+    "chainId": "task-streak",
+    "order": 3
+  },
+  {
+    "id": "task-streak-30",
+    "name": "月度稳定",
+    "description": "连续 30 天保持执行（允许 1 天宽限）",
+    "icon": "Award",
+    "category": "continuity",
+    "condition": { "type": "task_streak_days", "target": 30 },
+    "reward": null,
+    "hidden": true,
+    "enabled": true,
+    "chainId": "task-streak",
+    "order": 4
+  }
+]

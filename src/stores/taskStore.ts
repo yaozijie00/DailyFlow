@@ -60,6 +60,7 @@ interface TaskState {
     plannedEnd?: number | null;
     estimatedDuration?: number | null;
     categoryId?: number | null;
+    courseId?: number | null;
   }) => Promise<boolean>;
   /** 拆分子任务（v1.8）：继承父任务日期/分类/目标/项目，挂到 parent_id 下 */
   createSubtask: (parent: Task, title: string) => Promise<void>;
@@ -188,6 +189,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         plannedEnd: input.plannedEnd ?? null,
         estimatedDuration: input.estimatedDuration ?? null,
         categoryId: input.categoryId ?? null,
+        courseId: input.courseId ?? null,
       });
       if (get().selectedDate === input.scheduledDate) {
         await get().load();

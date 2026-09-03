@@ -62,6 +62,26 @@ export interface WeeklyReviewsCondition {
   type: "weekly_reviews";
   target: number;
 }
+export interface TaskStreakCondition {
+  type: "task_streak_days";
+  target: number;
+}
+export interface NightSessionsCondition {
+  type: "night_sessions";
+  target: number;
+}
+export interface EstimateStreakCondition {
+  type: "estimate_streak";
+  target: number;
+}
+export interface CourseTasksCondition {
+  type: "course_tasks_completed";
+  target: number;
+}
+export interface UndoDailyCondition {
+  type: "undo_daily";
+  target: number;
+}
 export interface AndCondition {
   type: "and";
   conditions: Condition[];
@@ -89,6 +109,11 @@ export type Condition =
   | CategoryNamedCondition
   | TasksCreatedCondition
   | WeeklyReviewsCondition
+  | TaskStreakCondition
+  | NightSessionsCondition
+  | EstimateStreakCondition
+  | CourseTasksCondition
+  | UndoDailyCondition
   | AndCondition
   | OrCondition
   | NotCondition;
@@ -131,6 +156,16 @@ export interface AchievementContext {
   createdTasks: number;
   /** 连续完成周复盘周数（v2.0：每周打开复盘至少一次） */
   weeklyReviewStreak: number;
+  /** 连续执行天数（每天 ≥1 个完成任务，允许 1 天宽限；v2.0.x） */
+  taskStreakDays: number;
+  /** 23:00 后完成（走满）的专注次数（行为探索：夜猫子） */
+  nightFocusCount: number;
+  /** 连续「预计误差 ≤15%」的完成任务次数（计划准确） */
+  estimateAccurateStreak: number;
+  /** 累计完成的课程任务数（tasks.course_id 非空且已完成） */
+  courseTasksCompleted: number;
+  /** 今日撤销次数（行为探索：撤回大师） */
+  undoCountToday: number;
 }
 
 function pct(current: number, target: number): number {
@@ -158,6 +193,11 @@ export function isValidCondition(cond: unknown): boolean {
     case "planned_tasks_completed":
     case "tasks_created":
     case "weekly_reviews":
+    case "task_streak_days":
+    case "night_sessions":
+    case "estimate_streak":
+    case "course_tasks_completed":
+    case "undo_daily":
       return typeof c.target === "number" && Number.isFinite(c.target) && c.target > 0;
     case "category_duration":
       return (
@@ -211,6 +251,16 @@ export const ConditionEngine = {
         return ctx.createdTasks >= condition.target;
       case "weekly_reviews":
         return ctx.weeklyReviewStreak >= condition.target;
+      case "task_streak_days":
+        return ctx.taskStreakDays >= condition.target;
+      case "night_sessions":
+        return ctx.nightFocusCount >= condition.target;
+      case "estimate_streak":
+        return ctx.estimateAccurateStreak >= condition.target;
+      case "course_tasks_completed":
+        return ctx.courseTasksCompleted >= condition.target;
+      case "undo_daily":
+        return ctx.undoCountToday >= condition.target;
       case "and":
         return condition.conditions.every((c) => ConditionEngine.evaluate(c, ctx));
       case "or":
@@ -341,6 +391,56 @@ export const ConditionEngine = {
           percentage: pct(current, condition.target),
           completed: current >= condition.target,
           unit: "weeks",
+        };
+      }
+      case "task_streak_days": {
+        const current = ctx.taskStreakDays;
+        return {
+          current,
+          target: condition.target,
+          percentage: pct(current, condition.target),
+          completed: current >= condition.target,
+          unit: "days",
+        };
+      }
+      case "night_sessions": {
+        const current = ctx.nightFocusCount;
+        return {
+          current,
+          target: condition.target,
+          percentage: pct(current, condition.target),
+          completed: current >= condition.target,
+          unit: "count",
+        };
+      }
+      case "estimate_streak": {
+        const current = ctx.estimateAccurateStreak;
+        return {
+          current,
+          target: condition.target,
+          percentage: pct(current, condition.target),
+          completed: current >= condition.target,
+          unit: "count",
+        };
+      }
+      case "course_tasks_completed": {
+        const current = ctx.courseTasksCompleted;
+        return {
+          current,
+          target: condition.target,
+          percentage: pct(current, condition.target),
+          completed: current >= condition.target,
+          unit: "count",
+        };
+      }
+      case "undo_daily": {
+        const current = ctx.undoCountToday;
+        return {
+          current,
+          target: condition.target,
+          percentage: pct(current, condition.target),
+          completed: current >= condition.target,
+          unit: "count",
         };
       }
       case "category_named": {

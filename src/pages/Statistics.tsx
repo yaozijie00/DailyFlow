@@ -76,7 +76,7 @@ export default function Statistics() {
       : Math.round(overview.completionRate * 100);
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-5">
+    <div className="mx-auto flex max-w-4xl flex-col gap-5">
       <PageHeader
         title="统计"
         description="基于完成的番茄钟实时聚合你的时间投入，并解锁成就。"
@@ -154,7 +154,7 @@ export default function Statistics() {
           ) : (
             <>
               {/* 核心指标 */}
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                 <StatCard
                   label="总投入"
                   value={formatDurationCompact(overview!.totalSeconds)}
@@ -170,7 +170,7 @@ export default function Statistics() {
               </div>
 
               {/* 次要指标 */}
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                 <StatCard
                   label="平均每次专注"
                   value={formatDurationCompact(overview!.avgSessionSeconds)}

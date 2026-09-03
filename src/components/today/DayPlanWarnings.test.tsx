@@ -44,6 +44,7 @@ function makeTask(
     repeatRule: "",
     projectId: null,
     parentId: null,
+    courseId: null,
   };
 }
 

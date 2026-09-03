@@ -21,6 +21,11 @@ function ctx(partial: Partial<AchievementContext> = {}): AchievementContext {
     categoryNames: [],
     createdTasks: 0,
     weeklyReviewStreak: 0,
+    taskStreakDays: 0,
+    nightFocusCount: 0,
+    estimateAccurateStreak: 0,
+    courseTasksCompleted: 0,
+    undoCountToday: 0,
     ...partial,
   };
 }

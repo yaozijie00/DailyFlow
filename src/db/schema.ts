@@ -51,6 +51,8 @@ export const tasks = sqliteTable("tasks", {
    * 删除置空行为由服务/仓库显式处理。
    */
   parentId: integer("parent_id"),
+  /** 归属课程（2.0.x 课程表 → 任务；删除课程时置空） */
+  courseId: integer("course_id").references(() => courses.id, { onDelete: "set null" }),
 });
 
 export const focusSessions = sqliteTable("focus_sessions", {
@@ -65,6 +67,10 @@ export const focusSessions = sqliteTable("focus_sessions", {
   endedAt: integer("ended_at"),
   completed: integer("completed", { mode: "boolean" }).notNull().default(false),
   createdAt: integer("created_at").notNull(),
+  /** 本次循环计划（2.0.x 双层参数；不回写 Settings）：休息时长/休息次数/番茄数量 */
+  plannedBreakMinutes: integer("planned_break_minutes"),
+  plannedBreakCount: integer("planned_break_count"),
+  plannedPomodoroCount: integer("planned_pomodoro_count"),
 });
 
 export const settings = sqliteTable("settings", {
@@ -134,4 +140,32 @@ export const projects = sqliteTable("projects", {
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
+});
+
+/**
+ * 课程（2.0.x Course Schedule）：课程库条目，关联分类取色/标签。
+ */
+export const courses = sqliteTable("courses", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  title: text("title").notNull(),
+  categoryId: integer("category_id").references(() => categories.id, {
+    onDelete: "set null",
+  }),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
+/**
+ * 每周固定时段（课程表核心）：weekday 1=周一..7=周日；
+ * start_minutes = 当天 0..1439 分钟；duration_minutes 时长。
+ * 每条 slot 天然「每周重复」；删除课程时级联删除（迁移 0017 建立 FK）。
+ */
+export const weeklySlots = sqliteTable("weekly_slots", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  courseId: integer("course_id").references(() => courses.id, { onDelete: "cascade" }),
+  weekday: integer("weekday").notNull(),
+  startMinutes: integer("start_minutes").notNull(),
+  durationMinutes: integer("duration_minutes").notNull().default(60),
+  createdAt: integer("created_at").notNull(),
 });

@@ -34,6 +34,10 @@ export interface PomodoroState {
   completedFocusCount: number;
   /** 本轮番茄目标（内存、可调；仅用于进度显示，不影响长休息间隔） */
   focusCountGoal: number;
+  /** 本次专注时长覆盖（分钟；null=跟随 Settings 默认值；2.0.x 双层参数） */
+  focusMinutesOverride: number | null;
+  /** 本次休息时长覆盖（分钟，短休息；null=跟随 Settings 默认值） */
+  breakMinutesOverride: number | null;
   snapshot: PomodoroSnapshot;
   showResult: boolean;
   /** 当前进行中专注会话的 focus_sessions 行 id */
@@ -53,6 +57,11 @@ export interface PomodoroState {
   endFocus: () => void;
   finalizeFocus: () => void;
   setFocusCountGoal: (n: number) => void;
+  /** 本次专注/休息覆盖（2.0.x：页面调整不写回 Settings） */
+  setFocusMinutesOverride: (n: number | null) => void;
+  setBreakMinutesOverride: (n: number | null) => void;
+  /** 清空本次覆盖（新一轮开始 / 恢复默认） */
+  clearFocusOverrides: () => void;
   setPendingTaskId: (id: number | null) => void;
   /** 放弃本次专注并返回任务选择（不落库、不完成任务） */
   abandonFocus: () => void;
@@ -118,7 +127,9 @@ export function createPomodoroStore(
       taskId: null,
       phase: "focus",
       completedFocusCount: 0,
-      focusCountGoal: 4,
+      focusCountGoal: 1, // 2.0.x：默认 1 个番茄钟，进入即可开始
+      focusMinutesOverride: null,
+      breakMinutesOverride: null,
       snapshot: timer.getSnapshot(),
       showResult: false,
       sessionId: null,
@@ -134,12 +145,20 @@ export function createPomodoroStore(
           finalizeCurrentSession(); // 专注阶段：落库旧会话（此前只 complete 不落库 → 遗留开放会话）
           if (timer.getCompletedAt() === null) timer.complete(); // 休息计时器：仅落定状态
         }
+        const settings = useSettingsStore.getState().settings;
         const ms =
-          durationMs ?? useSettingsStore.getState().settings.pomodoroDurationMinutes * 60_000;
+          durationMs ??
+          ((get().focusMinutesOverride ?? settings.pomodoroDurationMinutes) * 60_000);
         timer.start(ms);
         const snap = timer.getSnapshot();
         set({ taskId, phase: "focus", showResult: false, sessionId: null, taskTitle: null, snapshot: snap });
         const plannedSeconds = Math.round(snap.durationMs / 1000);
+        // 2.0.x：本次循环计划（不回写 Settings 默认）随 session 落库
+        const sessionPlan = {
+          breakMinutes: get().breakMinutesOverride ?? settings.shortBreakMinutes,
+          breakCount: settings.longBreakInterval,
+          pomodoroCount: get().focusCountGoal,
+        };
         // 调度「专注完成」系统通知（Rust 原生线程，最小化/后台也准时）
         scheduleFocusEndNotification(Date.now() + ms, Math.round(ms / 60_000));
         // 开始提醒（异步查任务名；轻量；查询失败静默）
@@ -148,7 +167,7 @@ export function createPomodoroStore(
           .then((t) => notifyFocusStart(t?.title ?? "未命名任务"))
           .catch(() => {});
         void focus
-          .start(taskId, plannedSeconds)
+          .start(taskId, plannedSeconds, sessionPlan)
           .then((session) => {
             set((s) => ({ sessionId: session.id, focusVersion: s.focusVersion + 1 }));
           })
@@ -165,7 +184,9 @@ export function createPomodoroStore(
         const settings = useSettingsStore.getState().settings;
         const count = get().completedFocusCount;
         const isLong = count >= settings.longBreakInterval;
-        const minutes = isLong ? settings.longBreakMinutes : settings.shortBreakMinutes;
+        const minutes = isLong
+          ? settings.longBreakMinutes
+          : (get().breakMinutesOverride ?? settings.shortBreakMinutes);
         timer.start(minutes * 60_000);
         set({
           phase: isLong ? "long_break" : "short_break",
@@ -239,6 +260,19 @@ export function createPomodoroStore(
         set({ focusCountGoal: goal });
       },
 
+      setFocusMinutesOverride: (n) => {
+        if (n == null) set({ focusMinutesOverride: null });
+        else set({ focusMinutesOverride: Math.min(180, Math.max(5, Math.round(n))) });
+      },
+
+      setBreakMinutesOverride: (n) => {
+        if (n == null) set({ breakMinutesOverride: null });
+        else set({ breakMinutesOverride: Math.min(60, Math.max(1, Math.round(n))) });
+      },
+
+      clearFocusOverrides: () =>
+        set({ focusMinutesOverride: null, breakMinutesOverride: null }),
+
       setPendingTaskId: (id) => set({ pendingTaskId: id }),
 
       abandonFocus: () => {
@@ -282,6 +316,8 @@ export function createPomodoroStore(
           sessionId: null,
           showResult: false,
           taskTitle: null,
+          focusMinutesOverride: null,
+          breakMinutesOverride: null,
           snapshot: timer.getSnapshot(),
         });
       },

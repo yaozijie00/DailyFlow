@@ -40,10 +40,14 @@ export default function Layout({ children }: { children: ReactNode }) {
               key={page}
               onClick={() => setPage(page)}
               aria-current={currentPage === page ? "page" : undefined}
-              className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/30 ${
+              className={`relative flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/30 ${
                 currentPage === page
-                  ? "bg-neutral-900 text-white"
-                  : "text-neutral-600 hover:bg-neutral-100"
+                  ? "bg-neutral-100 font-medium text-neutral-900"
+                  : "text-neutral-600 hover:bg-neutral-100/70 hover:text-neutral-900"
+              } ${
+                currentPage === page
+                  ? "before:absolute before:left-0 before:h-4 before:w-[3px] before:rounded-full before:bg-neutral-900 before:content-['']"
+                  : ""
               }`}
             >
               <Icon size={16} />

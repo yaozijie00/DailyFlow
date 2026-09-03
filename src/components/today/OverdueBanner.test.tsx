@@ -35,6 +35,7 @@ function makeTask(id: number, title: string): Task {
     repeatRule: "",
     projectId: null,
     parentId: null,
+    courseId: null,
     sortOrder: 0,
     createdAt: 0,
     updatedAt: 0,
