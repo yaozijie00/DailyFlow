@@ -20,6 +20,7 @@ function ctx(partial: Partial<AchievementContext> = {}): AchievementContext {
     completedPlannedTasks: 0,
     categoryNames: [],
     createdTasks: 0,
+    weeklyReviewStreak: 0,
     ...partial,
   };
 }
@@ -113,6 +114,16 @@ describe("ConditionEngine", () => {
     const c: Condition = { type: "tasks_created", target: 1 };
     expect(ConditionEngine.evaluate(c, ctx({ createdTasks: 1 }))).toBe(true);
     expect(ConditionEngine.evaluate(c, ctx({ createdTasks: 0 }))).toBe(false);
+  });
+
+  it("weekly_reviews：按周连续复盘达标，进度单位 weeks", () => {
+    const c: Condition = { type: "weekly_reviews", target: 4 };
+    expect(ConditionEngine.evaluate(c, ctx({ weeklyReviewStreak: 3 }))).toBe(false);
+    expect(ConditionEngine.evaluate(c, ctx({ weeklyReviewStreak: 4 }))).toBe(true);
+    const p = ConditionEngine.getProgress(c, ctx({ weeklyReviewStreak: 2 }));
+    expect(p).toMatchObject({ current: 2, target: 4, unit: "weeks", completed: false });
+    expect(isValidCondition({ type: "weekly_reviews", target: 4 })).toBe(true);
+    expect(isValidCondition({ type: "weekly_reviews", target: 0 })).toBe(false);
   });
 
   it("彩蛋条件 isValidCondition 校验", () => {

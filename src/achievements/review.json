@@ -1,0 +1,54 @@
+[
+  {
+    "id": "weekly-review-1",
+    "name": "第一次复盘",
+    "description": "完成第一次周复盘",
+    "icon": "CalendarCheck",
+    "category": "productivity",
+    "condition": { "type": "weekly_reviews", "target": 1 },
+    "reward": null,
+    "hidden": false,
+    "enabled": true,
+    "chainId": "weekly-review",
+    "order": 1
+  },
+  {
+    "id": "weekly-review-2",
+    "name": "复盘新手",
+    "description": "连续 2 周完成复盘",
+    "icon": "CalendarCheck",
+    "category": "productivity",
+    "condition": { "type": "weekly_reviews", "target": 2 },
+    "reward": null,
+    "hidden": false,
+    "enabled": true,
+    "chainId": "weekly-review",
+    "order": 2
+  },
+  {
+    "id": "weekly-review-4",
+    "name": "复盘坚持",
+    "description": "连续 4 周完成复盘",
+    "icon": "CalendarCheck",
+    "category": "productivity",
+    "condition": { "type": "weekly_reviews", "target": 4 },
+    "reward": null,
+    "hidden": false,
+    "enabled": true,
+    "chainId": "weekly-review",
+    "order": 3
+  },
+  {
+    "id": "weekly-review-8",
+    "name": "月度记忆",
+    "description": "连续 8 周完成复盘",
+    "icon": "CalendarCheck",
+    "category": "productivity",
+    "condition": { "type": "weekly_reviews", "target": 8 },
+    "reward": null,
+    "hidden": true,
+    "enabled": true,
+    "chainId": "weekly-review",
+    "order": 4
+  }
+]

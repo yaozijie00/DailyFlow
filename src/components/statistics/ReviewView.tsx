@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
 import {
@@ -9,7 +9,19 @@ import { goalService } from "../../stores/goalStore";
 import { startOfTomorrow, todayString } from "../../lib/date";
 import { formatDurationCompact } from "../../lib/format";
 import { buildNarrativeLines } from "../../lib/reviewNarrative";
+import {
+  REVIEW_STREAK_KEY,
+  REVIEW_LAST_WEEK_KEY,
+  weekIndexOf,
+  nextReviewStreak,
+} from "../../lib/reviewStreak";
+import { getDb } from "../../db/db";
+import { SettingsRepository } from "../../db/repositories/settingsRepository";
+import { setWeeklyReviewStreak } from "../../services/achievementService";
+import { evaluateAndNotify } from "../../services/achievementRuntime";
 import type { OverviewStatistics } from "../../services/statisticsService";
+
+const reviewSettings = new SettingsRepository(getDb());
 
 type ReviewPreset = "today" | "week" | "days30";
 
@@ -49,6 +61,33 @@ export default function ReviewView() {
   const dbStatus = useAppStore((s) => s.dbStatus);
   const [preset, setPreset] = useState<ReviewPreset>("week");
   const [data, setData] = useState<ReviewData | null>(null);
+  const recordedRef = useRef(false);
+
+  // 打开复盘即登记「本周复盘」并评估成就（首次/连续 2/4/8 周）
+  useEffect(() => {
+    if (dbStatus !== "ready" || recordedRef.current) return;
+    recordedRef.current = true;
+    const thisWeek = weekIndexOf(Date.now());
+    void (async () => {
+      try {
+        const lastRaw = await reviewSettings.get(REVIEW_LAST_WEEK_KEY);
+        const streakRaw = await reviewSettings.get(REVIEW_STREAK_KEY);
+        const last = lastRaw ? Number(lastRaw) : null;
+        const current = streakRaw ? Number(streakRaw) : 0;
+        if (last === thisWeek) {
+          setWeeklyReviewStreak(Math.max(1, current));
+        } else {
+          const next = nextReviewStreak(last, thisWeek, current);
+          await reviewSettings.set(REVIEW_LAST_WEEK_KEY, String(thisWeek));
+          await reviewSettings.set(REVIEW_STREAK_KEY, String(next));
+          setWeeklyReviewStreak(next);
+        }
+        await evaluateAndNotify();
+      } catch {
+        /* 登记失败不影响复盘展示 */
+      }
+    })();
+  }, [dbStatus]);
 
   useEffect(() => {
     if (dbStatus !== "ready") return;

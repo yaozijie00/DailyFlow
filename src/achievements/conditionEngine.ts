@@ -58,6 +58,10 @@ export interface TasksCreatedCondition {
   type: "tasks_created";
   target: number;
 }
+export interface WeeklyReviewsCondition {
+  type: "weekly_reviews";
+  target: number;
+}
 export interface AndCondition {
   type: "and";
   conditions: Condition[];
@@ -84,11 +88,12 @@ export type Condition =
   | PlannedTasksCompletedCondition
   | CategoryNamedCondition
   | TasksCreatedCondition
+  | WeeklyReviewsCondition
   | AndCondition
   | OrCondition
   | NotCondition;
 
-export type ProgressUnit = "count" | "minutes" | "days";
+export type ProgressUnit = "count" | "minutes" | "days" | "weeks";
 
 export interface Progress {
   current: number;
@@ -124,6 +129,8 @@ export interface AchievementContext {
   categoryNames: string[];
   /** 累计创建任务数（含所有状态） */
   createdTasks: number;
+  /** 连续完成周复盘周数（v2.0：每周打开复盘至少一次） */
+  weeklyReviewStreak: number;
 }
 
 function pct(current: number, target: number): number {
@@ -150,6 +157,7 @@ export function isValidCondition(cond: unknown): boolean {
     case "planned_tasks":
     case "planned_tasks_completed":
     case "tasks_created":
+    case "weekly_reviews":
       return typeof c.target === "number" && Number.isFinite(c.target) && c.target > 0;
     case "category_duration":
       return (
@@ -201,6 +209,8 @@ export const ConditionEngine = {
         );
       case "tasks_created":
         return ctx.createdTasks >= condition.target;
+      case "weekly_reviews":
+        return ctx.weeklyReviewStreak >= condition.target;
       case "and":
         return condition.conditions.every((c) => ConditionEngine.evaluate(c, ctx));
       case "or":
@@ -321,6 +331,16 @@ export const ConditionEngine = {
           percentage: pct(current, condition.target),
           completed: current >= condition.target,
           unit: "count",
+        };
+      }
+      case "weekly_reviews": {
+        const current = ctx.weeklyReviewStreak;
+        return {
+          current,
+          target: condition.target,
+          percentage: pct(current, condition.target),
+          completed: current >= condition.target,
+          unit: "weeks",
         };
       }
       case "category_named": {

@@ -1,5 +1,18 @@
 # Changelog
 
+## DailyFlow 2.0.0
+
+### Features（v2.0 Complete：闭环收口）
+
+- 复盘驱动成就：首次复盘 / 连续 2 / 4 / 8 周复盘成就链（打开「复盘」Tab 即登记本周复盘，settings 记录 streak；解锁走既有成就 Toast）
+- 成就引擎新增 `weekly_reviews` 条件与 `weeks` 进度单位（formatProgress / 卡片「还差 N 周」适配）
+- README 功能清单整体同步 v1.7～v2.0
+
+### Technical
+
+- lib/reviewStreak.ts（周序号 + streak 推导，含单测）；review.json 成就链
+- 测试 590/590 全绿；版本 2.0.0
+
 ## DailyFlow 1.9.0
 
 ### Features（v1.9 Intelligence Through Data：从数据到结论）

@@ -36,17 +36,19 @@ export function formatDurationCompact(seconds: number): string {
   return m === 0 ? `${h}h` : `${h}h ${m}m`;
 }
 
-/** 格式化成就进度「current / target」，按单位选择展示（分钟→紧凑时长、天→天、其他→整数）。 */
+/** 格式化成就进度「current / target」，按单位选择展示（分钟→紧凑时长、天→天、周→周、其他→整数）。 */
 export function formatProgress(
   current: number,
   target: number,
-  unit: "count" | "minutes" | "days",
+  unit: "count" | "minutes" | "days" | "weeks",
 ): string {
   switch (unit) {
     case "minutes":
       return `${formatDurationCompact(current * 60)} / ${formatDurationCompact(target * 60)}`;
     case "days":
       return `${Math.round(current)} / ${target} 天`;
+    case "weeks":
+      return `${Math.round(current)} / ${target} 周`;
     default:
       return `${Math.round(current)} / ${target}`;
   }

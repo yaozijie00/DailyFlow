@@ -25,6 +25,8 @@ function remainingText(a: AchievementProgressView): string {
       return `还差 ${formatDurationCompact(left * 60)}`;
     case "days":
       return `还差 ${Math.round(left)} 天`;
+    case "weeks":
+      return `还差 ${Math.round(left)} 周`;
     default:
       return `还差 ${Math.round(left)} 次`;
   }

@@ -10,6 +10,15 @@ import {
 } from "../achievements/conditionEngine";
 import type { AchievementDefinition } from "../achievements/definitions";
 
+/**
+ * v2.0 周复盘连续次数：由复盘页登记 settings 后调用 setWeeklyReviewStreak，
+ * 评估上下文据此计算「每周复盘」类成就（首次/连续 2/4/8 周）。
+ */
+let weeklyReviewStreak = 0;
+export function setWeeklyReviewStreak(n: number): void {
+  weeklyReviewStreak = Math.max(0, Math.round(n));
+}
+
 /** 成就进度视图：定义 + 进度 + 解锁态，UI 只消费它。 */
 export interface AchievementProgressView extends AchievementDefinition, Progress {
   unlocked: boolean;
@@ -116,6 +125,7 @@ export class AchievementService {
       completedPlannedTasks,
       categoryNames: cats.map((c) => c.name),
       createdTasks: allTasks.length,
+      weeklyReviewStreak,
     };
   }
 
