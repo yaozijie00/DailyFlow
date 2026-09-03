@@ -1,5 +1,22 @@
 # Changelog
 
+## DailyFlow 1.9.0
+
+### Features（v1.9 Intelligence Through Data：从数据到结论）
+
+- 统计页新增「复盘」Tab（今日 / 本周 / 近30天）：
+  - 叙述性复盘（确定性文本）：总投入与专注次数、任务完成与完成率、计划 vs 实际偏差、时间低估率与平均超时、最佳投入时段、投入最多项目
+  - 类别投入 Top / 项目投入 Top（横向条图）
+  - 「近两周无推进目标」告警（进行中且近 14 天无关联任务完成）
+  - 空数据引导与口径说明
+- 数据查询层：会话按任务所属项目 SQL 聚合（projectAggregateInRange）；停滞目标查询（listActiveStalled，仅含已挂任务的目标）
+- 服务：statisticsService.getProjectStatistics / goalService.listStalled
+
+### Technical
+
+- lib/reviewNarrative.ts 纯函数叙述生成（含单测）；StatsTab 新增 review
+- 测试 587/587 全绿
+
 ## DailyFlow 1.8.0
 
 ### Features（v1.8 Product Structure：Goal → Project → Task）

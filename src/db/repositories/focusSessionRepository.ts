@@ -1,6 +1,6 @@
 import { and, count, desc, eq, gte, isNull, lt, sql } from "drizzle-orm";
 import type { Db } from "../db";
-import { categories, focusSessions, tasks } from "../schema";
+import { categories, focusSessions, projects, tasks } from "../schema";
 
 export type FocusSession = typeof focusSessions.$inferSelect;
 
@@ -267,6 +267,34 @@ export class FocusSessionRepository {
       .all();
     return rows.map((r) => ({
       categoryId: r.categoryId,
+      seconds: Number(r.seconds),
+      count: r.count ?? 0,
+    }));
+  }
+
+  /* ---------- v1.9 复盘：项目维度投入 ---------- */
+
+  /** [from, to) 按任务所属项目 GROUP BY（v1.9；任务已删/未归项目 → projectId null）。 */
+  async projectAggregateInRange(
+    from: number,
+    to: number,
+  ): Promise<Array<{ projectId: number | null; projectTitle: string | null; seconds: number; count: number }>> {
+    const rows = await this.db
+      .select({
+        projectId: tasks.projectId,
+        projectTitle: projects.title,
+        seconds: sql<number>`coalesce(sum(${focusSessions.actualDuration}), 0)`,
+        count: count(),
+      })
+      .from(focusSessions)
+      .leftJoin(tasks, eq(tasks.id, focusSessions.taskId))
+      .leftJoin(projects, eq(projects.id, tasks.projectId))
+      .where(and(gte(focusSessions.startedAt, from), lt(focusSessions.startedAt, to)))
+      .groupBy(tasks.projectId)
+      .all();
+    return rows.map((r) => ({
+      projectId: r.projectId,
+      projectTitle: r.projectTitle ?? null,
       seconds: Number(r.seconds),
       count: r.count ?? 0,
     }));

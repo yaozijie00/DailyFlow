@@ -13,6 +13,7 @@ import { HourlyLineChart } from "../components/statistics/HourlyLineChart";
 import { DailyTrendChart } from "../components/statistics/DailyTrendChart";
 import { CompletedTasksChart } from "../components/statistics/CompletedTasksChart";
 import AchievementsView from "../components/achievements/AchievementsView";
+import ReviewView from "../components/statistics/ReviewView";
 import { formatDurationCompact } from "../lib/format";
 
 const RANGE_TABS: { key: RangePreset; label: string }[] = [
@@ -26,6 +27,7 @@ const RANGE_TABS: { key: RangePreset; label: string }[] = [
 
 const TOP_TABS: { key: StatsTab; label: string }[] = [
   { key: "statistics", label: "统计" },
+  { key: "review", label: "复盘" },
   { key: "achievements", label: "成就" },
 ];
 
@@ -97,7 +99,9 @@ export default function Statistics() {
         ))}
       </div>
 
-      {tab === "achievements" ? (
+      {tab === "review" ? (
+        <ReviewView />
+      ) : tab === "achievements" ? (
         <AchievementsView />
       ) : (
         <>

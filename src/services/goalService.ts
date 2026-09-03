@@ -66,6 +66,11 @@ export class GoalService {
     return this.goals.searchByTitle(query, limit);
   }
 
+  /** 活跃但近期无推进（[from,to) 内无任务完成）的目标 —— 复盘停滞告警。 */
+  async listStalled(from: number, to: number): Promise<Array<{ id: number; title: string }>> {
+    return this.goals.listActiveStalled(from, to);
+  }
+
   async create(input: CreateGoalInput): Promise<Goal> {
     const goal = await this.goals.create(input);
     if (!undoManager.applying) {

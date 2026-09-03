@@ -266,4 +266,22 @@ export class GoalRepository {
       .limit(limit)
       .all();
   }
+
+  /** 活跃但 [from, to) 内无任何关联任务完成的目标（v1.9 停滞告警；仅含已挂任务的目标）。 */
+  async listActiveStalled(from: number, to: number): Promise<Array<{ id: number; title: string }>> {
+    return this.db
+      .select({ id: goals.id, title: goals.title })
+      .from(goals)
+      .leftJoin(tasks, and(eq(tasks.goalId, goals.id), ne(tasks.status, "CANCELLED")))
+      .where(eq(goals.status, "active"))
+      .groupBy(goals.id)
+      .having(
+        and(
+          sql`count(${tasks.id}) > 0`,
+          sql`coalesce(sum(case when ${tasks.completedAt} >= ${from} and ${tasks.completedAt} < ${to} then 1 else 0 end), 0) = 0`,
+        ),
+      )
+      .orderBy(goals.sortOrder, goals.id)
+      .all();
+  }
 }

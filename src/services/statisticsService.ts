@@ -192,6 +192,22 @@ export class StatisticsService {
     return buckets.map((seconds, hour) => ({ hour, seconds }));
   }
 
+  /** [from, to) 内按任务所属项目聚合投入（v1.9 复盘）：按时长降序。 */
+  async getProjectStatistics(
+    from: number,
+    to: number,
+  ): Promise<Array<{ projectId: number | null; name: string; seconds: number; count: number }>> {
+    const rows = await this.focusSessions.projectAggregateInRange(from, to);
+    return rows
+      .map((r) => ({
+        projectId: r.projectId,
+        name: r.projectTitle ?? "未归项目",
+        seconds: r.seconds,
+        count: r.count,
+      }))
+      .sort((a, b) => b.seconds - a.seconds);
+  }
+
   /**
    * 每日任务（统计页「每日任务」）：按 scheduledDate 范围查询任务并按日期分组。
    * 今日 → 当天任务；近7天/近30天/全部/自定义 → 按日期分组列表。

@@ -21,14 +21,17 @@ import {
 
 export type RangePreset = "today" | "week" | "days7" | "days30" | "all" | "custom";
 
-/** 「统计」页顶层 Tab：统计 / 成就（成就由快捷键与 Tab 切换进入）。 */
-export type StatsTab = "statistics" | "achievements";
+/** 「统计」页顶层 Tab：统计 / 复盘 / 成就。 */
+export type StatsTab = "statistics" | "review" | "achievements";
 
 const statisticsService = new StatisticsService(
   new TaskRepository(getDb()),
   new FocusSessionRepository(getDb()),
   new CategoryRepository(getDb()),
 );
+
+/** 共享统计服务单例（复盘视图等只读查询复用）。 */
+export { statisticsService };
 
 /** 纯函数：预设 → 时间范围 [from, to)。custom 用 from/to 的 YYYY-MM-DD（含 to 当日）。 */
 export function computeRange(
