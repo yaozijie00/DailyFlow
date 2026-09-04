@@ -29,6 +29,32 @@ vi.mock("../stores/appStore", () => ({
     selector({ dbStatus: "ready", pushToast: vi.fn() }),
 }));
 
+const settingsState = vi.hoisted(() => ({
+  settings: {
+    pomodoroDurationMinutes: 25,
+    shortBreakMinutes: 5,
+    longBreakMinutes: 15,
+    longBreakInterval: 4,
+    timelineStartMinutes: 8 * 60,
+    timelineEndMinutes: 24 * 60,
+    timelineSnapMinutes: 15,
+    timelinePxPerMinute: 1.5,
+    notificationsEnabled: true,
+    closeBehavior: "exit",
+    closeBehaviorConfigured: true,
+    undoHistoryLimit: 50,
+    defaultPage: "today",
+    todayHideCompleted: false,
+    todayShowNotes: true,
+    weekStart: "monday",
+  },
+  update: vi.fn(),
+}));
+
+vi.mock("../stores/settingsStore", () => ({
+  useSettingsStore: (selector: (s: unknown) => unknown) => selector(settingsState),
+}));
+
 const projectState = vi.hoisted(() => ({
   projects: [] as { id: number; goalId: number | null; title: string; goalTitle: string | null }[],
   loading: false,

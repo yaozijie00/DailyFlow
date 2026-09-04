@@ -7,6 +7,7 @@ import {
 } from "../db/repositories/taskRepository";
 import { FocusSessionRepository } from "../db/repositories/focusSessionRepository";
 import { undoManager, diffTaskUpdate } from "../lib/undoManager";
+import { taskPriorityMeta } from "../lib/taskPriority";
 import { nextOccurrenceDate } from "../lib/repeat";
 
 export type TaskCreateInput = Omit<RepoCreateInput, "scheduledDate"> & {
@@ -96,16 +97,16 @@ export class TaskService {
   private captureTaskUpdate(id: number, before: Task | null, after: Task | null): void {
     if (undoManager.applying) return;
     if (!before || !after) return;
-    const diff = diffTaskUpdate(before, after);
+    const diff = diffTaskUpdate(before, after) as UpdateTaskInput;
     if (Object.keys(diff).length === 0) return;
     undoManager.push({
       type: "task.update",
       label: "修改任务",
       undo: async () => {
-        await this.updateTask(id, diffTaskUpdate(after, before));
+        await this.updateTask(id, diffTaskUpdate(after, before) as UpdateTaskInput);
       },
       redo: async () => {
-        await this.updateTask(id, diffTaskUpdate(before, after));
+        await this.updateTask(id, diff);
       },
     });
   }
@@ -219,6 +220,7 @@ export class TaskService {
             notes: before.notes,
             goalId: before.goalId,
             repeatRule: before.repeatRule,
+            priority: taskPriorityMeta(before.priority).value,
           });
           await this.tasks.reorderByTime(child.scheduledDate);
           const snapshot = { ...child };

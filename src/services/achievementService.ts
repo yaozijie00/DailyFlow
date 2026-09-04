@@ -4,6 +4,7 @@ import { TaskRepository } from "../db/repositories/taskRepository";
 import { AchievementProgressRepository } from "../db/repositories/achievementProgressRepository";
 import { dateStringOf } from "../lib/date";
 import { todayUndoCount } from "../lib/undoManager";
+import { taskPriorityMeta } from "../lib/taskPriority";
 import {
   ConditionEngine,
   type AchievementContext,
@@ -150,6 +151,23 @@ export class AchievementService {
     const nightFocusCount = rows.filter(
       (r) => r.completed && new Date(r.startedAt).getHours() >= 23,
     ).length;
+    // 行为探索：早起（<09:00）/ 周末 的走满专注；单日走满峰值
+    let morningFocusCount = 0;
+    let weekendFocusCount = 0;
+    const pomoByDate = new Map<string, number>();
+    for (const r of rows) {
+      if (!r.completed) continue;
+      const d = new Date(r.startedAt);
+      if (d.getHours() < 9) morningFocusCount += 1;
+      const dow = d.getDay();
+      if (dow === 0 || dow === 6) weekendFocusCount += 1;
+      const date = dateStringOf(r.startedAt);
+      pomoByDate.set(date, (pomoByDate.get(date) ?? 0) + 1);
+    }
+    let maxDailyPomodoros = 0;
+    for (const v of pomoByDate.values()) {
+      if (v > maxDailyPomodoros) maxDailyPomodoros = v;
+    }
 
     // 任务维度（不含已取消；计划 = plannedStart != null）
     let completedTasks = 0;
@@ -184,6 +202,9 @@ export class AchievementService {
     const courseTasksCompleted = allTasks.filter(
       (t) => t.status === "COMPLETED" && t.courseId != null,
     ).length;
+    const highPriorityTasksCompleted = allTasks.filter(
+      (t) => t.status === "COMPLETED" && taskPriorityMeta(t.priority).value === "high",
+    ).length;
 
     return {
       completedCount,
@@ -204,6 +225,10 @@ export class AchievementService {
       estimateAccurateStreak,
       courseTasksCompleted,
       undoCountToday: todayUndoCount(),
+      morningFocusCount,
+      weekendFocusCount,
+      maxDailyPomodoros,
+      highPriorityTasksCompleted,
     };
   }
 

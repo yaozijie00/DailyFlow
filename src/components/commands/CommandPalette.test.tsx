@@ -50,6 +50,7 @@ function makeTask(id: number, title: string, scheduledDate = "2026-08-27"): Task
     projectId: null,
     parentId: null,
     courseId: null,
+    priority: "medium",
     sortOrder: 0,
     createdAt: 0,
     updatedAt: 0,

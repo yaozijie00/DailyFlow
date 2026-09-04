@@ -16,7 +16,7 @@ export default function Focus() {
   }, [dbStatus, loadToday]);
 
   return (
-    <div>
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
       <PageHeader
         title="专注"
         description="番茄钟：专注一个任务，完成后记录本次专注。"

@@ -82,6 +82,22 @@ export interface UndoDailyCondition {
   type: "undo_daily";
   target: number;
 }
+export interface MorningSessionsCondition {
+  type: "morning_sessions";
+  target: number;
+}
+export interface WeekendSessionsCondition {
+  type: "weekend_sessions";
+  target: number;
+}
+export interface DailyPomodorosCondition {
+  type: "daily_pomodoros";
+  target: number;
+}
+export interface HighPriorityTasksCondition {
+  type: "high_priority_tasks_completed";
+  target: number;
+}
 export interface AndCondition {
   type: "and";
   conditions: Condition[];
@@ -114,6 +130,10 @@ export type Condition =
   | EstimateStreakCondition
   | CourseTasksCondition
   | UndoDailyCondition
+  | MorningSessionsCondition
+  | WeekendSessionsCondition
+  | DailyPomodorosCondition
+  | HighPriorityTasksCondition
   | AndCondition
   | OrCondition
   | NotCondition;
@@ -166,6 +186,14 @@ export interface AchievementContext {
   courseTasksCompleted: number;
   /** 今日撤销次数（行为探索：撤回大师） */
   undoCountToday: number;
+  /** 上午 9 点前开始且走满的专注次数（早起鸟） */
+  morningFocusCount: number;
+  /** 周六/周日开始且走满的专注次数（周末战士） */
+  weekendFocusCount: number;
+  /** 单日走满番茄数最大值（日投入高峰） */
+  maxDailyPomodoros: number;
+  /** 累计完成的高优先级任务数（优先级之王） */
+  highPriorityTasksCompleted: number;
 }
 
 function pct(current: number, target: number): number {
@@ -198,6 +226,10 @@ export function isValidCondition(cond: unknown): boolean {
     case "estimate_streak":
     case "course_tasks_completed":
     case "undo_daily":
+    case "morning_sessions":
+    case "weekend_sessions":
+    case "daily_pomodoros":
+    case "high_priority_tasks_completed":
       return typeof c.target === "number" && Number.isFinite(c.target) && c.target > 0;
     case "category_duration":
       return (
@@ -261,6 +293,14 @@ export const ConditionEngine = {
         return ctx.courseTasksCompleted >= condition.target;
       case "undo_daily":
         return ctx.undoCountToday >= condition.target;
+      case "morning_sessions":
+        return ctx.morningFocusCount >= condition.target;
+      case "weekend_sessions":
+        return ctx.weekendFocusCount >= condition.target;
+      case "daily_pomodoros":
+        return ctx.maxDailyPomodoros >= condition.target;
+      case "high_priority_tasks_completed":
+        return ctx.highPriorityTasksCompleted >= condition.target;
       case "and":
         return condition.conditions.every((c) => ConditionEngine.evaluate(c, ctx));
       case "or":
@@ -435,6 +475,46 @@ export const ConditionEngine = {
       }
       case "undo_daily": {
         const current = ctx.undoCountToday;
+        return {
+          current,
+          target: condition.target,
+          percentage: pct(current, condition.target),
+          completed: current >= condition.target,
+          unit: "count",
+        };
+      }
+      case "morning_sessions": {
+        const current = ctx.morningFocusCount;
+        return {
+          current,
+          target: condition.target,
+          percentage: pct(current, condition.target),
+          completed: current >= condition.target,
+          unit: "count",
+        };
+      }
+      case "weekend_sessions": {
+        const current = ctx.weekendFocusCount;
+        return {
+          current,
+          target: condition.target,
+          percentage: pct(current, condition.target),
+          completed: current >= condition.target,
+          unit: "count",
+        };
+      }
+      case "daily_pomodoros": {
+        const current = ctx.maxDailyPomodoros;
+        return {
+          current,
+          target: condition.target,
+          percentage: pct(current, condition.target),
+          completed: current >= condition.target,
+          unit: "count",
+        };
+      }
+      case "high_priority_tasks_completed": {
+        const current = ctx.highPriorityTasksCompleted;
         return {
           current,
           target: condition.target,

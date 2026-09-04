@@ -210,6 +210,7 @@ export const TASK_UNDOABLE_FIELDS = [
   "goalId",
   "scheduledDate",
   "repeatRule",
+  "priority",
 ] as const;
 
 export type TaskUndoableField = (typeof TASK_UNDOABLE_FIELDS)[number];

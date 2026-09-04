@@ -35,9 +35,40 @@ describe("SettingsService", () => {
       closeBehavior: "exit",
       closeBehaviorConfigured: false,
       undoHistoryLimit: 50,
+      defaultPage: "today",
+      todayHideCompleted: false,
+      todayShowNotes: true,
+      weekStart: "monday",
     });
     const s = await service.getSettings();
     expect(s).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it("扩展设置：默认页/今日显示/周起始日 保存与回退", async () => {
+    // 默认值
+    let s = await service.getSettings();
+    expect(s.defaultPage).toBe("today");
+    expect(s.todayHideCompleted).toBe(false);
+    expect(s.todayShowNotes).toBe(true);
+    expect(s.weekStart).toBe("monday");
+    // 保存往返
+    await service.update({
+      defaultPage: "goals",
+      todayHideCompleted: true,
+      todayShowNotes: false,
+      weekStart: "sunday",
+    });
+    s = await service.getSettings();
+    expect(s.defaultPage).toBe("goals");
+    expect(s.todayHideCompleted).toBe(true);
+    expect(s.todayShowNotes).toBe(false);
+    expect(s.weekStart).toBe("sunday");
+    // 非法值回退默认
+    await repo.set("default_page", "hacker");
+    await repo.set("week_start", "friday");
+    s = await service.getSettings();
+    expect(s.defaultPage).toBe("today");
+    expect(s.weekStart).toBe("monday");
   });
 
   it("关闭行为：旧库无键 → 默认 exit + 未配置（升级 V1.4.0→1.4.1 首次询问）", async () => {
@@ -95,6 +126,10 @@ describe("SettingsService", () => {
       closeBehavior: "exit",
       closeBehaviorConfigured: false,
       undoHistoryLimit: 50,
+      defaultPage: "today",
+      todayHideCompleted: false,
+      todayShowNotes: true,
+      weekStart: "monday",
     });
   });
 

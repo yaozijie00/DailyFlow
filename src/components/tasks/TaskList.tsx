@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Circle, GripVertical, StickyNote } from "lucide-react";
 import { useTaskStore } from "../../stores/taskStore";
 import { useNoteStore } from "../../stores/noteStore";
+import { useSettingsStore } from "../../stores/settingsStore";
 import { useWindowDrag } from "../../hooks/useWindowDrag";
 import { useTaskToNoteDrag } from "../../hooks/useTaskToNoteDrag";
 import type { Task } from "../../db/repositories/taskRepository";
@@ -15,6 +16,7 @@ import { undoManager } from "../../lib/undoManager";
 import { formatDuration } from "../../lib/format";
 import { TASK_STATUS_LABEL } from "../../lib/taskLabels";
 import { NO_CATEGORY_COLOR } from "../../lib/categoryColors";
+import { TASK_PRIORITIES, taskPriorityMeta } from "../../lib/taskPriority";
 
 type StatusFilter = "all" | "todo" | "done";
 
@@ -39,8 +41,19 @@ export default function TaskList() {
   const { start: startWindowDrag } = useWindowDrag();
   const startTaskToNoteDrag = useTaskToNoteDrag();
   const didDragRef = useRef(false);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const hideCompleted = useSettingsStore((s) => s.settings.todayHideCompleted);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() =>
+    hideCompleted ? "todo" : "all",
+  );
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [priorityFilter, setPriorityFilter] = useState("");
+
+  // 设置「默认隐藏已完成」：开启时若仍处于「全部」，自动切到待办
+  useEffect(() => {
+    if (hideCompleted) {
+      setStatusFilter((prev) => (prev === "all" ? "todo" : prev));
+    }
+  }, [hideCompleted]);
 
   /** 行内按下：位移超过阈值进入「拖入时间轴」拖拽；否则保持点击选择。 */
   function beginDrag(e: React.MouseEvent, task: Task) {
@@ -71,9 +84,9 @@ export default function TaskList() {
     );
   }
 
-  /** 上下拖动：把 fromId 移到 beforeId 之前（按当前筛选后的显示顺序重排）。 */
+  /** 上下拖动：把 fromId 移到 beforeId 之前（始终按完整列表顺序重排，避免筛选下打乱全局顺序）。 */
   function moveTask(fromId: number, beforeId: number) {
-    const ids = filteredTasks.map((t) => t.id);
+    const ids = tasks.map((t) => t.id);
     const from = ids.indexOf(fromId);
     const to = ids.indexOf(beforeId);
     if (from < 0 || to < 0 || from === to) return;
@@ -116,11 +129,15 @@ export default function TaskList() {
     if (categoryFilter !== "") {
       list = list.filter((t) => t.categoryId === Number(categoryFilter));
     }
+    if (priorityFilter !== "") {
+      list = list.filter((t) => taskPriorityMeta(t.priority).value === priorityFilter);
+    }
     return list;
-  }, [tasks, statusFilter, categoryFilter]);
+  }, [tasks, statusFilter, categoryFilter, priorityFilter]);
 
-  /** 「全部」无分类过滤时按父子分组展示：子任务折叠在父任务下，不单独成行。 */
-  const flatAll = statusFilter === "all" && categoryFilter === "";
+  /** 「全部」无分类/优先级过滤时按父子分组展示：子任务折叠在父任务下，不单独成行。 */
+  const flatAll =
+    statusFilter === "all" && categoryFilter === "" && priorityFilter === "";
   const displayTasks = flatAll ? tasks.filter((t) => t.parentId == null) : filteredTasks;
 
   return (
@@ -153,18 +170,34 @@ export default function TaskList() {
                 </button>
               ))}
             </div>
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-full rounded-md border border-neutral-300 px-2 py-1 text-xs text-neutral-600"
-            >
-              <option value="">全部分类</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+            <div className="flex gap-1.5">
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="min-w-0 flex-1 rounded-md border border-neutral-300 px-2 py-1 text-xs text-neutral-600"
+              >
+                <option value="">全部分类</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              {/* 优先级筛选（与分类并排，不额外占行高） */}
+              <select
+                value={priorityFilter}
+                onChange={(e) => setPriorityFilter(e.target.value)}
+                aria-label="按优先级筛选"
+                className="min-w-0 flex-1 rounded-md border border-neutral-300 px-2 py-1 text-xs text-neutral-600"
+              >
+                <option value="">全部优先级</option>
+                {TASK_PRIORITIES.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {displayTasks.length === 0 ? (
@@ -177,6 +210,7 @@ export default function TaskList() {
                 const done = task.status === "COMPLETED";
                 const cancelled = task.status === "CANCELLED";
                 const selected = task.id === selectedTaskId;
+                const pMeta = taskPriorityMeta(task.priority);
                 const childTasks = flatAll ? tasks.filter((t) => t.parentId === task.id) : [];
                 const childDone = childTasks.filter((c) => c.status === "COMPLETED").length;
                 return (
@@ -211,6 +245,14 @@ export default function TaskList() {
                           <Circle size={18} />
                         )}
                       </button>
+                      {/* 优先级标签 */}
+                      <span
+                        className="shrink-0 rounded px-1 py-px text-[10px] font-medium leading-tight"
+                        style={{ color: pMeta.text, backgroundColor: pMeta.bg }}
+                        title={`优先级：${pMeta.label}`}
+                      >
+                        {pMeta.label}
+                      </span>
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center gap-1.5">
                           <span
@@ -273,8 +315,8 @@ export default function TaskList() {
                             moveTask(fromId, task.id);
                           }
                         }}
-                        className="shrink-0 cursor-grab text-neutral-300 transition-colors hover:text-neutral-500"
-                        title="拖动调整顺序"
+                        className="shrink-0 cursor-grab text-neutral-400 transition-colors hover:text-neutral-700"
+                        title="拖动手柄调整顺序（拖动整行是拖入时间轴）"
                       >
                         <GripVertical size={14} />
                       </span>

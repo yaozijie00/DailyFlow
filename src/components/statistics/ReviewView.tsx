@@ -151,6 +151,8 @@ export default function ReviewView() {
   const completionRate = ov.taskCreated > 0 ? Math.round((ov.taskCompleted / ov.taskCreated) * 100) : 0;
   const maxCategory = ov.categoryStats.length ? ov.categoryStats[0].seconds : 0;
   const maxProject = data.projects.length ? data.projects[0].seconds : 0;
+  const hourlyTop = [...data.hourly].sort((a, b) => b.seconds - a.seconds).slice(0, 5);
+  const maxHour = hourlyTop.length ? hourlyTop[0].seconds : 0;
 
   const narrative = buildNarrativeLines({
     label,
@@ -189,24 +191,8 @@ export default function ReviewView() {
         ))}
       </div>
 
-      {/* 叙述性复盘 */}
-      <section className="rounded-md border border-neutral-200 bg-white p-5">
-        <h2 className="mb-3 flex items-center gap-1.5 text-sm font-medium text-neutral-600">
-          <Sparkles size={14} className="text-amber-500" />
-          {label}复盘
-        </h2>
-        <ul className="space-y-1.5 text-sm text-neutral-700">
-          {narrative.map((line, i) => (
-            <li key={i} className="flex gap-1.5">
-              <span className="text-neutral-300">·</span>
-              <span>{line}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {/* 概览数字 */}
-      <section className="grid grid-cols-3 gap-3">
+      {/* 概览数字（先数字后结论，便于速览） */}
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <div className="rounded-md border border-neutral-200 bg-white p-4">
           <div className="text-xs text-neutral-500">总投入</div>
           <div className="mt-1 text-xl font-semibold tabular-nums text-neutral-900">
@@ -228,10 +214,35 @@ export default function ReviewView() {
           </div>
           <div className="text-xs text-neutral-400">未完成 {ov.taskIncomplete}</div>
         </div>
+        <div className="rounded-md border border-neutral-200 bg-white p-4">
+          <div className="text-xs text-neutral-500">平均每次专注</div>
+          <div className="mt-1 text-xl font-semibold tabular-nums text-neutral-900">
+            {ov.sessionCount > 0
+              ? formatDurationCompact(Math.round(ov.totalSeconds / ov.sessionCount))
+              : "—"}
+          </div>
+          <div className="text-xs text-neutral-400">走满 {ov.completedFocusCount} 个番茄</div>
+        </div>
       </section>
 
-      {/* 类别 / 项目 Top */}
-      <div className="grid gap-3 lg:grid-cols-2">
+      {/* 叙述性复盘 */}
+      <section className="rounded-md border border-neutral-200 bg-white p-5">
+        <h2 className="mb-3 flex items-center gap-1.5 text-sm font-medium text-neutral-600">
+          <Sparkles size={14} className="text-amber-500" />
+          {label}复盘
+        </h2>
+        <ul className="space-y-1.5 text-sm text-neutral-700">
+          {narrative.map((line, i) => (
+            <li key={i} className="flex gap-1.5">
+              <span className="text-neutral-300">·</span>
+              <span>{line}</span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {/* 类别 / 项目 / 时段 Top */}
+      <div className="grid gap-3 lg:grid-cols-3">
         <section className="rounded-md border border-neutral-200 bg-white p-4">
           <h3 className="mb-3 text-sm font-medium text-neutral-600">类别投入 Top</h3>
           {ov.categoryStats.length === 0 ? (
@@ -263,6 +274,24 @@ export default function ReviewView() {
                   value={p.seconds}
                   max={maxProject}
                   right={formatDurationCompact(p.seconds)}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+        <section className="rounded-md border border-neutral-200 bg-white p-4">
+          <h3 className="mb-3 text-sm font-medium text-neutral-600">时段投入 Top</h3>
+          {hourlyTop.length === 0 ? (
+            <p className="text-xs text-neutral-400">暂无数据</p>
+          ) : (
+            <div className="space-y-2">
+              {hourlyTop.map((h) => (
+                <Bar
+                  key={h.hour}
+                  label={`${String(h.hour).padStart(2, "0")}:00`}
+                  value={h.seconds}
+                  max={maxHour}
+                  right={formatDurationCompact(h.seconds)}
                 />
               ))}
             </div>

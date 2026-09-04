@@ -32,6 +32,7 @@ const task: Task = {
   projectId: null,
   parentId: null,
   courseId: null,
+  priority: "medium",
 };
 
 beforeEach(() => {
@@ -132,6 +133,39 @@ describe("PomodoroPanel 时长与番茄目标设置", () => {
     fireEvent.click(screen.getByLabelText("减少番茄目标"));
     fireEvent.click(screen.getByLabelText("减少番茄目标"));
     expect(usePomodoroStore.getState().focusCountGoal).toBe(1);
+  });
+});
+
+describe("PomodoroPanel 结果视图（阶段间显式选择）", () => {
+  it("休息结束面板：可「开始下一轮」或「结束会话」，不自动连开", () => {
+    usePomodoroStore.setState({
+      taskId: 7,
+      phase: "short_break",
+      completedFocusCount: 1,
+      showResult: true,
+      snapshot: {
+        state: "COMPLETED",
+        durationMs: 5 * 60_000,
+        elapsedMs: 5 * 60_000,
+        remainingMs: 0,
+        progress: 1,
+        startedAt: 0,
+        pausedAt: null,
+        totalPausedDurationMs: 0,
+        completedAt: 1,
+        cancelledAt: null,
+      },
+    });
+    render(<PomodoroPanel />);
+    expect(screen.getByText("休息结束")).toBeTruthy();
+    expect(screen.getByText("开始下一轮专注")).toBeTruthy();
+    expect(screen.queryByText("去休息")).toBeNull(); // 没有自动进入任何下一阶段
+    fireEvent.click(screen.getByText("结束会话"));
+    const s = usePomodoroStore.getState();
+    expect(s.taskId).toBeNull();
+    expect(s.phase).toBe("focus");
+    expect(s.showResult).toBe(false);
+    expect(s.completedFocusCount).toBe(0);
   });
 });
 

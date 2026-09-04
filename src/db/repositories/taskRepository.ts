@@ -1,6 +1,8 @@
 import { and, count, desc, eq, gte, like, lte, lt, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import { tasks } from "../schema";
+import type { TaskPriority } from "../../lib/taskPriority";
+import { DEFAULT_TASK_PRIORITY } from "../../lib/taskPriority";
 
 export type Task = typeof tasks.$inferSelect;
 
@@ -25,6 +27,8 @@ export interface CreateTaskInput {
   courseId?: number | null;
   /** 重复规则（'' 不重复 / daily / weekdays / weekly / monthly） */
   repeatRule?: string;
+  /** 优先级（v2.3.x；缺省 = medium） */
+  priority?: TaskPriority;
 }
 
 export type UpdateTaskInput = Partial<CreateTaskInput> & { sortOrder?: number };
@@ -54,6 +58,7 @@ export class TaskRepository {
         parentId: input.parentId ?? null,
         courseId: input.courseId ?? null,
         repeatRule: input.repeatRule ?? "",
+        priority: input.priority ?? DEFAULT_TASK_PRIORITY,
       })
       .returning()
       .all();

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import Layout from "./components/Layout";
 import CloseBehaviorDialog from "./components/settings/CloseBehaviorDialog";
 import { useAppStore } from "./stores/appStore";
@@ -29,7 +29,19 @@ function App() {
   const setDbStatus = useAppStore((s) => s.setDbStatus);
   const dbStatus = useAppStore((s) => s.dbStatus);
   const undoLimit = useSettingsStore((s) => s.settings.undoHistoryLimit);
+  const settingsLoaded = useSettingsStore((s) => s.loaded);
+  const defaultPage = useSettingsStore((s) => s.settings.defaultPage);
+  const bootPageAppliedRef = useRef(false);
   const Page = pages[currentPage];
+
+  // 启动默认页：设置加载完成后一次性跳转（仅首次；之后手动导航/改设置不干扰）
+  useEffect(() => {
+    if (!settingsLoaded || bootPageAppliedRef.current) return;
+    bootPageAppliedRef.current = true;
+    if (defaultPage !== "today" && defaultPage !== currentPage) {
+      useAppStore.getState().setPage(defaultPage);
+    }
+  }, [settingsLoaded, defaultPage, currentPage]);
 
   // 撤销历史上限：跟随设置（默认 50），修改后立即生效
   useEffect(() => {

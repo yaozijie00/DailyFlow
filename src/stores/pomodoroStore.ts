@@ -65,6 +65,8 @@ export interface PomodoroState {
   setPendingTaskId: (id: number | null) => void;
   /** 放弃本次专注并返回任务选择（不落库、不完成任务） */
   abandonFocus: () => void;
+  /** 结束本轮/结束会话（v2.3.x）：不自动进入下一阶段，回到任务选择并清零本轮番茄计数 */
+  endSession: () => void;
   refresh: () => void;
   reset: () => void;
   /** 启动时从持久化状态恢复进行中的专注 */
@@ -318,6 +320,23 @@ export function createPomodoroStore(
           taskTitle: null,
           focusMinutesOverride: null,
           breakMinutesOverride: null,
+          snapshot: timer.getSnapshot(),
+        });
+      },
+
+      /** 用户主动结束本轮/会话：回到待选状态（不再自动连开下一阶段），本轮番茄计数清零。 */
+      endSession: () => {
+        timer = new PomodoroTimer({ now });
+        set({
+          taskId: null,
+          phase: "focus",
+          sessionId: null,
+          showResult: false,
+          taskTitle: null,
+          pendingTaskId: null,
+          focusMinutesOverride: null,
+          breakMinutesOverride: null,
+          completedFocusCount: 0,
           snapshot: timer.getSnapshot(),
         });
       },

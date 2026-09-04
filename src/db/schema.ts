@@ -53,6 +53,8 @@ export const tasks = sqliteTable("tasks", {
   parentId: integer("parent_id"),
   /** 归属课程（2.0.x 课程表 → 任务；删除课程时置空） */
   courseId: integer("course_id").references(() => courses.id, { onDelete: "set null" }),
+  /** 优先级（v2.3.x）：high / medium / low，默认 medium */
+  priority: text("priority").notNull().default("medium"),
 });
 
 export const focusSessions = sqliteTable("focus_sessions", {

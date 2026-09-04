@@ -3,6 +3,8 @@ import {
   minutesLabel,
   snapMinutes,
   minutesToPx,
+  pxToMinutes,
+  rowHeightForWindow,
   SCHEDULE_START_HOUR,
   SCHEDULE_ROW_H,
   SCHEDULE_GRID_START_MIN,
@@ -63,9 +65,32 @@ describe("schedule（课程表时间工具）", () => {
     expect(clampGridStart(9 * 60, 60)).toBe(9 * 60);
     // 早于 08:00 → 拉回 08:00
     expect(clampGridStart(7 * 60, 60)).toBe(SCHEDULE_GRID_START_MIN);
-    // 晚到放不下（22:00 后结束）→ 提前到 22:00-duration
-    expect(clampGridStart(22 * 60, 60)).toBe(SCHEDULE_GRID_END_MIN - 60);
-    expect(clampGridStart(21 * 60, 120)).toBe(SCHEDULE_GRID_END_MIN - 120);
+    // 晚到放不下（end 之后结束）→ 提前到 end-duration
+    expect(clampGridStart(23 * 60, 60)).toBe(SCHEDULE_GRID_END_MIN - 60);
+    expect(clampGridStart(22 * 60, 120)).toBe(SCHEDULE_GRID_END_MIN - 120);
+  });
+
+  it("clampGridStart：支持自定义时间窗（跟随时间轴设置）", () => {
+    // 窗口 06:00–22:00
+    expect(clampGridStart(5 * 60, 60, 6 * 60, 22 * 60)).toBe(6 * 60);
+    expect(clampGridStart(23 * 60, 60, 6 * 60, 22 * 60)).toBe(21 * 60);
+    expect(clampGridStart(10 * 60, 60, 6 * 60, 22 * 60)).toBe(10 * 60);
+  });
+
+  it("minutesToPx / pxToMinutes：支持自定义行高与起点（双向一致）", () => {
+    expect(minutesToPx(9 * 60, 35, 8 * 60)).toBe(35); // 09:00 距 08:00 一小时 × 35px
+    expect(pxToMinutes(35, 35, 8 * 60)).toBe(9 * 60);
+    expect(pxToMinutes(minutesToPx(21 * 60 + 30, 30, 6 * 60), 30, 6 * 60)).toBe(21 * 60 + 30);
+    // 默认参数保持旧行为
+    expect(pxToMinutes(0)).toBe(SCHEDULE_GRID_START_MIN);
+  });
+
+  it("rowHeightForWindow：小时越多行越矮，总高保持约 560px", () => {
+    expect(rowHeightForWindow(14)).toBe(40);
+    expect(rowHeightForWindow(16)).toBe(35);
+    expect(rowHeightForWindow(24)).toBe(23);
+    expect(rowHeightForWindow(8)).toBe(40);
+    expect(rowHeightForWindow(30)).toBeGreaterThanOrEqual(22); // 有下限不挤爆
   });
 
   it("resizeSlot：拖上边缘改开始、结束不动，最短 30 分钟", () => {
@@ -77,12 +102,14 @@ describe("schedule（课程表时间工具）", () => {
     expect(r3).toEqual({ startMinutes: 9 * 60 + 30, durationMinutes: 30 });
   });
 
-  it("resizeSlot：拖下边缘改结束，最短 30 分钟且不超 22:00", () => {
+  it("resizeSlot：拖下边缘改结束，最短 30 分钟且不超可视窗", () => {
     const r1 = resizeSlot(9 * 60, 60, "end", 11 * 60); // 加长到 2 小时
     expect(r1).toEqual({ startMinutes: 9 * 60, durationMinutes: 120 });
     const r2 = resizeSlot(9 * 60, 60, "end", 9 * 60 + 15); // 少于 30 → 压到 30
     expect(r2).toEqual({ startMinutes: 9 * 60, durationMinutes: 30 });
-    const r3 = resizeSlot(9 * 60, 60, "end", 23 * 60); // 超窗 → 22:00
+    const r3 = resizeSlot(9 * 60, 60, "end", 25 * 60); // 超窗 → 夹到窗口末尾
     expect(r3).toEqual({ startMinutes: 9 * 60, durationMinutes: SCHEDULE_GRID_END_MIN - 9 * 60 });
+    const r4 = resizeSlot(9 * 60, 60, "end", 23 * 60, 8 * 60, 22 * 60); // 自定义窗 08–22
+    expect(r4).toEqual({ startMinutes: 9 * 60, durationMinutes: 22 * 60 - 9 * 60 });
   });
 });

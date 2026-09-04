@@ -10,6 +10,7 @@ import { NoteService } from "../services/noteService";
 import { evaluateAndNotify } from "../services/achievementRuntime";
 import { convertTaskToNote } from "../lib/noteConvert";
 import { undoManager } from "../lib/undoManager";
+import { taskPriorityMeta } from "../lib/taskPriority";
 import { todayString, yesterdayString } from "../lib/date";
 import { useAppStore } from "./appStore";
 import { useNoteStore } from "./noteStore";
@@ -213,6 +214,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         goalId: parent.goalId,
         projectId: parent.projectId,
         parentId: parent.id,
+        priority: taskPriorityMeta(parent.priority).value,
       });
       await get().load();
     } catch {

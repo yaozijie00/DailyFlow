@@ -32,6 +32,15 @@ vi.mock("../../stores/noteStore", () => ({
   useNoteStore: (selector: (s: unknown) => unknown) => selector(noteMockState),
 }));
 
+const settingsState = vi.hoisted(() => ({
+  settings: { todayHideCompleted: false },
+  update: vi.fn(),
+}));
+
+vi.mock("../../stores/settingsStore", () => ({
+  useSettingsStore: (selector: (s: unknown) => unknown) => selector(settingsState),
+}));
+
 function makeNote(overrides: Partial<Note> = {}): Note {
   return {
     id: 1,
@@ -67,6 +76,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     projectId: null,
     parentId: null,
     courseId: null,
+    priority: "medium",
     ...overrides,
   };
 }
@@ -134,16 +144,46 @@ describe("TaskList", () => {
       makeTask({ id: 2, title: "其他任务", categoryId: null }),
     ];
     render(<TaskList />);
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "5" } });
+    fireEvent.change(screen.getAllByRole("combobox")[0], { target: { value: "5" } });
     expect(screen.getByText("开发任务")).toBeTruthy();
     expect(screen.queryByText("其他任务")).toBeNull();
+  });
+
+  it("按优先级筛选（高/中/低）", () => {
+    mockState.tasks = [
+      makeTask({ id: 1, title: "高优任务", priority: "high" }),
+      makeTask({ id: 2, title: "低优任务", priority: "low" }),
+    ];
+    render(<TaskList />);
+    fireEvent.change(screen.getByLabelText("按优先级筛选"), { target: { value: "high" } });
+    expect(screen.getByText("高优任务")).toBeTruthy();
+    expect(screen.queryByText("低优任务")).toBeNull();
+  });
+
+  it("行内展示优先级标签", () => {
+    mockState.tasks = [makeTask({ id: 1, title: "高优任务", priority: "high" })];
+    render(<TaskList />);
+    const tag = screen.getByTitle("优先级：高");
+    expect(tag.textContent).toBe("高");
+  });
+
+  it("设置「默认隐藏已完成」时列表初始只显示待办", () => {
+    settingsState.settings.todayHideCompleted = true;
+    mockState.tasks = [
+      makeTask({ id: 1, title: "待办甲", status: "TODO" }),
+      makeTask({ id: 2, title: "完成乙", status: "COMPLETED" }),
+    ];
+    render(<TaskList />);
+    expect(screen.getByText("待办甲")).toBeTruthy();
+    expect(screen.queryByText("完成乙")).toBeNull();
+    settingsState.settings.todayHideCompleted = false;
   });
 
   it("拖动排序：drop 到另一行触发 reorderTasks", () => {
     mockState.tasks = [makeTask({ id: 1, title: "A" }), makeTask({ id: 2, title: "B" })];
     render(<TaskList />);
     // 行 2（B）的 grip drop，数据为行 1（A）→ 把 A 移到 B 前（已是，但应调用 reorder）
-    const grips = screen.getAllByTitle("拖动调整顺序");
+    const grips = screen.getAllByTitle(/拖动手柄调整顺序/);
     fireEvent.dragStart(grips[1], { dataTransfer: { setData: () => {}, getData: () => "1" } });
     fireEvent.drop(grips[1], { dataTransfer: { getData: () => "1" } });
     expect(mockState.reorderTasks).toHaveBeenCalled();

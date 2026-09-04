@@ -1,20 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BookOpen, Plus, X } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
+import { useSettingsStore } from "../../stores/settingsStore";
 import { useCourseStore, courseService } from "../../stores/courseStore";
 import { useWindowDrag } from "../../hooks/useWindowDrag";
 import { startOfWeek, dateStringOf } from "../../lib/date";
 import {
   SCHEDULE_WEEKDAYS,
-  SCHEDULE_START_HOUR,
-  SCHEDULE_HOURS,
-  SCHEDULE_ROW_H,
   minutesLabel,
   minutesToPx,
+  pxToMinutes,
   snapMinutes,
   isOccupied,
   clampGridStart,
   resizeSlot,
+  rowHeightForWindow,
 } from "../../lib/schedule";
 import { courseColor } from "../../lib/courseColors";
 import { NO_CATEGORY_COLOR } from "../../lib/categoryColors";
@@ -120,7 +120,24 @@ export default function CourseSchedule() {
   const armedCourse: Course | null =
     armedId == null ? null : (courses.find((c) => c.id === armedId) ?? null);
 
-  const hours = Array.from({ length: SCHEDULE_HOURS }, (_, i) => SCHEDULE_START_HOUR + i);
+  // 可视时间窗：跟随「时间轴开始/结束」设置（取整点，保证 end > start）
+  const timelineSettings = useSettingsStore((s) => s.settings);
+  const gridStartMin = Math.max(0, Math.round(timelineSettings.timelineStartMinutes / 60) * 60);
+  const gridEndMin = Math.max(
+    gridStartMin + 60,
+    Math.min(24 * 60, Math.round(timelineSettings.timelineEndMinutes / 60) * 60),
+  );
+  const snapStep = Math.max(5, Math.min(60, Math.round(timelineSettings.timelineSnapMinutes || 15)));
+  const hourCount = (gridEndMin - gridStartMin) / 60;
+  const pxPerHour = rowHeightForWindow(hourCount);
+  const startHour = gridStartMin / 60;
+  const hours = Array.from({ length: hourCount }, (_, i) => startHour + i);
+
+  /** 列 → 真实 weekday（1=周一..7=周日）：周起始日决定首列（默认周一为首）。 */
+  const colWeekdays = useMemo(() => {
+    const lead = timelineSettings.weekStart === "sunday" ? 7 : 1;
+    return Array.from({ length: 7 }, (_, i) => ((lead - 1 + i) % 7) + 1);
+  }, [timelineSettings.weekStart]);
 
   const daySlotsByWeekday = useMemo(() => {
     const m = new Map<number, SlotView[]>();
@@ -164,21 +181,32 @@ export default function CourseSchedule() {
       const r = el.getBoundingClientRect();
       if (x < r.left || x > r.right) continue;
       if (y < r.top || y > r.bottom) return null;
-      const raw = SCHEDULE_START_HOUR * 60 + ((y - r.top) / SCHEDULE_ROW_H) * 60;
-      const start = clampGridStart(snapMinutes(raw), durationMinutes);
-      const conflict = isOccupied(slots, i + 1, start, durationMinutes, ignoreId);
-      return { weekday: i + 1, start, conflict };
+      const weekday = colWeekdays[i];
+      const raw = pxToMinutes(y - r.top, pxPerHour, gridStartMin);
+      const start = clampGridStart(
+        snapMinutes(raw, snapStep),
+        durationMinutes,
+        gridStartMin,
+        gridEndMin,
+      );
+      const conflict = isOccupied(slots, weekday, start, durationMinutes, ignoreId);
+      return { weekday, start, conflict };
     }
     return null;
   }
 
-  /** 放置模式下的列内悬停目标（基于列自身坐标，吸附 15 分钟、默认 60 分钟）。 */
+  /** 放置模式下的列内悬停目标（基于列自身坐标，默认 60 分钟）。 */
   function hoverAt(e: React.MouseEvent<HTMLDivElement>, weekday: number): HoverTarget | null {
     const r = e.currentTarget.getBoundingClientRect();
     const y = e.clientY;
     if (y < r.top || y > r.bottom) return null;
-    const raw = SCHEDULE_START_HOUR * 60 + ((y - r.top) / SCHEDULE_ROW_H) * 60;
-    const start = clampGridStart(snapMinutes(raw), PLACE_DURATION);
+    const raw = pxToMinutes(y - r.top, pxPerHour, gridStartMin);
+    const start = clampGridStart(
+      snapMinutes(raw, snapStep),
+      PLACE_DURATION,
+      gridStartMin,
+      gridEndMin,
+    );
     const conflict = isOccupied(slots, weekday, start, PLACE_DURATION);
     return { weekday, start, conflict };
   }
@@ -318,8 +346,15 @@ export default function CourseSchedule() {
           const colEl = colRefs.current[weekday - 1];
           if (!colEl) return;
           const r = colEl.getBoundingClientRect();
-          const raw = SCHEDULE_START_HOUR * 60 + ((ev.clientY - r.top) / SCHEDULE_ROW_H) * 60;
-          const rs = resizeSlot(origStart, origDur, edge, snapMinutes(raw));
+          const raw = pxToMinutes(ev.clientY - r.top, pxPerHour, gridStartMin);
+          const rs = resizeSlot(
+            origStart,
+            origDur,
+            edge,
+            snapMinutes(raw, snapStep),
+            gridStartMin,
+            gridEndMin,
+          );
           const conflict = isOccupied(slots, weekday, rs.startMinutes, rs.durationMinutes, slot.id);
           last = { start: rs.startMinutes, duration: rs.durationMinutes, conflict };
           setDrag({
@@ -398,7 +433,8 @@ export default function CourseSchedule() {
         </div>
       )}
 
-      <div className="flex items-start gap-3">
+      {/* 布局：左侧 = 周表格视图，右侧 = 我的课程（flex-row-reverse 视觉对调） */}
+      <div className="flex flex-row-reverse items-start gap-3">
         {/* 课程库 */}
         <aside className="w-48 shrink-0 select-none space-y-2 rounded-lg border border-neutral-200 bg-white p-3">
           <div className="flex items-center justify-between">
@@ -432,7 +468,7 @@ export default function CourseSchedule() {
                     }}
                     title={
                       armed
-                        ? "已选中：点击右侧空白格放置 · 再点一下或按 Esc 取消"
+                        ? "已选中：点击左侧表格空白格放置 · 再点一下或按 Esc 取消"
                         : "点击开始放置（点空白格添加 60 分钟）；按住可拖入周视图"
                     }
                     className={`group flex cursor-grab items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors active:cursor-grabbing ${
@@ -512,7 +548,7 @@ export default function CourseSchedule() {
               <span className="text-neutral-700">
                 正在添加{" "}
                 <span className="font-medium text-neutral-900">{armedCourse.title}</span>
-                ：点击右侧空白格放置（60 分钟）
+                ：点击左侧表格空白格放置（60 分钟）
               </span>
               <span className="hidden text-neutral-400 sm:inline">· 再点课程 / Esc 取消</span>
               <button
@@ -531,40 +567,39 @@ export default function CourseSchedule() {
           {/* 周几表头 */}
           <div className="flex border-b border-neutral-200">
             <div className="w-11 shrink-0" />
-            {SCHEDULE_WEEKDAYS.map((w, wi) => {
+            {colWeekdays.map((weekday) => {
               const active =
-                (drag && drag.weekday === wi + 1) ||
-                (!drag && armedCourse && hover?.weekday === wi + 1);
+                (drag && drag.weekday === weekday) ||
+                (!drag && armedCourse && hover?.weekday === weekday);
               return (
                 <div
-                  key={w}
+                  key={weekday}
                   className={`min-w-0 flex-1 border-l border-neutral-100 py-1 text-center text-xs font-medium text-neutral-500 first:border-l-0 ${
                     active ? "bg-neutral-100/70" : ""
                   }`}
                 >
-                  {w}
+                  {SCHEDULE_WEEKDAYS[weekday - 1]}
                 </div>
               );
             })}
           </div>
 
-          <div className="relative flex" style={{ height: SCHEDULE_HOURS * SCHEDULE_ROW_H }}>
+          <div className="relative flex" style={{ height: hourCount * pxPerHour }}>
             {/* 时间尺 */}
             <div className="w-11 shrink-0">
               {hours.map((h) => (
                 <div
                   key={h}
                   className="border-t border-neutral-100 px-1 pt-0.5 text-right text-[10px] tabular-nums text-neutral-400"
-                  style={{ height: SCHEDULE_ROW_H }}
+                  style={{ height: pxPerHour }}
                 >
                   {String(h).padStart(2, "0")}
                 </div>
               ))}
             </div>
 
-            {/* 7 天列 */}
-            {SCHEDULE_WEEKDAYS.map((_, wi) => {
-              const weekday = wi + 1;
+            {/* 7 天列（按周起始日排列表头与命中映射） */}
+            {colWeekdays.map((weekday, wi) => {
               const colActive =
                 (drag && drag.weekday === weekday) ||
                 (!drag && armedCourse && hover?.weekday === weekday);
@@ -591,7 +626,7 @@ export default function CourseSchedule() {
                     <div
                       key={h}
                       className="border-t border-neutral-100/60"
-                      style={{ height: SCHEDULE_ROW_H }}
+                      style={{ height: pxPerHour }}
                     />
                   ))}
 
@@ -599,8 +634,8 @@ export default function CourseSchedule() {
                   {(daySlotsByWeekday.get(weekday) ?? []).map((s) => {
                     const color = colorOfCourse(s.courseId);
                     const isDragging = drag?.slotId === s.id;
-                    const top = minutesToPx(s.startMinutes);
-                    const height = Math.max(16, (s.durationMinutes / 60) * SCHEDULE_ROW_H - 2);
+                    const top = minutesToPx(s.startMinutes, pxPerHour, gridStartMin);
+                    const height = Math.max(16, (s.durationMinutes / 60) * pxPerHour - 2);
                     return (
                       <div
                         key={s.id}
@@ -666,8 +701,8 @@ export default function CourseSchedule() {
                         ghost.conflict ? "opacity-90" : "opacity-80"
                       }`}
                       style={{
-                        top: minutesToPx(ghost.start!) + 1,
-                        height: Math.max(16, (ghost.durationMinutes / 60) * SCHEDULE_ROW_H - 2),
+                        top: minutesToPx(ghost.start!, pxPerHour, gridStartMin) + 1,
+                        height: Math.max(16, (ghost.durationMinutes / 60) * pxPerHour - 2),
                         backgroundColor: ghost.conflict ? "#fee2e2" : `${colorOfCourse(ghost.courseId)}33`,
                         borderLeft: `3px solid ${ghost.conflict ? "#ef4444" : colorOfCourse(ghost.courseId)}`,
                         borderRadius: 5,
@@ -691,7 +726,7 @@ export default function CourseSchedule() {
                 <p className="rounded-md bg-white/70 px-3 py-1.5 text-xs text-neutral-400">
                   {courses.length === 0
                     ? "先新建一门课程，再点空白格或拖入排课"
-                    : "点左侧课程 → 点空白格放置；或把课程卡直接拖进来"}
+                    : "点右侧课程 → 在左侧表格点空白格放置；或把课程卡直接拖进来"}
                 </p>
               </div>
             )}

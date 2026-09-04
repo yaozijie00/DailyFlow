@@ -1,6 +1,6 @@
 [package]
 name = "dailyflow"
-version = "2.2.0"
+version = "2.3.0"
 description = "DailyFlow - 个人本地时间管理工具"
 authors = ["you"]
 edition = "2021"

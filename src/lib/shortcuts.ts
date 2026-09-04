@@ -54,7 +54,7 @@ export const DEFAULT_SHORTCUTS: ShortcutMap = {
   open_goals: "Ctrl+3",
   open_statistics: "Ctrl+4",
   open_achievements: "Ctrl+5",
-  open_settings: "Ctrl+,",
+  open_settings: "Ctrl+6",
   undo: "Ctrl+Z",
   redo: "Ctrl+Shift+Z",
 };

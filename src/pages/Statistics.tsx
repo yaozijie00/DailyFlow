@@ -166,7 +166,7 @@ export default function Statistics() {
                   value={String(overview!.taskCompleted)}
                   sub={`未完成 ${overview!.taskIncomplete}`}
                 />
-                <StatCard label="完成率" value={`${completionPct}%`} sub={`创建 ${overview!.taskCreated}`} />
+                <StatCard label="完成率" value={`${completionPct}%`} />
               </div>
 
               {/* 次要指标 */}
@@ -177,7 +177,11 @@ export default function Statistics() {
                 />
                 <StatCard label="平均每日投入" value={formatDurationCompact(overview!.avgDailySeconds)} />
                 <StatCard label="最常类别" value={overview!.topCategory ?? "—"} />
-                <StatCard label="未完成任务" value={String(overview!.taskIncomplete)} />
+                <StatCard
+                  label="创建任务"
+                  value={String(overview!.taskCreated)}
+                  sub={`未完成 ${overview!.taskIncomplete}`}
+                />
               </div>
 
               {/* 类别投入柱状图 */}

@@ -300,6 +300,29 @@ describe("休息循环（Focus → Break）", () => {
     expect(s.taskId).toBe(7);
   });
 
+  it("休息结束不自动连开；endSession 结束会话回到待选并清零计数", () => {
+    const { store, clock } = makeStore();
+    store.getState().startFocus(7);
+    clock.advance(25 * MINUTE);
+    store.getState().refresh();
+    store.getState().startBreak(); // 进入短休息
+    clock.advance(5 * MINUTE);
+    store.getState().refresh(); // 休息自然结束 → 只弹结果，绝不自动开始下一轮
+    let s = store.getState();
+    expect(s.phase).toBe("short_break");
+    expect(s.snapshot.state).toBe("COMPLETED");
+    expect(s.showResult).toBe(true);
+    expect(s.taskId).toBe(7);
+    expect(s.snapshot.state).not.toBe("RUNNING"); // 未自动连开
+    store.getState().endSession();
+    s = store.getState();
+    expect(s.snapshot.state).toBe("IDLE");
+    expect(s.phase).toBe("focus");
+    expect(s.taskId).toBeNull();
+    expect(s.showResult).toBe(false);
+    expect(s.completedFocusCount).toBe(0);
+  });
+
   it("休息进行中可跳过休息直接开始下一专注", () => {
     const { store, clock } = makeStore();
     store.getState().startFocus(7);

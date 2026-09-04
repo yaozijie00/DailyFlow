@@ -36,6 +36,7 @@ export default function PomodoroPanel() {
   const abandonFocus = usePomodoroStore((s) => s.abandonFocus);
   const refresh = usePomodoroStore((s) => s.refresh);
   const reset = usePomodoroStore((s) => s.reset);
+  const endSession = usePomodoroStore((s) => s.endSession);
 
   const tasks = useTaskStore((s) => s.tasks);
   const completeTask = useTaskStore((s) => s.completeTask);
@@ -43,6 +44,8 @@ export default function PomodoroPanel() {
     (s) => s.settings.pomodoroDurationMinutes,
   );
   const shortBreakMinutes = useSettingsStore((s) => s.settings.shortBreakMinutes);
+  const longBreakMinutes = useSettingsStore((s) => s.settings.longBreakMinutes);
+  const longBreakInterval = useSettingsStore((s) => s.settings.longBreakInterval);
   const focusMinutesOverride = usePomodoroStore((s) => s.focusMinutesOverride);
   const breakMinutesOverride = usePomodoroStore((s) => s.breakMinutesOverride);
   const setFocusMinutesOverride = usePomodoroStore((s) => s.setFocusMinutesOverride);
@@ -258,7 +261,7 @@ export default function PomodoroPanel() {
             </button>
           </div>
           <p className="text-[11px] text-neutral-400">
-            以上只作用于本次专注；默认值在「设置 → 专注」中调整。
+            以上只作用于本次专注；默认值在「设置 → 默认」中调整。
           </p>
         </div>
       )}
@@ -271,9 +274,15 @@ export default function PomodoroPanel() {
               <CheckCircle2 size={20} />
               <span className="text-lg font-semibold">休息结束</span>
             </div>
+            <p className="text-sm text-neutral-500">
+              休息已完成，是否开始下一轮专注？由你决定，不会自动连开。
+            </p>
             <div className="flex gap-2">
               <button onClick={startNextFocus} className={PRIMARY_BTN}>
-                <Play size={14} /> 开始专注
+                <Play size={14} /> 开始下一轮专注
+              </button>
+              <button onClick={endSession} className={SECONDARY_BTN}>
+                <Flag size={14} /> 结束会话
               </button>
             </div>
           </div>
@@ -301,17 +310,34 @@ export default function PomodoroPanel() {
             </dl>
             <div className="flex gap-2">
               {completed ? (
-                <button onClick={startBreak} className={PRIMARY_BTN}>
-                  <Coffee size={14} /> 开始休息
-                </button>
+                <>
+                  <button onClick={startBreak} className={PRIMARY_BTN}>
+                    <Coffee size={14} /> 去休息{" "}
+                    {completedFocusCount >= longBreakInterval
+                      ? longBreakMinutes
+                      : (breakMinutesOverride ?? shortBreakMinutes)}{" "}
+                    分钟
+                  </button>
+                  <button onClick={endSession} className={SECONDARY_BTN}>
+                    <Flag size={14} /> 结束本轮
+                  </button>
+                  <button onClick={handleFinishTask} className={SECONDARY_BTN}>
+                    <CheckCircle2 size={14} /> 完成任务
+                  </button>
+                </>
               ) : (
-                <button onClick={startNextFocus} className={PRIMARY_BTN}>
-                  <Play size={14} /> 继续专注
-                </button>
+                <>
+                  <button onClick={startNextFocus} className={PRIMARY_BTN}>
+                    <Play size={14} /> 继续专注
+                  </button>
+                  <button onClick={endSession} className={SECONDARY_BTN}>
+                    <Flag size={14} /> 结束本轮
+                  </button>
+                  <button onClick={handleFinishTask} className={SECONDARY_BTN}>
+                    <CheckCircle2 size={14} /> 完成任务
+                  </button>
+                </>
               )}
-              <button onClick={handleFinishTask} className={SECONDARY_BTN}>
-                <Flag size={14} /> 完成任务
-              </button>
             </div>
           </div>
         )

@@ -5,6 +5,12 @@ import {
   type ShortcutMap,
 } from "../lib/shortcuts";
 
+/** 可设为「启动默认页」的页面（导航级页面）。 */
+export type DefaultPageId = "today" | "focus" | "goals" | "statistics" | "settings";
+
+/** 周起始日：周一 或 周日（影响月历/课程表的列序与行窗口）。 */
+export type WeekStart = "monday" | "sunday";
+
 /** 应用设置（内存模型，分钟单位）。 */
 export interface AppSettings {
   /** 番茄钟默认时长（分钟） */
@@ -31,6 +37,14 @@ export interface AppSettings {
   closeBehaviorConfigured: boolean;
   /** 撤销记录数量上限（默认 50；可设 20/50/100/200） */
   undoHistoryLimit: number;
+  /** 启动时默认打开的页面（v2.3.x；默认今日） */
+  defaultPage: DefaultPageId;
+  /** 今日任务列表默认隐藏已完成（v2.3.x；默认不隐藏） */
+  todayHideCompleted: boolean;
+  /** 今日页是否显示便签栏（v2.3.x；默认显示） */
+  todayShowNotes: boolean;
+  /** 周起始日：周一 / 周日（v2.3.x；默认周一） */
+  weekStart: WeekStart;
 }
 
 /** 关闭窗口行为。 */
@@ -49,7 +63,18 @@ export const DEFAULT_SETTINGS: AppSettings = {
   closeBehavior: "exit",
   closeBehaviorConfigured: false, // 旧版本升级：首次点击 X 询问
   undoHistoryLimit: 50,
+  defaultPage: "today",
+  todayHideCompleted: false,
+  todayShowNotes: true,
+  weekStart: "monday",
 };
+
+/** 合法的「默认页」白名单。 */
+const DEFAULT_PAGE_IDS: DefaultPageId[] = ["today", "focus", "goals", "statistics", "settings"];
+
+function isDefaultPageId(v: unknown): v is DefaultPageId {
+  return typeof v === "string" && (DEFAULT_PAGE_IDS as string[]).includes(v);
+}
 
 /** settings 表键名（存储格式：时长用秒或分钟、时间用 "HH:mm"、粒度用分钟）。 */
 const KEY_POMODORO_DURATION = "pomodoro_duration";
@@ -65,6 +90,10 @@ const KEY_NOTIFICATIONS = "notifications_enabled";
 const KEY_CLOSE_BEHAVIOR = "close_behavior";
 const KEY_CLOSE_BEHAVIOR_CONFIGURED = "close_behavior_configured";
 const KEY_UNDO_LIMIT = "undo_history_limit";
+const KEY_DEFAULT_PAGE = "default_page";
+const KEY_TODAY_HIDE_COMPLETED = "today_hide_completed";
+const KEY_TODAY_SHOW_NOTES = "today_show_notes";
+const KEY_WEEK_START = "week_start";
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
@@ -143,6 +172,12 @@ export class SettingsService {
         stored[KEY_CLOSE_BEHAVIOR] === "tray" ? "tray" : "exit",
       closeBehaviorConfigured: stored[KEY_CLOSE_BEHAVIOR_CONFIGURED] === "1",
       undoHistoryLimit: Math.round(parseIntSafe(stored[KEY_UNDO_LIMIT], 50)),
+      defaultPage: isDefaultPageId(stored[KEY_DEFAULT_PAGE])
+        ? stored[KEY_DEFAULT_PAGE]
+        : DEFAULT_SETTINGS.defaultPage,
+      todayHideCompleted: stored[KEY_TODAY_HIDE_COMPLETED] === "1",
+      todayShowNotes: stored[KEY_TODAY_SHOW_NOTES] !== "0",
+      weekStart: stored[KEY_WEEK_START] === "sunday" ? "sunday" : "monday",
     };
   }
 
@@ -194,6 +229,18 @@ export class SettingsService {
     if (partial.undoHistoryLimit !== undefined) {
       const n = Math.max(10, Math.min(500, Math.round(partial.undoHistoryLimit)));
       writes.push([KEY_UNDO_LIMIT, String(n)]);
+    }
+    if (partial.defaultPage !== undefined && isDefaultPageId(partial.defaultPage)) {
+      writes.push([KEY_DEFAULT_PAGE, partial.defaultPage]);
+    }
+    if (partial.todayHideCompleted !== undefined) {
+      writes.push([KEY_TODAY_HIDE_COMPLETED, partial.todayHideCompleted ? "1" : "0"]);
+    }
+    if (partial.todayShowNotes !== undefined) {
+      writes.push([KEY_TODAY_SHOW_NOTES, partial.todayShowNotes ? "1" : "0"]);
+    }
+    if (partial.weekStart !== undefined) {
+      writes.push([KEY_WEEK_START, partial.weekStart === "sunday" ? "sunday" : "monday"]);
     }
     for (const [k, v] of writes) {
       await this.repo.set(k, v);

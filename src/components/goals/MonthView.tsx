@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { useSettingsStore } from "../../stores/settingsStore";
 import { useWindowDrag } from "../../hooks/useWindowDrag";
 import {
-  WEEKDAY_NAMES,
+  weekDayNames,
   monthGrid,
   monthLabel,
   segmentInWeek,
@@ -11,16 +12,18 @@ import {
   shiftDateRange,
   parseDateKey,
   dateKey,
+  type WeekStart,
   type MonthGridWeek,
   type WeekSegment,
 } from "../../lib/monthView";
 import type { GoalWithProgress } from "../../db/repositories/goalRepository";
+import { goalColor } from "../../lib/goalColors";
 
 /** 每行最多同时展示的轨道数，超出走「+N 更多」折叠（保证周行高度有上限）。 */
 const MAX_LANES = 3;
 const HEADER_H = 22; // 日号区高度
-const BAR_H = 15; // 任务条高
-const BAR_GAP = 3; // 轨道间距
+const BAR_H = 20; // 任务条高（v2.3.x 加粗）
+const BAR_GAP = 4; // 轨道间距
 const FOOTER_H = 18; // +N 折叠行高
 
 function addDaysKey(date: string, delta: number): string {
@@ -55,6 +58,7 @@ interface RowSeg {
 export default function MonthView({ goals, onEdit, onMoveRange, onRequestCreate }: MonthViewProps) {
   const now = new Date();
   const todayKey = dateKey(now);
+  const weekStart: WeekStart = useSettingsStore((s) => s.settings.weekStart);
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
   const { start: startWindowDrag } = useWindowDrag();
@@ -69,7 +73,7 @@ export default function MonthView({ goals, onEdit, onMoveRange, onRequestCreate 
   /** 是否已发生真实拖动（>4px），抑制拖动后的 click 误触编辑 */
   const movedRef = useRef(false);
 
-  const weeks = monthGrid(year, month, todayKey);
+  const weeks = monthGrid(year, month, todayKey, weekStart);
   const arranged = goals.filter((g) => g.startDate && g.deadline);
   const unscheduled = goals.filter((g) => !g.startDate || !g.deadline);
 
@@ -258,7 +262,7 @@ export default function MonthView({ goals, onEdit, onMoveRange, onRequestCreate 
 
       {/* 周表头 */}
       <div className="flex rounded-t-md border border-b-0 border-neutral-200 bg-white">
-        {WEEKDAY_NAMES.map((w) => (
+        {weekDayNames(weekStart).map((w) => (
           <div
             key={w}
             className="flex-1 border-l border-neutral-100 py-1 text-center text-xs font-medium text-neutral-500 first:border-l-0"
@@ -326,6 +330,7 @@ export default function MonthView({ goals, onEdit, onMoveRange, onRequestCreate 
               {visibleIdx.map((i) => {
                 const { seg, goal } = rows[i];
                 const lane = laneOf[i];
+                const color = goalColor(goal.id);
                 return (
                   <div
                     key={`${seg.goalId}-${wi}`}
@@ -339,17 +344,21 @@ export default function MonthView({ goals, onEdit, onMoveRange, onRequestCreate 
                     }}
                     aria-label="编辑长期任务"
                     title={`${goal.title}：${goal.startDate} ~ ${goal.deadline}（拖动移动，边缘调整起止）`}
-                    className="absolute z-10 flex cursor-grab items-center overflow-hidden rounded-sm bg-neutral-900/10 hover:bg-neutral-900/20 active:cursor-grabbing"
+                    className="absolute z-10 flex cursor-grab items-center overflow-hidden rounded-[4px] transition-[filter] hover:brightness-[0.96] active:cursor-grabbing"
                     style={{
                       left: `${(seg.startCol / 7) * 100}%`,
                       width: `${((seg.endCol - seg.startCol + 1) / 7) * 100}%`,
                       top: HEADER_H + lane * (BAR_H + BAR_GAP) + 1,
                       height: BAR_H - 2,
+                      backgroundColor: `${color}24`,
+                      borderLeft: `3px solid ${color}`,
+                      boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.03)",
                     }}
                   >
+                    {/* 进度：同色加深填充（饱和度略高，保持与底色的色相一致） */}
                     <div
-                      className="absolute inset-y-0 left-0 bg-neutral-900/60"
-                      style={{ width: `${seg.progressPercent}%` }}
+                      className="absolute inset-y-0 left-0"
+                      style={{ width: `${seg.progressPercent}%`, backgroundColor: `${color}47` }}
                     />
                     {seg.startsGoal && (
                       <div
@@ -365,7 +374,7 @@ export default function MonthView({ goals, onEdit, onMoveRange, onRequestCreate 
                         title="拖动调整结束日期"
                       />
                     )}
-                    <span className="relative z-10 truncate px-1.5 text-[10px] text-neutral-900">
+                    <span className="relative z-10 truncate pl-1.5 pr-1 text-[11px] font-medium leading-none text-neutral-800">
                       {seg.title}
                     </span>
                   </div>
@@ -414,8 +423,12 @@ export default function MonthView({ goals, onEdit, onMoveRange, onRequestCreate 
               <button
                 key={g.id}
                 onClick={() => onEdit(g)}
-                className="rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-700 hover:border-neutral-300"
+                className="flex items-center gap-1.5 rounded-md border border-neutral-200 bg-white px-2 py-1 text-xs text-neutral-700 hover:border-neutral-300"
               >
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: goalColor(g.id) }}
+                />
                 {g.title}
               </button>
             ))}
@@ -446,6 +459,10 @@ export default function MonthView({ goals, onEdit, onMoveRange, onRequestCreate 
                   }}
                   className="flex w-full items-center gap-2 rounded-md border border-neutral-100 px-2 py-1.5 text-left text-xs hover:bg-neutral-50"
                 >
+                  <span
+                    className="h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: goalColor(g.id) }}
+                  />
                   <span className="min-w-0 flex-1 truncate text-neutral-800">{g.title}</span>
                   <span className="shrink-0 text-neutral-400">
                     {g.startDate?.slice(5)}~{g.deadline?.slice(5)}

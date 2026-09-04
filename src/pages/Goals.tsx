@@ -99,7 +99,7 @@ export default function Goals() {
   };
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-5">
+    <div className="mx-auto flex max-w-6xl flex-col gap-5">
       <PageHeader
         title="长期"
         description={`月规划 · 进行中 ${goals.length} · 已完成 ${completedGoals.length}；任务关联目标后进度自动统计`}

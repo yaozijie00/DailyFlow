@@ -26,6 +26,10 @@ function ctx(partial: Partial<AchievementContext> = {}): AchievementContext {
     estimateAccurateStreak: 0,
     courseTasksCompleted: 0,
     undoCountToday: 0,
+    morningFocusCount: 0,
+    weekendFocusCount: 0,
+    maxDailyPomodoros: 0,
+    highPriorityTasksCompleted: 0,
     ...partial,
   };
 }
@@ -190,5 +194,31 @@ describe("ConditionEngine", () => {
     expect(isValidCondition({ type: "category_duration", target: 10 })).toBe(false); // 缺 categoryName
     expect(isValidCondition(null)).toBe(false);
     expect(isValidCondition("x")).toBe(false);
+  });
+
+  it("新增里程碑条件：morning/weekend/daily_pomodoros/high_priority 达标与进度", () => {
+    const morning: Condition = { type: "morning_sessions", target: 10 };
+    expect(ConditionEngine.evaluate(morning, ctx({ morningFocusCount: 9 }))).toBe(false);
+    expect(ConditionEngine.evaluate(morning, ctx({ morningFocusCount: 10 }))).toBe(true);
+
+    const weekend: Condition = { type: "weekend_sessions", target: 50 };
+    expect(ConditionEngine.evaluate(weekend, ctx({ weekendFocusCount: 50 }))).toBe(true);
+    expect(
+      ConditionEngine.getProgress(weekend, ctx({ weekendFocusCount: 25 })).percentage,
+    ).toBe(50);
+
+    const pomo: Condition = { type: "daily_pomodoros", target: 8 };
+    expect(ConditionEngine.evaluate(pomo, ctx({ maxDailyPomodoros: 8 }))).toBe(true);
+    expect(ConditionEngine.evaluate(pomo, ctx({ maxDailyPomodoros: 7 }))).toBe(false);
+
+    const hp: Condition = { type: "high_priority_tasks_completed", target: 200 };
+    expect(ConditionEngine.evaluate(hp, ctx({ highPriorityTasksCompleted: 199 }))).toBe(false);
+    expect(ConditionEngine.evaluate(hp, ctx({ highPriorityTasksCompleted: 200 }))).toBe(true);
+
+    // 校验器接受新类型、拒绝缺 target
+    for (const c of [morning, weekend, pomo, hp]) {
+      expect(isValidCondition(c)).toBe(true);
+    }
+    expect(isValidCondition({ type: "morning_sessions" })).toBe(false);
   });
 });

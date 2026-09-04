@@ -5,6 +5,7 @@ import { useGoalStore } from "../../stores/goalStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { formatTimeRange } from "../../lib/timeline";
 import { REPEAT_RULES } from "../../lib/repeat";
+import { TASK_PRIORITIES, taskPriorityMeta, type TaskPriority } from "../../lib/taskPriority";
 
 export default function TaskFormModal() {
   const isCreateOpen = useTaskStore((s) => s.isCreateOpen);
@@ -33,6 +34,7 @@ export default function TaskFormModal() {
   const [estimatedMinutes, setEstimatedMinutes] = useState("");
   const [notes, setNotes] = useState("");
   const [repeatRule, setRepeatRule] = useState("");
+  const [priority, setPriority] = useState<TaskPriority>("medium");
 
   // 打开表单时按需加载项目（长期页可先建项目）
   useEffect(() => {
@@ -55,6 +57,7 @@ export default function TaskFormModal() {
       );
       setNotes(editingTask.notes ?? "");
       setRepeatRule(editingTask.repeatRule ?? "");
+      setPriority(taskPriorityMeta(editingTask.priority).value);
     } else if (hasDraft) {
       setTitle("");
       setCategoryId("");
@@ -65,6 +68,7 @@ export default function TaskFormModal() {
       );
       setNotes("");
       setRepeatRule("");
+      setPriority("medium");
     } else {
       setTitle("");
       setCategoryId("");
@@ -73,6 +77,7 @@ export default function TaskFormModal() {
       setEstimatedMinutes("");
       setNotes("");
       setRepeatRule("");
+      setPriority("medium");
     }
   }, [editingTaskId, isCreateOpen, editingTask, createDraft, hasDraft]);
 
@@ -100,6 +105,7 @@ export default function TaskFormModal() {
           : Math.round(estimated * 60),
       notes: notes.trim() === "" ? null : notes.trim(),
       repeatRule,
+      priority,
       ...(hasDraft
         ? {
             plannedStart: createDraft.plannedStart,
@@ -145,6 +151,31 @@ export default function TaskFormModal() {
               placeholder="例如：写代码"
               className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-neutral-900"
             />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-neutral-600">优先级</label>
+            <div className="flex gap-2">
+              {TASK_PRIORITIES.map((p) => {
+                const active = priority === p.value;
+                return (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => setPriority(p.value)}
+                    className={`flex-1 rounded-md border px-3 py-1.5 text-sm transition-colors ${
+                      active ? "" : "border-neutral-300 text-neutral-500 hover:bg-neutral-50"
+                    }`}
+                    style={
+                      active
+                        ? { color: p.text, backgroundColor: p.bg, borderColor: p.text }
+                        : undefined
+                    }
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
           <div>
             <label className="mb-1 block text-sm text-neutral-600">类别</label>

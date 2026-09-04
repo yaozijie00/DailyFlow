@@ -8,6 +8,7 @@ import {
   shiftDateRange,
   weekdayOf,
   monthGrid,
+  weekDayNames,
   segmentInWeek,
   assignLanes,
   overflowCounts,
@@ -284,5 +285,23 @@ describe("overflowCounts（+N 更多折叠计数）", () => {
   it("无溢出时全为 0", () => {
     const segs = [{ startCol: 0, endCol: 6 }];
     expect(overflowCounts(segs, assignLanes(segs), 3)).toEqual([0, 0, 0, 0, 0, 0, 0]);
+  });
+});
+
+describe("周起始日（weekStart：周一/周日）", () => {
+  it("weekDayNames：周一首列 vs 周日首列", () => {
+    expect(weekDayNames("monday")).toEqual(["周一", "周二", "周三", "周四", "周五", "周六", "周日"]);
+    expect(weekDayNames("sunday")).toEqual(["周日", "周一", "周二", "周三", "周四", "周五", "周六"]);
+    expect(weekDayNames()).toEqual(weekDayNames("monday")); // 默认周一
+  });
+
+  it("2026-09-01 是周二：周一为首首格 08/31，周日为首首格 08/30", () => {
+    const mon = monthGrid(2026, 8, "2026-09-15", "monday");
+    expect(mon[0].cells[0].date).toBe("2026-08-31");
+    expect(mon[0].cells[0].weekday).toBe("周一");
+    const sun = monthGrid(2026, 8, "2026-09-15", "sunday");
+    expect(sun[0].cells[0].date).toBe("2026-08-30");
+    expect(sun[0].cells[0].weekday).toBe("周日");
+    expect(sun[0].cells[6].date).toBe("2026-09-05"); // 周六收尾
   });
 });

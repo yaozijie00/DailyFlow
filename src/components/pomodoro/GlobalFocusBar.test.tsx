@@ -49,6 +49,7 @@ const task: Task = {
   projectId: null,
   parentId: null,
   courseId: null,
+  priority: "medium",
 };
 
 beforeEach(() => {

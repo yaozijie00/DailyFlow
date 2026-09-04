@@ -28,6 +28,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
     projectId: null,
     parentId: null,
     courseId: null,
+    priority: "medium",
     ...overrides,
   };
 }

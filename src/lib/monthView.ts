@@ -35,6 +35,16 @@ export function daysInMonth(year: number, month: number): number {
 
 export const WEEKDAY_NAMES = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 
+export type WeekStart = "monday" | "sunday";
+
+/** 依周起始日返回排列表头（周一为首 或 周日为首）。 */
+export function weekDayNames(weekStart: WeekStart = "monday"): string[] {
+  if (weekStart === "sunday") {
+    return ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+  }
+  return [...WEEKDAY_NAMES];
+}
+
 /** 日期字符串 → 星期名（周一为首）。 */
 export function weekdayOf(dateStr: string): string {
   const d = parseDateKey(dateStr);
@@ -140,12 +150,18 @@ export interface MonthGridWeek {
 }
 
 /**
- * 生成某月的月历网格：周一为首、7 列、4~6 行，补位相邻月日期。
- * 真实日期动态生成（28/29/30/31、闰年、跨年均由 Date 保证）。
+ * 生成某月的月历网格：7 列、4~6 行，补位相邻月日期。
+ * 周起始日可配置（默认周一为首）；真实日期动态生成（28/29/30/31、闰年、跨年均由 Date 保证）。
  */
-export function monthGrid(year: number, month: number, today = dateKey(new Date())): MonthGridWeek[] {
+export function monthGrid(
+  year: number,
+  month: number,
+  today = dateKey(new Date()),
+  weekStart: WeekStart = "monday",
+): MonthGridWeek[] {
   const first = new Date(year, month, 1);
-  const leading = (first.getDay() + 6) % 7; // 周一为首时的前补天数
+  // 行首 = 该月 1 日所在周的首日：周一为首 → (getDay()+6)%7 前补；周日为首 → getDay() 前补
+  const leading = weekStart === "sunday" ? first.getDay() : (first.getDay() + 6) % 7;
   const n = daysInMonth(year, month);
   const rows = Math.ceil((leading + n) / 7);
   const start = new Date(year, month, 1 - leading);
