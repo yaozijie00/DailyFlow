@@ -87,7 +87,7 @@ fn hide_to_tray(app: tauri::AppHandle) {
 const MINI_WINDOW_LABEL: &str = "mini";
 
 #[tauri::command]
-fn open_mini_window(app: tauri::AppHandle) -> Result<(), String> {
+async fn open_mini_window(app: tauri::AppHandle) -> Result<(), String> {
     use tauri::WebviewWindowBuilder;
     append_startup_log("open_mini_window: 开始");
     // 隐藏主窗（Mini 模式下最小化 = 主窗退场）
@@ -103,6 +103,10 @@ fn open_mini_window(app: tauri::AppHandle) -> Result<(), String> {
     // 首次创建：同一前端 bundle（与主窗相同 URL），身份完全由窗口 label="mini" 区分。
     // 不用 query/hash 标记：dev 下 Vite 重定向会丢 query，而 window label 由 Tauri 注入
     // 到前端 __TAURI_INTERNALS__，前端 getCurrentWindow().label === "mini" 稳定可判。
+    //
+    // 注意：必须是 async command —— 同步 command 在主线程 IPC 内同步 build 第二个
+    // WebView2 窗口会死锁（WebView2 初始化需主线程消息循环被 pump，而主线程正被阻塞），
+    // 表现为「创建新窗口」日志后无下文 + Mini 白屏/主窗消失。
     let url = "index.html";
     append_startup_log(&format!("open_mini_window: 创建新窗口 url={url}"));
     let win = WebviewWindowBuilder::new(&app, MINI_WINDOW_LABEL, tauri::WebviewUrl::App(url.into()))
@@ -148,15 +152,15 @@ fn window_maximize_toggle(app: tauri::AppHandle) {
 /// - Mini 不可见或未创建 → 隐藏主窗并显示 Mini；
 /// - Mini 已可见 → 还原主窗（再次点击相当于返回）。
 #[tauri::command]
-fn toggle_mini_window(app: tauri::AppHandle) -> Result<(), String> {
+async fn toggle_mini_window(app: tauri::AppHandle) -> Result<(), String> {
     if let Some(mini) = app.get_webview_window(MINI_WINDOW_LABEL) {
         if mini.is_visible().unwrap_or(false) {
             close_mini_window(app);
         } else {
-            open_mini_window(app)?;
+            open_mini_window(app).await?;
         }
     } else {
-        open_mini_window(app)?;
+        open_mini_window(app).await?;
     }
     Ok(())
 }
@@ -230,7 +234,11 @@ fn setup_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
                 show_main_window(app);
             }
             "open_mini" => {
-                let _ = toggle_mini_window(app.clone());
+                // async command：经 async_runtime 执行（同步建窗会死锁主线程）
+                let h = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    let _ = toggle_mini_window(h).await;
+                });
             }
             "toggle_focus" => {
                 // 前端监听后调用 pomodoroStore 暂停/恢复（不阻塞托盘线程）
