@@ -1,6 +1,6 @@
-import { and, count, desc, eq, gte, like, lte, lt, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, like, lt, inArray, sql } from "drizzle-orm";
 import type { Db } from "../db";
-import { tasks } from "../schema";
+import { tasks, focusSessions } from "../schema";
 import type { TaskPriority } from "../../lib/taskPriority";
 import { DEFAULT_TASK_PRIORITY } from "../../lib/taskPriority";
 
@@ -72,6 +72,13 @@ export class TaskRepository {
   async findById(id: number): Promise<Task | null> {
     const row = await this.db.select().from(tasks).where(eq(tasks.id, id)).get();
     return row ?? null;
+  }
+
+  /** 按 id 批量读取（Extension Data API：课程扩展按 task_links 回查 Core 任务状态）。 */
+  async listByIds(ids: number[]): Promise<Task[]> {
+    const uniq = [...new Set(ids)].filter((n) => Number.isFinite(n));
+    if (uniq.length === 0) return [];
+    return this.db.select().from(tasks).where(inArray(tasks.id, uniq)).all();
   }
 
   async findByDate(scheduledDate: string): Promise<Task[]> {
@@ -236,25 +243,50 @@ export class TaskRepository {
       .all();
   }
 
-  /** 某课程在 [fromDate, toDate] 内「已完成」任务的日期（2.0.x 课程完成状态）。 */
-  async findCompletedDatesByCourse(
-    courseId: number,
-    fromDate: string,
-    toDate: string,
-  ): Promise<string[]> {
+  /** Core 旧 tasks.course_id 关联（课程 Extension 回填 task_links 用；迁移完成后该列降级为过渡列）。 */
+  async listLegacyCoursePairs(): Promise<Array<{ taskId: number; courseId: number }>> {
     const rows = await this.db
-      .select({ scheduledDate: tasks.scheduledDate })
+      .select({ taskId: tasks.id, courseId: tasks.courseId })
       .from(tasks)
-      .where(
-        and(
-          eq(tasks.courseId, courseId),
-          eq(tasks.status, "COMPLETED"),
-          gte(tasks.scheduledDate, fromDate),
-          lte(tasks.scheduledDate, toDate),
-        ),
-      )
-      .groupBy(tasks.scheduledDate)
+      .where(sql`${tasks.courseId} is not null`)
       .all();
-    return rows.map((r) => r.scheduledDate);
+    return rows.flatMap((r) =>
+      r.courseId != null ? [{ taskId: r.taskId, courseId: r.courseId }] : [],
+    );
+  }
+
+  /** 按项目聚合（全部日期）：待办/已完成 任务数 + 关联专注累计秒数（v2.3.x 项目卡）。 */
+  async projectAggregates(): Promise<
+    Array<{ projectId: number; todo: number; completed: number; seconds: number }>
+  > {
+    const taskRows = await this.db
+      .select({ projectId: tasks.projectId, status: tasks.status })
+      .from(tasks)
+      .where(sql`${tasks.projectId} is not null`)
+      .all();
+    const by = new Map<number, { todo: number; completed: number; seconds: number }>();
+    for (const r of taskRows) {
+      if (r.projectId == null) continue;
+      const cur = by.get(r.projectId) ?? { todo: 0, completed: 0, seconds: 0 };
+      if (r.status === "COMPLETED") cur.completed += 1;
+      else if (r.status === "TODO") cur.todo += 1;
+      by.set(r.projectId, cur);
+    }
+    const sessRows = await this.db
+      .select({
+        projectId: tasks.projectId,
+        seconds: sql<number>`coalesce(sum(${focusSessions.actualDuration}), 0)`,
+      })
+      .from(focusSessions)
+      .leftJoin(tasks, eq(focusSessions.taskId, tasks.id))
+      .where(sql`${tasks.projectId} is not null`)
+      .groupBy(tasks.projectId)
+      .all();
+    for (const s of sessRows) {
+      if (s.projectId == null) continue;
+      const cur = by.get(s.projectId);
+      if (cur) cur.seconds += Number(s.seconds);
+    }
+    return [...by.entries()].map(([projectId, v]) => ({ projectId, ...v }));
   }
 }

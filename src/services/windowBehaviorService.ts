@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { useAppStore, type Page } from "../stores/appStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { usePomodoroStore } from "../stores/pomodoroStore";
+import { useTaskStore } from "../stores/taskStore";
 import type { CloseBehavior } from "./settingsService";
 
 /**
@@ -16,7 +17,7 @@ import type { CloseBehavior } from "./settingsService";
  */
 
 /** 纯决策函数（可单测）：给定设置与 Focus 状态，返回应执行的动作。 */
-export type CloseAction = "dialog" | "hide" | "exit" | "exit-confirm";
+export type CloseAction = "dialog" | "hide" | "exit" | "exit-confirm" | "mini";
 
 export function resolveCloseAction(
   configured: boolean,
@@ -25,6 +26,7 @@ export function resolveCloseAction(
 ): CloseAction {
   if (!configured) return "dialog"; // 首次点击 X：询问并记住
   if (behavior === "tray") return "hide"; // 隐藏到系统托盘，Focus 继续运行
+  if (behavior === "mini") return "mini"; // 关闭主窗 → 转 Mini 悬浮窗
   return focusRunning ? "exit-confirm" : "exit"; // 退出（Focus 运行中先确认）
 }
 
@@ -42,6 +44,9 @@ function handleCloseRequest(): void {
       break;
     case "hide":
       void invoke("hide_to_tray");
+      break;
+    case "mini":
+      void invoke("toggle_mini_window");
       break;
     case "exit-confirm":
       useAppStore.getState().openCloseDialog("exit-focus");
@@ -72,14 +77,28 @@ function handleTrayOpenPage(page: unknown): void {
 
 /**
  * 初始化窗口行为监听（App 挂载时调用一次）。返回清理函数。
- * - app-close-requested：Rust 窗口 X 被点击；
+ * - app-close-requested：Rust 窗口 X 被点击（主窗）；
+ * - df:tasks-changed：Mini 窗任务变更广播（主窗刷新任务）；
  * - tray-toggle-focus：托盘「开始 / 暂停专注」；
  * - tray-open-page：托盘「打开今日/长期/统计」。
+ * 注：Tauri 2.11 WindowEvent 无 Minimized 变体 → 「最小化自动转 Mini」不可达，
+ * Mini 窗经托盘菜单「打开 Mini 窗」入口（A4 降级说明见 open_mini_window）。
  */
 export function initWindowBehavior(): () => void {
   let disposed = false;
   const unlisteners: Array<() => void> = [];
   void listen("app-close-requested", () => handleCloseRequest()).then((fn) => {
+    if (disposed) fn();
+    else unlisteners.push(fn);
+  });
+  void listen("df:tasks-changed", () => {
+    // Mini 窗完成任务后主窗刷新（跨窗同步；失败静默不影响主流程）
+    try {
+      void useTaskStore.getState().load();
+    } catch {
+      /* ignore */
+    }
+  }).then((fn) => {
     if (disposed) fn();
     else unlisteners.push(fn);
   });
@@ -100,6 +119,11 @@ export function initWindowBehavior(): () => void {
 /** 隐藏到系统托盘（供关闭行为对话框/设置直接调用）。 */
 export function hideToTray(): void {
   void invoke("hide_to_tray");
+}
+
+/** 关闭主窗 → 转 Mini 悬浮窗（供关闭行为对话框「转迷你窗」调用）。 */
+export function hideToMini(): void {
+  void invoke("toggle_mini_window");
 }
 
 /** 真正退出应用（供关闭行为对话框调用）。 */

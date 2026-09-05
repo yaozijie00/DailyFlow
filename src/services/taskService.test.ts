@@ -6,6 +6,7 @@ import { CategoryRepository } from "../db/repositories/categoryRepository";
 import { FocusSessionRepository } from "../db/repositories/focusSessionRepository";
 import { TaskService } from "./taskService";
 import { todayString } from "../lib/date";
+import { undoManager } from "../lib/undoManager";
 
 describe("TaskService", () => {
   let db: Db;
@@ -140,5 +141,20 @@ describe("TaskService", () => {
     const task = await service.createTask({ title: "写代码" });
     const updated = await service.changeEstimatedDuration(task.id, 5400);
     expect(updated?.estimatedDuration).toBe(5400);
+  });
+
+  it("A1：silent completeTask 不记录撤销（Workflow Finish→Task 完成）", async () => {
+    undoManager.clear();
+    const task = await service.createTask({ title: "按流程完成" });
+    const before = undoManager.undoSize;
+    const done = await service.completeTask(task.id, true); // silent
+    expect(done?.status).toBe("COMPLETED");
+    // 不产生撤销记录（常规 completeTask 会产生一条 task.update）
+    expect(undoManager.undoSize).toBe(before);
+
+    // 对照：非 silent 会记录撤销
+    const task2 = await service.createTask({ title: "手动完成" });
+    await service.completeTask(task2.id);
+    expect(undoManager.undoSize).toBeGreaterThan(before);
   });
 });

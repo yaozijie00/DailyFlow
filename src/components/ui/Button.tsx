@@ -9,13 +9,13 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const BASE =
-  "inline-flex items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/30 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-control)] text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 disabled:cursor-not-allowed disabled:opacity-50";
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary: "bg-neutral-900 text-white hover:bg-neutral-700",
-  secondary: "border border-neutral-300 text-neutral-700 hover:bg-neutral-100",
-  danger: "bg-red-600 text-white hover:bg-red-500",
-  ghost: "text-neutral-600 hover:bg-neutral-100",
+  primary: "bg-accent text-on-accent hover:bg-accent-hover",
+  secondary: "border border-border-strong bg-surface text-text-secondary hover:bg-surface-hover",
+  danger: "bg-danger text-white hover:opacity-90",
+  ghost: "text-text-muted hover:bg-surface-hover hover:text-text-primary",
 };
 
 const SIZES: Record<ButtonSize, string> = {

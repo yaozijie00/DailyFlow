@@ -18,12 +18,34 @@ function dateAtMonday(fromDate: string, weekday: number): string {
 }
 
 /**
- * 课程业务逻辑（2.0.x Course Schedule）。
+ * 课程业务逻辑（Course Schedule Extension）。
  * 课程创建/删除（含时段还原）、时段增删改均接入 Undo。
+ * 存储层为「存储端口」：生产注入扩展独立库仓库（ExtensionCourseRepository），
+ * 与具体实现解耦。
  */
+export type CourseStoragePort = Pick<
+  CourseRepository,
+  | "listCourses"
+  | "listSlotsView"
+  | "createCourse"
+  | "deleteCourse"
+  | "insertRestoredCourse"
+  | "insertRestoredSlots"
+  | "findSlot"
+  | "createSlot"
+  | "updateSlot"
+  | "deleteSlot"
+  | "insertRestoredSlot"
+> & {
+  /** 扩展库 task_links：课程关联的任务 id（数据独立库后新增能力）。 */
+  taskIdsForCourse: (courseId: number) => Promise<number[]>;
+  /** 扩展库 task_links：记录任务 ↔ 课程引用（幂等）。 */
+  recordTaskLink: (taskId: number, courseId: number) => Promise<void>;
+};
+
 export class CourseService {
   constructor(
-    private readonly repo: CourseRepository,
+    private readonly repo: CourseStoragePort,
     private readonly tasks: TaskRepository,
   ) {}
 
@@ -155,8 +177,10 @@ export class CourseService {
   }
 
   /**
-   * 本周课程完成状态（2.0.x）：fromDate=周一 ~ toDate=周日。
-   * 完成 = 该时段对应的星期内出现了「归属该课程且已完成」的任务。
+   * 本周课程完成状态（Course Schedule Extension · 数据独立库）：
+   * fromDate=周一 ~ toDate=周日。
+   * 完成 = 该时段对应星期内出现「task_links 映射的该课程已完成任务」——
+   * 任务本体仍在 Core，经 Core Data API（tasks.listByIds）回查状态。
    */
   async getWeekProgress(
     fromDate: string,
@@ -180,8 +204,22 @@ export class CourseService {
     }
     const out: Array<{ courseId: number; title: string; occurrences: number; completed: number }> = [];
     for (const [courseId, cur] of byCourse) {
-      const doneDates = await this.tasks.findCompletedDatesByCourse(courseId, fromDate, toDate);
-      const completed = doneDates.filter((d) => cur.dates.has(d)).length;
+      const taskIds = await this.repo.taskIdsForCourse(courseId);
+      const tasks = taskIds.length > 0 ? await this.tasks.listByIds(taskIds) : [];
+      const doneDates = new Set(
+        tasks
+          .filter(
+            (t) =>
+              t.status === "COMPLETED" &&
+              t.scheduledDate >= fromDate &&
+              t.scheduledDate <= toDate,
+          )
+          .map((t) => t.scheduledDate),
+      );
+      let completed = 0;
+      for (const d of cur.dates) {
+        if (doneDates.has(d)) completed += 1;
+      }
       out.push({
         courseId,
         title: cur.title,

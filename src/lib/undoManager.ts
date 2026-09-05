@@ -35,6 +35,18 @@ export class UndoManager {
   /** 批量上下文：withBatch 内 push 的动作被合并为一个复合动作 */
   private batchDepth = 0;
   private batchActions: UndoableAction[] = [];
+  /** 串行执行链：undo/redo 必须排队逐个执行（并发撤销会交错修改同一数据源） */
+  private chain: Promise<unknown> = Promise.resolve();
+
+  /** 把操作排入串行链：前一个 undo/redo 完成后才执行下一个（失败不阻断后续）。 */
+  private enqueue<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this.chain.then(fn, fn);
+    this.chain = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
 
   push(action: UndoableAction): void {
     if (this.batchDepth > 0) {
@@ -89,44 +101,48 @@ export class UndoManager {
     }
   }
 
-  /** 撤销最近一个动作；无可撤销动作返回 false。失败时不移动栈并抛出。 */
+  /** 撤销最近一个动作；无可撤销动作返回 false。失败时不移动栈并抛出。串行：前一个未完成时排队。 */
   async undo(): Promise<boolean> {
-    const action = this.undoStack.pop();
-    if (!action) return false;
-    bumpDailyUndo();
-    this.applying = true;
-    try {
-      await action.undo();
-      this.redoStack.push(action);
-      this.lastLabel = action.label;
-    } catch (e) {
-      // 撤销失败：把动作放回撤销栈顶部，保持栈一致，由调用方提示
-      this.undoStack.push(action);
-      throw e;
-    } finally {
-      this.applying = false;
-    }
-    this.notify();
-    return true;
+    return this.enqueue(async () => {
+      const action = this.undoStack.pop();
+      if (!action) return false;
+      bumpDailyUndo();
+      this.applying = true;
+      try {
+        await action.undo();
+        this.redoStack.push(action);
+        this.lastLabel = action.label;
+      } catch (e) {
+        // 撤销失败：把动作放回撤销栈顶部，保持栈一致，由调用方提示
+        this.undoStack.push(action);
+        throw e;
+      } finally {
+        this.applying = false;
+      }
+      this.notify();
+      return true;
+    });
   }
 
-  /** 重做最近一个被撤销的动作；无可重做动作返回 false。失败时不移动栈并抛出。 */
+  /** 重做最近一个被撤销的动作；无可重做动作返回 false。失败时不移动栈并抛出。串行：前一个未完成时排队。 */
   async redo(): Promise<boolean> {
-    const action = this.redoStack.pop();
-    if (!action) return false;
-    this.applying = true;
-    try {
-      await action.redo();
-      this.undoStack.push(action);
-      this.lastLabel = action.label;
-    } catch (e) {
-      this.redoStack.push(action);
-      throw e;
-    } finally {
-      this.applying = false;
-    }
-    this.notify();
-    return true;
+    return this.enqueue(async () => {
+      const action = this.redoStack.pop();
+      if (!action) return false;
+      this.applying = true;
+      try {
+        await action.redo();
+        this.undoStack.push(action);
+        this.lastLabel = action.label;
+      } catch (e) {
+        this.redoStack.push(action);
+        throw e;
+      } finally {
+        this.applying = false;
+      }
+      this.notify();
+      return true;
+    });
   }
 
   canUndo(): boolean {

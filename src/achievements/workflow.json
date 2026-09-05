@@ -1,0 +1,30 @@
+[
+  {
+    "id": "workflow-first-run",
+    "name": "流程首跑",
+    "description": "完成第一个 WorkflowRun",
+    "icon": "Workflow",
+    "category": "execution",
+    "condition": { "type": "workflow_runs_completed", "target": 1 },
+    "reward": null,
+    "hidden": false,
+    "enabled": true,
+    "chainId": "workflow-run-complete",
+    "order": 1,
+    "extensionId": "com.dailyflow.workflow"
+  },
+  {
+    "id": "workflow-10-runs",
+    "name": "流程熟练工",
+    "description": "累计完成 10 个 WorkflowRun",
+    "icon": "ListChecks",
+    "category": "exploration",
+    "condition": { "type": "workflow_runs_completed", "target": 10 },
+    "reward": null,
+    "hidden": false,
+    "enabled": true,
+    "chainId": "workflow-run-complete",
+    "order": 2,
+    "extensionId": "com.dailyflow.workflow"
+  }
+]

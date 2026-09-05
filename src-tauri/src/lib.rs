@@ -83,6 +83,103 @@ fn hide_to_tray(app: tauri::AppHandle) {
     }
 }
 
+/// Mini 窗配置（A4）：创建/复用 label="mini" 的窗口，隐藏主窗并显示 Mini。
+const MINI_WINDOW_LABEL: &str = "mini";
+
+#[tauri::command]
+fn open_mini_window(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::WebviewWindowBuilder;
+    append_startup_log("open_mini_window: 开始");
+    // 隐藏主窗（Mini 模式下最小化 = 主窗退场）
+    if let Some(main) = app.get_webview_window("main") {
+        let _ = main.hide();
+    }
+    if let Some(mini) = app.get_webview_window(MINI_WINDOW_LABEL) {
+        append_startup_log("open_mini_window: 复用已有 mini");
+        let _ = mini.show();
+        let _ = mini.set_focus();
+        return Ok(());
+    }
+    // 首次创建：同一前端 bundle（与主窗相同 URL），身份完全由窗口 label="mini" 区分。
+    // 不用 query/hash 标记：dev 下 Vite 重定向会丢 query，而 window label 由 Tauri 注入
+    // 到前端 __TAURI_INTERNALS__，前端 getCurrentWindow().label === "mini" 稳定可判。
+    let url = "index.html";
+    append_startup_log(&format!("open_mini_window: 创建新窗口 url={url}"));
+    let win = WebviewWindowBuilder::new(&app, MINI_WINDOW_LABEL, tauri::WebviewUrl::App(url.into()))
+        .title("DailyFlow Mini")
+        .inner_size(360.0, 560.0)
+        .resizable(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .decorations(false)
+        .build()
+        .map_err(|e| {
+            append_startup_log(&format!("open_mini_window: 创建失败 {e}"));
+            e.to_string()
+        })?;
+    append_startup_log("open_mini_window: 创建成功，show()");
+    win.show().map_err(|e| {
+        append_startup_log(&format!("open_mini_window: show 失败 {e}"));
+        e.to_string()
+    })
+}
+
+/// 标题栏按钮：最小化主窗。
+#[tauri::command]
+fn window_minimize(app: tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.minimize();
+    }
+}
+
+/// 标题栏按钮：最大化/还原主窗。
+#[tauri::command]
+fn window_maximize_toggle(app: tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        if w.is_maximized().unwrap_or(false) {
+            let _ = w.unmaximize();
+        } else {
+            let _ = w.maximize();
+        }
+    }
+}
+
+/// 标题栏 Mini 按钮 / 关闭转 Mini：主窗 ⇄ Mini 切换。
+/// - Mini 不可见或未创建 → 隐藏主窗并显示 Mini；
+/// - Mini 已可见 → 还原主窗（再次点击相当于返回）。
+#[tauri::command]
+fn toggle_mini_window(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(mini) = app.get_webview_window(MINI_WINDOW_LABEL) {
+        if mini.is_visible().unwrap_or(false) {
+            close_mini_window(app);
+        } else {
+            open_mini_window(app)?;
+        }
+    } else {
+        open_mini_window(app)?;
+    }
+    Ok(())
+}
+
+/// 关闭/隐藏 Mini 窗并恢复主窗（Mini 关闭按钮或完成后返回主界面）。
+#[tauri::command]
+fn close_mini_window(app: tauri::AppHandle) {
+    if let Some(mini) = app.get_webview_window(MINI_WINDOW_LABEL) {
+        let _ = mini.hide();
+    }
+    if let Some(main) = app.get_webview_window("main") {
+        let _ = main.show();
+        let _ = main.unminimize();
+        let _ = main.set_focus();
+    }
+}
+
+/// Mini 窗完成/变更任务后广播给全部窗口（主窗据此刷新 taskStore，实现跨窗同步）。
+#[tauri::command]
+fn notify_tasks_changed(app: tauri::AppHandle) {
+    let _ = app.emit("df:tasks-changed", ());
+}
+
 /// 真正退出应用（托盘「退出 DailyFlow」或前端确认退出时调用；不再二次确认）。
 #[tauri::command]
 fn exit_app(app: tauri::AppHandle) {
@@ -98,6 +195,7 @@ fn setup_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
     let open_today = MenuItem::with_id(app, "open_today", "打开今日", true, None::<&str>)?;
     let open_goals = MenuItem::with_id(app, "open_goals", "打开长期", true, None::<&str>)?;
     let open_stats = MenuItem::with_id(app, "open_statistics", "打开统计", true, None::<&str>)?;
+    let open_mini = MenuItem::with_id(app, "open_mini", "切换迷你窗", true, None::<&str>)?;
     let toggle_item = MenuItem::with_id(app, "toggle_focus", "开始 / 暂停专注", true, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, "quit", "退出 DailyFlow", true, None::<&str>)?;
     let menu = Menu::with_items(
@@ -107,6 +205,7 @@ fn setup_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
             &open_today,
             &open_goals,
             &open_stats,
+            &open_mini,
             &toggle_item,
             &quit_item,
         ],
@@ -129,6 +228,9 @@ fn setup_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
             "open_statistics" => {
                 let _ = app.emit("tray-open-page", "statistics");
                 show_main_window(app);
+            }
+            "open_mini" => {
+                let _ = toggle_mini_window(app.clone());
             }
             "toggle_focus" => {
                 // 前端监听后调用 pomodoroStore 暂停/恢复（不阻塞托盘线程）
@@ -182,16 +284,65 @@ fn install_dir() -> Result<PathBuf, String> {
         .ok_or_else(|| "无法解析可执行文件目录".into())
 }
 
-/// 数据目录：配置了 data_dir 用之，否则 <安装目录>\data。
+/// 递归复制目录（目标已存在的文件跳过，不覆盖——用于一次性迁移，保证不破坏半程结果）。
+fn copy_dir_skip_existing(src: &Path, dst: &Path) -> std::io::Result<()> {
+    fs::create_dir_all(dst)?;
+    for entry in fs::read_dir(src)? {
+        let entry = entry?;
+        let from = entry.path();
+        let to = dst.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            copy_dir_skip_existing(&from, &to)?;
+        } else if entry.file_type()?.is_file() && !to.exists() {
+            fs::copy(&from, &to)?;
+        }
+    }
+    Ok(())
+}
+
+/// 旧默认数据目录：可执行文件同目录 \data（2.x 早期版本；卸载/升级安装目录会删除它）。
+fn legacy_install_data_dir() -> Option<PathBuf> {
+    install_dir().ok().map(|d| d.join("data"))
+}
+
+/**
+ * 数据目录（A1 修复）：
+ * - 用户在设置里自定义过 data_dir → 用之；
+ * - 否则默认 %LOCALAPPDATA%\DailyFlow（与启动日志同目录）；
+ *   若该目录尚不存在数据库、而旧位置 <安装目录>\data 存在 dailyflow.db，
+ *   则把旧数据目录整体复制迁移到新默认（保留旧目录作为保险，不删除）；
+ *   迁移失败时保守回退旧位置（不丢数据，待下次成功）。
+ */
 fn dailyflow_data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let cfg = read_storage_paths(app);
-    let dir = if cfg.data_dir.trim().is_empty() {
-        install_dir()?.join("data")
-    } else {
-        PathBuf::from(cfg.data_dir.trim())
-    };
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    Ok(dir)
+    if !cfg.data_dir.trim().is_empty() {
+        let dir = PathBuf::from(cfg.data_dir.trim());
+        fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        return Ok(dir);
+    }
+    let target = default_data_dir()?; // %LOCALAPPDATA%\DailyFlow（已创建）
+    if !target.join("dailyflow.db").is_file() {
+        if let Some(legacy) = legacy_install_data_dir() {
+            if legacy.join("dailyflow.db").is_file() {
+                match copy_dir_skip_existing(&legacy, &target) {
+                    Ok(()) => append_startup_log(&format!(
+                        "已迁移数据目录：{} → {}",
+                        legacy.display(),
+                        target.display()
+                    )),
+                    Err(e) => {
+                        append_startup_log(&format!(
+                            "数据目录迁移失败（{e}），本次回退旧位置：{}",
+                            legacy.display()
+                        ));
+                        fs::create_dir_all(&legacy).map_err(|e| e.to_string())?;
+                        return Ok(legacy);
+                    }
+                }
+            }
+        }
+    }
+    Ok(target)
 }
 
 /// 启动自诊断使用的数据目录（不依赖 AppHandle，始终 %LOCALAPPDATA%\DailyFlow）。
@@ -417,6 +568,34 @@ fn db_relative_path(app: tauri::AppHandle) -> Result<String, String> {
     Ok(path.to_string_lossy().into_owned())
 }
 
+/**
+ * 课程扩展独立库绝对路径（A1-P0Fix-③）：
+ * - 统一托管到数据目录（course-schedule.db 与主库同目录），随 dataDir/备份/恢复管理；
+ * - 旧版本课程库经插件相对路径解析到 app_config_dir（Roaming\com.dailyflow.desktop），
+ *   首次启动检测到旧文件且新位置为空时复制迁移（保留旧文件不删除）。
+ */
+#[tauri::command]
+fn course_db_path(app: tauri::AppHandle) -> Result<String, String> {
+    let data = dailyflow_data_dir(&app)?;
+    let target = data.join("course-schedule.db");
+    if !target.is_file() {
+        if let Ok(cfg_dir) = app.path().app_config_dir() {
+            let legacy = cfg_dir.join("course-schedule.db");
+            if legacy.is_file() {
+                match fs::copy(&legacy, &target) {
+                    Ok(_) => append_startup_log(&format!(
+                        "已迁移课程库：{} → {}",
+                        legacy.display(),
+                        target.display()
+                    )),
+                    Err(e) => append_startup_log(&format!("课程库迁移失败：{e}")),
+                }
+            }
+        }
+    }
+    Ok(target.to_string_lossy().into_owned())
+}
+
 /// 校验备份文件名为安全：仅允许 DailyFlow_Backup_*.db 且不含路径分隔符。
 fn is_safe_backup_name(name: &str) -> bool {
     name.starts_with("DailyFlow_Backup_")
@@ -447,21 +626,69 @@ fn list_backups(app: tauri::AppHandle) -> Result<Vec<String>, String> {
 }
 
 /// 删除一个备份文件（同日导出覆盖前调用；目标不存在视为成功）。
+/// 若存在同名伴生课程库备份（<name>.course）一并删除。
 #[tauri::command]
 fn delete_backup(app: tauri::AppHandle, backup_name: String) -> Result<(), String> {
     if !is_safe_backup_name(&backup_name) {
         return Err("非法的备份文件名".into());
     }
-    let path = resolve_backups_dir(&app)?.join(&backup_name);
-    match fs::remove_file(&path) {
-        Ok(_) => Ok(()),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(e) => Err(e.to_string()),
+    let dir = resolve_backups_dir(&app)?;
+    let remove_if_exists = |name: &str| -> Result<(), String> {
+        let path = dir.join(name);
+        match fs::remove_file(&path) {
+            Ok(_) => Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(e.to_string()),
+        }
+    };
+    remove_if_exists(&backup_name)?;
+    remove_if_exists(&format!("{backup_name}.course"))
+}
+
+/// 两阶段原子替换（B3/恢复一致性加固）：
+/// 1. 把主库备份与（可选的）伴生课程库备份都复制到同目录 tmp（不替换目标）；
+///    任一复制失败 → 清理已生成的 tmp，主库/课程库保持原状（无半恢复状态）。
+/// 2. 全部复制成功后，依次 rename 覆盖目标（同卷 rename 原子）。
+///    rename 失败时清理残留 tmp 并报错（rename 失败概率远低于 copy，且不产生半文件）。
+/// @param main_db 主库目标与备份源；(course_db, course_backup) 存在时同时替换伴生课程库。
+fn stage_and_swap_restore_files(
+    main_db: (&std::path::Path, &std::path::Path),
+    course: Option<(&std::path::Path, &std::path::Path)>,
+) -> Result<(), String> {
+    let (db_path, main_backup) = main_db;
+    let data_dir = db_path.parent().ok_or("主库路径缺少父目录")?;
+    let db_tmp = data_dir.join("dailyflow.db.restore-tmp");
+    let course_tmp = data_dir.join("course-schedule.db.restore-tmp");
+
+    // 阶段 1：全部复制到 tmp（任何失败 → 清理并整体中止，目标未动）
+    if let Some((_cp, cb)) = course {
+        fs::copy(cb, &course_tmp).map_err(|e| e.to_string())?;
     }
+    if let Err(e) = fs::copy(main_backup, &db_tmp) {
+        let _ = fs::remove_file(&course_tmp);
+        return Err(e.to_string());
+    }
+
+    // 阶段 2：全部就绪后统一 rename（主库先、伴生后；wal/shm 清理由调用方完成）
+    if let Err(e) = fs::rename(&db_tmp, db_path) {
+        let _ = fs::remove_file(&db_tmp);
+        let _ = fs::remove_file(&course_tmp);
+        return Err(e.to_string());
+    }
+    if let Some((cp, _cb)) = course {
+        if let Err(e) = fs::rename(&course_tmp, cp) {
+            let _ = fs::remove_file(&course_tmp);
+            return Err(e.to_string());
+        }
+    }
+    Ok(())
 }
 
 /// 用备份文件覆盖当前数据库，并清理 WAL/SHM 残留。
-/// 前置条件（前端完成）：备份已校验、当前库已自动备份、主库连接已关闭。
+/// 前置条件（前端完成）：备份已校验、当前库已自动备份、主库连接已关闭（课程库亦已关闭）。
+/// 若备份目录存在同名伴生课程库备份（<name>.course），一并替换数据目录下的 course-schedule.db。
+/// 原子性：主库与伴生都先复制到 tmp、全部成功后才 rename 替换（stage_and_swap_restore_files），
+/// 杜绝「主库已替换、伴生失败」的半恢复状态。
 #[tauri::command]
 fn restore_backup(app: tauri::AppHandle, backup_name: String) -> Result<(), String> {
     if !is_safe_backup_name(&backup_name) {
@@ -473,17 +700,20 @@ fn restore_backup(app: tauri::AppHandle, backup_name: String) -> Result<(), Stri
         return Err(format!("备份文件不存在：{backup_name}"));
     }
     let db_path = data.join("dailyflow.db");
+    let course_backup = resolve_backups_dir(&app)?.join(format!("{backup_name}.course"));
+    let course = course_backup
+        .is_file()
+        .then(|| (data.join("course-schedule.db"), course_backup.clone()));
 
-    // 先完整写到临时文件，再 rename 原子替换，避免直接覆盖中断导致主库损坏（B3）
-    let tmp = data.join("dailyflow.db.restore-tmp");
-    fs::copy(&src, &tmp).map_err(|e| e.to_string())?;
-    fs::rename(&tmp, &db_path).map_err(|e| {
-        let _ = fs::remove_file(&tmp);
-        e.to_string()
-    })?;
+    stage_and_swap_restore_files((&db_path, &src), course.as_ref().map(|(p, b)| (p.as_path(), b.as_path())))?;
 
+    // 替换成功后清理 WAL/SHM 残留（主库与伴生课程库）
     let _ = fs::remove_file(data.join("dailyflow.db-wal"));
     let _ = fs::remove_file(data.join("dailyflow.db-shm"));
+    if course.is_some() {
+        let _ = fs::remove_file(data.join("course-schedule.db-wal"));
+        let _ = fs::remove_file(data.join("course-schedule.db-shm"));
+    }
     Ok(())
 }
 
@@ -554,6 +784,130 @@ fn set_storage_paths(
     std::fs::write(&path, serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?)
         .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+// ---------------- Workflow Extension 系统操作（P7/P5 收口） ----------------
+// 原则：所有路径必须绝对路径；错误分类返回（不 panic）；启动外部进程不阻塞等待。
+
+fn ensure_absolute_path(path: &str) -> Result<std::path::PathBuf, String> {
+    let p = std::path::PathBuf::from(path);
+    if !p.is_absolute() {
+        return Err(format!("路径必须是绝对路径：{path}"));
+    }
+    Ok(p)
+}
+
+/// 引号感知的命令行参数分词（P5 收口）：
+/// 支持用双引号包裹含空格的单参数（如 `--out "C:\My Folder\a.png"`），
+/// 双引号本身不保留；未闭合的引号视为普通字符段。
+fn split_args(input: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+    let mut has_token = false;
+    for ch in input.chars() {
+        match ch {
+            '"' => {
+                in_quotes = !in_quotes;
+                has_token = true;
+            }
+            c if c.is_whitespace() && !in_quotes => {
+                if has_token {
+                    out.push(std::mem::take(&mut current));
+                    has_token = false;
+                }
+            }
+            c => {
+                current.push(c);
+                has_token = true;
+            }
+        }
+    }
+    if has_token {
+        out.push(current);
+    }
+    out
+}
+
+/// 用 Windows 默认关联打开文件/文件夹（ShellExecuteW "open"）：
+/// - 相比 cmd start：参数不经 cmd 解析（无 % 展开/引号边界问题）；
+/// - 能识别「无关联程序」（返回值 31 = SE_ERR_NOASSOC）等失败并返回可读错误。
+fn open_with_default(path: &str) -> Result<(), String> {
+    use windows_sys::Win32::UI::Shell::ShellExecuteW;
+    let p = ensure_absolute_path(path)?;
+    if !p.exists() {
+        return Err(format!("路径不存在：{path}"));
+    }
+    let wide_path: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
+    let wide_open: Vec<u16> = "open".encode_utf16().chain(std::iter::once(0)).collect();
+    // ShellExecuteW 失败时返回 <=32 的错误码；>32 表示成功
+    let result = unsafe {
+        ShellExecuteW(
+            std::ptr::null_mut(),
+            wide_open.as_ptr(),
+            wide_path.as_ptr(),
+            std::ptr::null(),
+            std::ptr::null(),
+            1, // SW_SHOWNORMAL
+        )
+    };
+    let code = result as i32;
+    if code > 32 {
+        Ok(())
+    } else if code == 31 {
+        Err(format!("没有程序可以打开该文件/文件夹（无默认关联）：{path}"))
+    } else {
+        Err(format!("打开失败（系统错误码 {code}）：{path}"))
+    }
+}
+
+/// 启动 Windows 外部程序（用户配置路径，禁止硬编码应用名）。
+#[tauri::command]
+fn workflow_launch_process(
+    executable: String,
+    arguments: Option<String>,
+    working_directory: Option<String>,
+) -> Result<(), String> {
+    let exe = ensure_absolute_path(&executable)?;
+    if !exe.is_file() {
+        return Err(format!("程序不存在：{executable}"));
+    }
+    let args: Vec<String> = arguments
+        .map(|a| split_args(&a))
+        .unwrap_or_default();
+    let mut cmd = std::process::Command::new(&exe);
+    cmd.args(&args);
+    if let Some(wd) = working_directory {
+        if !wd.trim().is_empty() {
+            let dir = ensure_absolute_path(&wd)?;
+            if !dir.is_dir() {
+                return Err(format!("工作目录不存在：{wd}"));
+            }
+            cmd.current_dir(dir);
+        }
+    }
+    cmd.spawn()
+        .map(|_| ())
+        .map_err(|e| format!("启动失败：{e}"))
+}
+
+/// 用系统默认关联打开文件（.psd → Photoshop 等由系统决定）。
+#[tauri::command]
+fn workflow_open_file(path: String) -> Result<(), String> {
+    open_with_default(&path)
+}
+
+/// 在 Windows Explorer 打开文件夹。
+#[tauri::command]
+fn workflow_open_folder(path: String) -> Result<(), String> {
+    open_with_default(&path)
+}
+
+/// 路径存在性预检（Engine/UI 校验用；只读）。
+#[tauri::command]
+fn workflow_path_exists(path: String) -> Result<bool, String> {
+    let p = ensure_absolute_path(&path)?;
+    Ok(p.exists())
 }
 
 /// 启动失败时弹出可读提示（避免「白屏挂起」无从排查）。
@@ -658,17 +1012,28 @@ pub fn run() {
                 payload.url()
             ));
         })
-        // 关闭拦截（V1.4.1 窗口行为）：始终阻止默认关闭，交由前端按 closeBehavior 决定
-        // （首次询问 / 隐藏到托盘 / 退出），避免「关闭即销毁窗口」破坏托盘常驻。
+        // 窗口事件（A4 多窗口分流）：
+        // - 主窗 "main"：关闭始终拦截交给前端决策；
+        // - Mini 窗 "mini"：关闭 = 隐藏（保留实例）；不触发主窗关闭决策。
+        // 注：Tauri 2.11 的 WindowEvent 无 Minimized 变体（平台事件限制），
+        // 「最小化→自动转 Mini」以托盘「打开 Mini 窗」/快捷键入口替代（见 open_mini_window）。
         .on_window_event(|window, event| {
+            let label = window.label().to_string();
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                api.prevent_close();
-                let _ = window.emit("app-close-requested", ());
+                if label == "main" {
+                    api.prevent_close();
+                    let _ = window.emit("app-close-requested", ());
+                } else {
+                    // Mini 窗：关闭即隐藏（保留实例，下次复用）
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
             }
         })
         .invoke_handler(tauri::generate_handler![
             data_dir,
             db_relative_path,
+            course_db_path,
             backups_dir,
             list_backups,
             delete_backup,
@@ -679,7 +1044,17 @@ pub fn run() {
             schedule_focus_end_notification,
             cancel_focus_notification,
             hide_to_tray,
-            exit_app
+            exit_app,
+            open_mini_window,
+            close_mini_window,
+            toggle_mini_window,
+            window_minimize,
+            window_maximize_toggle,
+            notify_tasks_changed,
+            workflow_launch_process,
+            workflow_open_file,
+            workflow_open_folder,
+            workflow_path_exists
         ])
         .run(tauri::generate_context!());
 
@@ -708,5 +1083,244 @@ mod tests {
         let from = std::path::Path::new("C:\\Users\\me\\AppData\\Roaming\\com.dailyflow.desktop");
         let to = std::path::Path::new("D:\\Data\\dailyflow.db");
         assert!(super::relative_path(from, to).is_none());
+    }
+
+    // ---- Workflow 系统操作（P7）：校验不 spawn，错误路径可控 ----
+
+    #[test]
+    fn workflow_rejects_relative_path() {
+        assert!(super::ensure_absolute_path("notepad.exe").is_err());
+        assert!(super::ensure_absolute_path(".\\x.txt").is_err());
+    }
+
+    #[test]
+    fn workflow_accepts_absolute_path() {
+        let p = super::ensure_absolute_path("C:\\Windows\\notepad.exe").unwrap();
+        assert!(p.is_absolute());
+    }
+
+    #[test]
+    fn workflow_path_exists_on_temp_file() {
+        let dir = std::env::temp_dir().join(format!("wf_test_{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let f = dir.join("probe.tmp");
+        std::fs::write(&f, b"x").unwrap();
+        assert_eq!(
+            super::workflow_path_exists(f.to_string_lossy().to_string()).unwrap(),
+            true
+        );
+        let missing = dir.join("nope.tmp");
+        assert_eq!(
+            super::workflow_path_exists(missing.to_string_lossy().to_string()).unwrap(),
+            false
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn workflow_path_exists_rejects_relative() {
+        assert!(super::workflow_path_exists("relative/path".to_string()).is_err());
+    }
+
+    #[test]
+    fn workflow_launch_rejects_missing_executable() {
+        let missing = std::env::temp_dir()
+            .join("definitely_not_an_exe_xyz.exe")
+            .to_string_lossy()
+            .to_string();
+        assert!(super::workflow_launch_process(missing, None, None).is_err());
+    }
+
+    #[test]
+    fn workflow_open_file_rejects_missing_path() {
+        let missing = std::env::temp_dir()
+            .join("definitely_missing_file.psd")
+            .to_string_lossy()
+            .to_string();
+        assert!(super::workflow_open_file(missing).is_err());
+    }
+
+    // ---- Phase 5 收口测试：参数分词 / working_directory / open_folder ----
+
+    #[test]
+    fn split_args_keeps_quoted_spaces_together() {
+        // 无引号：按空白切
+        assert_eq!(super::split_args("--background --no-splash"), vec!["--background", "--no-splash"]);
+        // 引号包裹的空格参数作为一个整体
+        assert_eq!(
+            super::split_args("--out \"C:\\My Folder\\a b.png\" -v"),
+            vec!["--out", "C:\\My Folder\\a b.png", "-v"]
+        );
+        // 空串 → 无参数
+        assert!(super::split_args("").is_empty());
+        // 连续空白不产生空参数
+        assert_eq!(super::split_args("  a   b  "), vec!["a", "b"]);
+    }
+
+    #[test]
+    fn workflow_launch_rejects_missing_working_directory() {
+        let exe = std::env::temp_dir()
+            .join("some_tool.exe")
+            .to_string_lossy()
+            .to_string();
+        // executable 不存在 → 先报程序不存在（错误路径确定性验证）
+        let r1 = super::workflow_launch_process(exe.clone(), None, None);
+        assert!(r1.is_err());
+        assert!(r1.unwrap_err().contains("程序不存在"));
+
+        // 用真实存在的可执行文件 + 不存在的工作目录 → 报工作目录错误
+        // （Windows 下 cmd.exe 恒存在，避免 spawn 成功掩盖校验）
+        let cmd_exe = std::env::var("WINDIR")
+            .map(|w| format!("{w}\\System32\\cmd.exe"))
+            .unwrap_or_else(|_| "C:\\Windows\\System32\\cmd.exe".to_string());
+        let missing_wd = std::env::temp_dir()
+            .join("definitely_no_such_wd_xyz")
+            .to_string_lossy()
+            .to_string();
+        let r2 = super::workflow_launch_process(cmd_exe, None, Some(missing_wd));
+        assert!(r2.is_err());
+        assert!(r2.unwrap_err().contains("工作目录不存在"));
+    }
+
+    #[test]
+    fn workflow_open_folder_rejects_missing_path() {
+        let missing = std::env::temp_dir()
+            .join("definitely_missing_folder_xyz")
+            .to_string_lossy()
+            .to_string();
+        let r = super::workflow_open_folder(missing);
+        assert!(r.is_err());
+        assert!(r.unwrap_err().contains("路径不存在"));
+    }
+
+    // ---- A1-P0Fix-①：默认数据目录迁移 ----
+
+    #[test]
+    fn copy_dir_skip_existing_copies_missing_and_keeps_existing() {
+        let base = std::env::temp_dir().join(format!("wf_copy_test_{}", std::process::id()));
+        let src = base.join("src");
+        let dst = base.join("dst");
+        std::fs::create_dir_all(src.join("sub")).unwrap();
+        std::fs::write(src.join("dailyflow.db"), b"db-content").unwrap();
+        std::fs::write(src.join("sub").join("nested.txt"), b"nested").unwrap();
+        std::fs::create_dir_all(dst.join("sub")).unwrap();
+        // 目标已存在同名文件（模拟目标已有更新数据）→ 不应被覆盖
+        std::fs::write(dst.join("dailyflow.db"), b"existing-newer").unwrap();
+
+        super::copy_dir_skip_existing(&src, &dst).unwrap();
+        assert_eq!(std::fs::read(dst.join("dailyflow.db")).unwrap(), b"existing-newer");
+        assert_eq!(std::fs::read(dst.join("sub").join("nested.txt")).unwrap(), b"nested");
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn legacy_data_migration_picks_target_when_db_present() {
+        // 模拟：目标默认目录已有 dailyflow.db → 即使旧位置存在也不触发复制覆盖
+        let base = std::env::temp_dir().join(format!("wf_legacy_test_{}", std::process::id()));
+        let legacy = base.join("install").join("data");
+        let target = base.join("localappdata").join("DailyFlow");
+        std::fs::create_dir_all(&legacy).unwrap();
+        std::fs::write(legacy.join("dailyflow.db"), b"legacy").unwrap();
+        std::fs::create_dir_all(&target).unwrap();
+        std::fs::write(target.join("dailyflow.db"), b"target").unwrap();
+
+        super::copy_dir_skip_existing(&legacy, &target).unwrap();
+        // 目标文件保持（不覆盖已有）
+        assert_eq!(std::fs::read(target.join("dailyflow.db")).unwrap(), b"target");
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn legacy_data_migration_copies_into_empty_target() {
+        let base = std::env::temp_dir().join(format!("wf_legacy_empty_{}", std::process::id()));
+        let legacy = base.join("install").join("data");
+        let target = base.join("localappdata").join("DailyFlow");
+        std::fs::create_dir_all(legacy.join("backups")).unwrap();
+        std::fs::write(legacy.join("dailyflow.db"), b"legacy").unwrap();
+        std::fs::write(legacy.join("backups").join("x.db"), b"x").unwrap();
+
+        super::copy_dir_skip_existing(&legacy, &target).unwrap();
+        assert_eq!(std::fs::read(target.join("dailyflow.db")).unwrap(), b"legacy");
+        assert_eq!(std::fs::read(target.join("backups").join("x.db")).unwrap(), b"x");
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    // ---- 恢复原子性（A1-P0Fix-③ 加固）：主库与伴生要么都替换、要么都不动 ----
+
+    #[test]
+    fn stage_swap_success_replaces_both_main_and_course() {
+        let base = std::env::temp_dir().join(format!("wf_restore_ok_{}", std::process::id()));
+        let data = base.join("data");
+        let back = base.join("backups");
+        std::fs::create_dir_all(&data).unwrap();
+        std::fs::create_dir_all(&back).unwrap();
+        // 当前库（将被替换）
+        let db_path = data.join("dailyflow.db");
+        std::fs::write(&db_path, b"old-main").unwrap();
+        let course_path = data.join("course-schedule.db");
+        std::fs::write(&course_path, b"old-course").unwrap();
+        // 备份
+        let main_backup = back.join("DailyFlow_Backup_x.db");
+        std::fs::write(&main_backup, b"new-main").unwrap();
+        let course_backup = back.join("DailyFlow_Backup_x.db.course");
+        std::fs::write(&course_backup, b"new-course").unwrap();
+
+        super::stage_and_swap_restore_files(
+            (&db_path, &main_backup),
+            Some((&course_path, &course_backup)),
+        )
+        .unwrap();
+
+        assert_eq!(std::fs::read(&db_path).unwrap(), b"new-main");
+        assert_eq!(std::fs::read(&course_path).unwrap(), b"new-course");
+        // 无 tmp 残留
+        assert!(!data.join("dailyflow.db.restore-tmp").exists());
+        assert!(!data.join("course-schedule.db.restore-tmp").exists());
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn stage_swap_without_course_replaces_main_only() {
+        let base = std::env::temp_dir().join(format!("wf_restore_main_{}", std::process::id()));
+        let data = base.join("data");
+        std::fs::create_dir_all(&data).unwrap();
+        let db_path = data.join("dailyflow.db");
+        std::fs::write(&db_path, b"old-main").unwrap();
+        let course_path = data.join("course-schedule.db");
+        std::fs::write(&course_path, b"keep-course").unwrap();
+        let main_backup = data.join("backup.db");
+        std::fs::write(&main_backup, b"new-main").unwrap();
+
+        super::stage_and_swap_restore_files((&db_path, &main_backup), None).unwrap();
+
+        assert_eq!(std::fs::read(&db_path).unwrap(), b"new-main");
+        assert_eq!(std::fs::read(&course_path).unwrap(), b"keep-course"); // 伴生不动
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn stage_swap_main_copy_failure_leaves_targets_untouched() {
+        let base = std::env::temp_dir().join(format!("wf_restore_fail_{}", std::process::id()));
+        let data = base.join("data");
+        std::fs::create_dir_all(&data).unwrap();
+        let db_path = data.join("dailyflow.db");
+        std::fs::write(&db_path, b"old-main").unwrap();
+        let course_path = data.join("course-schedule.db");
+        std::fs::write(&course_path, b"old-course").unwrap();
+        // 主库备份源不存在 → copy 失败
+        let missing = data.join("no_such_backup.db");
+
+        let result = super::stage_and_swap_restore_files(
+            (&db_path, &missing),
+            Some((&course_path, &missing)),
+        );
+        assert!(result.is_err());
+        // 两个目标都保持原状（无半恢复）
+        assert_eq!(std::fs::read(&db_path).unwrap(), b"old-main");
+        assert_eq!(std::fs::read(&course_path).unwrap(), b"old-course");
+        // 无 tmp 残留
+        assert!(!data.join("dailyflow.db.restore-tmp").exists());
+        assert!(!data.join("course-schedule.db.restore-tmp").exists());
+        let _ = std::fs::remove_dir_all(&base);
     }
 }

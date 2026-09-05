@@ -7,7 +7,7 @@ export default function TodaySummary() {
 
   if (!stats) {
     return (
-      <div className="rounded-md border border-neutral-200 bg-white px-4 py-2 text-sm text-neutral-400">
+      <div className="rounded-md border border-border-subtle glass-surface px-4 py-2 text-sm text-text-faint">
         统计计算中…
       </div>
     );
@@ -16,30 +16,30 @@ export default function TodaySummary() {
   const rate = Math.round(stats.completionRate * 100);
 
   return (
-    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 rounded-md border border-neutral-200 bg-white px-4 py-2 text-sm text-neutral-600 shadow-sm">
+    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 rounded-md border border-border-subtle glass-surface px-4 py-2 text-sm text-text-secondary shadow-card">
       <span>
         今日任务{" "}
-        <span className="font-medium text-neutral-900">{stats.totalTasks}</span>
+        <span className="font-medium text-text-primary">{stats.totalTasks}</span>
       </span>
       <span>
         完成任务{" "}
-        <span className="font-medium text-neutral-900">
+        <span className="font-medium text-text-primary">
           {stats.completedTasks}/{stats.totalTasks}
         </span>
       </span>
       <span>
         完成率{" "}
-        <span className="font-medium text-neutral-900">{rate}%</span>
+        <span className="font-medium text-text-primary">{rate}%</span>
       </span>
       <span>
         今日专注{" "}
-        <span className="font-medium text-neutral-900">
+        <span className="font-medium text-text-primary">
           {formatDuration(stats.totalFocusSeconds) || "0分钟"}
         </span>
       </span>
       <span>
         专注次数{" "}
-        <span className="font-medium text-neutral-900">{stats.focusCount}</span> 次
+        <span className="font-medium text-text-primary">{stats.focusCount}</span> 次
       </span>
     </div>
   );

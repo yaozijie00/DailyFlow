@@ -1,4 +1,5 @@
 import { undoManager } from "./undoManager";
+import { bumpDataVersion } from "./dataVersion";
 import { useAppStore } from "../stores/appStore";
 import { useTaskStore } from "../stores/taskStore";
 import { useNoteStore } from "../stores/noteStore";
@@ -8,6 +9,7 @@ import { useGoalStore } from "../stores/goalStore";
  * 撤销/重做的统一入口（按钮与快捷键共用）：
  * - Undo/Redo 成功后刷新受影响 Store（任务/便签/长期目标），保证
  *   Undo → SQLite → Store → UI 全链路同步（v1.6.2，修复撤销后 UI 不刷新的缺口）；
+ * - 同时 bump 数据域版本（A1-P0Fix-④），使统计/成就/课程周进度等派生视图失效刷新；
  * - 成功用动作 label 弹 Toast（已撤销：… / 已重做：…）；
  * - 失败不移动栈，提示「数据没有改变」，与 undoManager 语义一致。
  */
@@ -32,6 +34,12 @@ function refreshAffectedStores(): void {
   } catch {
     /* ignore */
   }
+  // 派生视图失效：任何撤销都可能影响任务/目标/项目/课程数据
+  bumpDataVersion("task");
+  bumpDataVersion("note");
+  bumpDataVersion("goal");
+  bumpDataVersion("project");
+  bumpDataVersion("course");
 }
 
 export async function performUndo(): Promise<void> {

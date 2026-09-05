@@ -14,8 +14,8 @@ import TaskFormModal from "../components/tasks/TaskFormModal";
 import Timeline from "../components/timeline/Timeline";
 import TodaySummary from "../components/today/TodaySummary";
 import TodayFestival from "../components/today/TodayFestival";
-import TodayCourses from "../components/today/TodayCourses";
 import ReminderRail, { REMINDER_RAIL_WIDTH } from "../components/today/ReminderRail";
+import { useEnabledSlotComponents, ExtensionErrorBoundary } from "../extensions/host";
 import { computeReminderSummary, hasAnyReminder } from "../lib/dayWarnings";
 import NoteList from "../components/notes/NoteList";
 import CalendarPopover from "../components/today/CalendarPopover";
@@ -63,6 +63,7 @@ export default function Today() {
     [tasks, overdue],
   );
   const showRail = hasAnyReminder(reminderSummary);
+  const todaySlotComponents = useEnabledSlotComponents("today");
   const [railNarrow, setRailNarrow] = useState(false);
   const [railOpen, setRailOpen] = useState(false);
 
@@ -206,7 +207,7 @@ export default function Today() {
                 onClick={() => setRailOpen((v) => !v)}
                 aria-label="今日提醒（点击展开）"
                 title="今日提醒"
-                className="relative flex h-9 w-9 items-center justify-center rounded-md border border-neutral-200 bg-white text-neutral-600 transition-colors hover:bg-neutral-100"
+                className="relative flex h-9 w-9 items-center justify-center rounded-md border border-border-subtle bg-surface text-text-secondary transition-colors hover:bg-surface-hover"
               >
                 <Bell size={15} />
                 <span className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-semibold leading-none text-white">
@@ -231,13 +232,13 @@ export default function Today() {
         <div className="fixed inset-0 z-[85]" onClick={() => setRailOpen(false)} />
       )}
       {showRail && railNarrow && railOpen && (
-        <div className="fixed right-3 top-[4.5rem] z-[90] w-[270px] max-h-[70vh] overflow-y-auto rounded-lg border border-neutral-200 bg-white p-2 shadow-xl">
+        <div className="fixed right-3 top-[4.5rem] z-[90] w-[270px] max-h-[70vh] overflow-y-auto rounded-lg border border-border-subtle bg-bg-elevated p-2 shadow-popover">
           <div className="mb-1 flex items-center justify-between px-1">
-            <span className="text-xs font-medium text-neutral-600">今日提醒</span>
+            <span className="text-xs font-medium text-text-secondary">今日提醒</span>
             <button
               onClick={() => setRailOpen(false)}
               aria-label="关闭提醒"
-              className="rounded p-0.5 text-neutral-400 hover:bg-neutral-100"
+              className="rounded p-0.5 text-text-faint hover:bg-surface-hover"
             >
               ×
             </button>
@@ -252,8 +253,14 @@ export default function Today() {
         <TodaySummary />
       </div>
 
-      {/* 今日课程（课程表 → Today，仅查看「今天」时显示） */}
-      {selectedDate === todayString() && <TodayCourses />}
+      {/* 今日扩展槽位（如课程表「今日课程」；仅查看今天时显示，由 Extension 决定内容）。
+          Rule 04：每个槽位组件独立包错误边界——单个扩展渲染异常只替换该区块，不崩 Today 页。 */}
+      {selectedDate === todayString() &&
+        todaySlotComponents.map(({ id, Component }) => (
+          <ExtensionErrorBoundary key={id} label={id}>
+            <Component />
+          </ExtensionErrorBoundary>
+        ))}
 
       {/* 主区：任务 | 时间轴 | 右列（提醒卡在详情面板上方；二者都不占用 Timeline 纵向空间） */}
       <div className="flex min-h-0 flex-1" ref={containerRef}>
@@ -261,17 +268,17 @@ export default function Today() {
         <aside className="flex w-72 shrink-0 flex-col pr-4">
           <div className="min-h-0 flex-1 overflow-y-auto">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-medium text-neutral-600">今日任务</h2>
+              <h2 className="text-sm font-medium text-text-secondary">今日任务</h2>
               <button
                 onClick={() => openCreate()}
-                className="flex items-center gap-1 rounded-md bg-neutral-900 px-2 py-1 text-xs text-white hover:bg-neutral-700"
+                className="flex items-center gap-1 rounded-md bg-accent px-2 py-1 text-xs text-on-accent hover:bg-accent-hover"
               >
                 <Plus size={14} /> 新建
               </button>
             </div>
             <QuickAddTask />
             {loading ? (
-              <div className="text-sm text-neutral-400">加载中…</div>
+              <div className="text-sm text-text-faint">加载中…</div>
             ) : (
               <TaskList />
             )}
@@ -285,7 +292,7 @@ export default function Today() {
         </aside>
 
         {/* 中：时间轴（自身负责滚动） */}
-        <main className="min-w-0 min-h-0 flex-1 overflow-hidden rounded-md border border-neutral-200 bg-white">
+        <main className="min-w-0 min-h-0 flex-1 overflow-hidden rounded-md border border-border-subtle glass-surface">
           <Timeline />
         </main>
 
@@ -302,7 +309,7 @@ export default function Today() {
                 title="拖动调整宽度，双击恢复默认"
                 className="group flex w-3 shrink-0 cursor-col-resize items-center justify-center"
               >
-                <div className="h-full w-px bg-neutral-200 transition-colors group-hover:bg-neutral-400" />
+                <div className="h-full w-px bg-border-subtle transition-colors group-hover:bg-border-strong" />
               </div>
             )}
             <div

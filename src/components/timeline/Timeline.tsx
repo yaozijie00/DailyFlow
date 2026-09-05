@@ -541,21 +541,21 @@ export default function Timeline() {
   return (
     <div ref={scrollRef} className="h-full overflow-auto">
       {/* 缩放控制（sticky 固定顶部，滚动时保持可见） */}
-      <div className="sticky top-0 z-40 flex items-center justify-end gap-1 border-b border-neutral-100 bg-white/95 px-2 py-1">
-        <span className="text-xs text-neutral-400">缩放</span>
+      <div className="sticky top-0 z-40 flex items-center justify-end gap-1 border-b border-border-subtle glass-surface px-2 py-1">
+        <span className="text-xs text-text-faint">缩放</span>
         <button
           onClick={() => zoom(-1)}
-          className="rounded border border-neutral-200 px-1.5 text-xs text-neutral-500 hover:bg-neutral-100"
+          className="rounded border border-border-subtle bg-surface px-1.5 text-xs text-text-muted hover:bg-surface-hover"
           aria-label="缩小时间轴"
         >
           −
         </button>
-        <span className="w-8 text-center text-xs tabular-nums text-neutral-600">
+        <span className="w-8 text-center text-xs tabular-nums text-text-secondary">
           {pxPerMinute.toFixed(1)}
         </span>
         <button
           onClick={() => zoom(1)}
-          className="rounded border border-neutral-200 px-1.5 text-xs text-neutral-500 hover:bg-neutral-100"
+          className="rounded border border-border-subtle bg-surface px-1.5 text-xs text-text-muted hover:bg-surface-hover"
           aria-label="放大时间轴"
         >
           ＋
@@ -567,12 +567,12 @@ export default function Timeline() {
         style={{ height: totalHeight, minWidth: Math.max(maxLaneCount * MIN_LANE_WIDTH, 0) }}
       >
         {/* 左侧时间刻度（sticky 固定左侧，不随横向滚动移走） */}
-        <div className="sticky left-0 z-10 w-14 shrink-0 bg-white">
+        <div className="sticky left-0 z-10 w-14 shrink-0 glass-surface">
           {/* 非整点 15 分钟刻度线（浅色，辅助判断非整点时刻） */}
           {quarterTicks.map((m) => (
             <div
               key={m}
-              className="absolute right-0 h-2 w-3 border-t border-neutral-300/80"
+              className="absolute right-0 h-2 w-3 border-t border-border-strong/80"
               style={{ top: minutesToY(m, pxPerMinute) }}
             />
           ))}
@@ -580,7 +580,7 @@ export default function Timeline() {
           {hours.map((m) => (
             <span
               key={m}
-              className="absolute right-2 -translate-y-1/2 text-xs font-medium tabular-nums text-neutral-500"
+              className="absolute right-2 -translate-y-1/2 text-xs font-medium tabular-nums text-text-muted"
               style={{ top: minutesToY(m, pxPerMinute) }}
             >
               {formatMinutes(m)}
@@ -597,11 +597,11 @@ export default function Timeline() {
         >
             {/* 范围外灰色（早于开始 / 晚于结束） */}
             <div
-              className="pointer-events-none absolute left-0 right-0 bg-neutral-100/70"
+              className="pointer-events-none absolute left-0 right-0 bg-surface-muted/70"
               style={{ top: 0, height: minutesToY(effStart, pxPerMinute) }}
             />
             <div
-              className="pointer-events-none absolute left-0 right-0 bg-neutral-100/70"
+              className="pointer-events-none absolute left-0 right-0 bg-surface-muted/70"
               style={{
                 top: minutesToY(effEnd, pxPerMinute),
                 height: totalHeight - minutesToY(effEnd, pxPerMinute),
@@ -612,7 +612,7 @@ export default function Timeline() {
             {minorTicks.map((m) => (
               <div
                 key={m}
-                className="absolute left-0 right-0 border-t border-neutral-100"
+                className="absolute left-0 right-0 border-t border-border-subtle/60"
                 style={{ top: minutesToY(m, pxPerMinute) }}
               />
             ))}
@@ -621,7 +621,7 @@ export default function Timeline() {
             {hours.map((m) => (
               <div
                 key={m}
-                className="absolute left-0 right-0 border-t border-neutral-200"
+                className="absolute left-0 right-0 border-t border-border-subtle"
                 style={{ top: minutesToY(m, pxPerMinute) }}
               />
             ))}
@@ -632,8 +632,8 @@ export default function Timeline() {
               className="group absolute left-0 right-0 z-30 -translate-y-1/2 cursor-ns-resize"
               style={{ top: minutesToY(effStart, pxPerMinute) }}
             >
-              <div className="h-1.5 w-full bg-neutral-400/40 transition-colors group-hover:bg-neutral-600/60" />
-              <span className="absolute left-1 top-0 -translate-y-full rounded bg-neutral-800 px-1 text-[10px] text-white">
+              <div className="h-1.5 w-full bg-border-strong/60 transition-colors group-hover:bg-text-secondary/70" />
+              <span className="absolute left-1 top-0 -translate-y-full rounded bg-accent px-1 text-[10px] text-on-accent">
                 {formatMinutes(effStart)}
               </span>
             </div>
@@ -644,8 +644,8 @@ export default function Timeline() {
               className="group absolute left-0 right-0 z-30 -translate-y-1/2 cursor-ns-resize"
               style={{ top: minutesToY(effEnd, pxPerMinute) }}
             >
-              <div className="h-1.5 w-full bg-neutral-400/40 transition-colors group-hover:bg-neutral-600/60" />
-              <span className="absolute left-1 top-1 rounded bg-neutral-800 px-1 text-[10px] text-white">
+              <div className="h-1.5 w-full bg-border-strong/60 transition-colors group-hover:bg-text-secondary/70" />
+              <span className="absolute left-1 top-1 rounded bg-accent px-1 text-[10px] text-on-accent">
                 {formatMinutes(effEnd)}
               </span>
             </div>
@@ -706,15 +706,15 @@ export default function Timeline() {
                     isRemoving
                       ? "bg-red-200 text-red-900 ring-2 ring-red-500"
                       : state === "running"
-                        ? "text-neutral-900 ring-2 ring-blue-400/80"
+                        ? "text-text-primary ring-2 ring-blue-400/80"
                         : state === "completed"
-                          ? "text-neutral-900/80 opacity-75"
+                          ? "text-text-primary/80 opacity-75"
                           : state === "cancelled"
                             ? "opacity-40"
-                            : "text-neutral-900 hover:brightness-95"
+                            : "text-text-primary hover:brightness-95"
                   } ${
                     selected
-                      ? "z-10 ring-2 ring-neutral-900/40"
+                      ? "z-10 ring-2 ring-accent/50"
                       : ""
                   } ${laneStyle ? "" : "left-1 right-1"}`}
                   style={{
@@ -748,7 +748,7 @@ export default function Timeline() {
                       <span
                         className={`truncate ${
                           state === "completed" || state === "cancelled"
-                            ? "line-through decoration-neutral-400"
+                            ? "line-through decoration-text-faint"
                             : ""
                         }`}
                       >
@@ -756,7 +756,7 @@ export default function Timeline() {
                       </span>
                       <span
                         onMouseDown={(e) => startTaskToNoteDrag(e, task.id)}
-                        className="ml-auto shrink-0 cursor-grab text-neutral-400 opacity-0 transition-opacity hover:text-amber-600 group-hover:opacity-100"
+                        className="ml-auto shrink-0 cursor-grab text-text-faint opacity-0 transition-opacity hover:text-amber-600 group-hover:opacity-100"
                         title="拖到便签区转为便签"
                         aria-label="转为便签"
                       >
@@ -765,13 +765,13 @@ export default function Timeline() {
                     </div>
                     {/* 时间行（块够高时显示开始-结束） */}
                     {info.showTime && (
-                      <div className="mt-0.5 truncate text-[10px] leading-tight tabular-nums text-neutral-600">
+                      <div className="mt-0.5 truncate text-[10px] leading-tight tabular-nums text-text-secondary">
                         {formatTimeRange(startMs, endMs)}
                       </div>
                     )}
                     {/* 描述行（块足够高且有备注时显示） */}
                     {info.showNotes && task.notes && (
-                      <div className="mt-0.5 truncate text-[10px] leading-tight text-neutral-500">
+                      <div className="mt-0.5 truncate text-[10px] leading-tight text-text-muted">
                         {task.notes}
                       </div>
                     )}

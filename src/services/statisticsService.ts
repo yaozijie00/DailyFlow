@@ -4,6 +4,10 @@ import {
   type FocusSessionAggregate,
 } from "../db/repositories/focusSessionRepository";
 import { CategoryRepository } from "../db/repositories/categoryRepository";
+import {
+  WorkflowMetricsRepository,
+  type WorkflowExecutionAggregate,
+} from "../db/repositories/workflowMetricsRepository";
 import { NO_CATEGORY_COLOR } from "../lib/categoryColors";
 import {
   startOfTomorrow,
@@ -116,6 +120,7 @@ export class StatisticsService {
     private readonly tasks: TaskRepository,
     private readonly focusSessions: FocusSessionRepository,
     private readonly categories: CategoryRepository,
+    private readonly workflowMetrics?: WorkflowMetricsRepository,
   ) {}
 
   /** 今日五项统计：任务总数 / 完成数 / 完成率 + 专注总时长 / 次数。 */
@@ -145,6 +150,12 @@ export class StatisticsService {
   async getRangeStatistics(from: number, to: number): Promise<RangeStatistics> {
     const s = await this.focusSessions.summaryInRange(from, to);
     return { totalSeconds: s.totalSeconds, completedCount: s.completedCount, eventCount: s.count };
+  }
+
+  /** A6：区间内 Workflow 执行指标（WorkflowRun 数据；未注入仓库时返回空指标）。 */
+  async getWorkflowExecution(from: number, to: number): Promise<WorkflowExecutionAggregate | null> {
+    if (!this.workflowMetrics) return null;
+    return this.workflowMetrics.aggregateInRange(from, to);
   }
 
   /** [from, to) 内按类别聚合投入时长与次数，按时长降序；已删除类别归入「已删除类别」。 */

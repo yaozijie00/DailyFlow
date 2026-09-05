@@ -71,6 +71,23 @@ vi.mock("../stores/projectStore", () => ({
   ),
 }));
 
+const taskState = vi.hoisted(() => ({
+  tasks: [] as unknown[],
+  projectSummary: {} as Record<number, unknown>,
+  projectFilter: null,
+  load: vi.fn(),
+  goToToday: vi.fn(),
+  loadProjectSummary: vi.fn(),
+  setProjectFilter: vi.fn(),
+}));
+
+vi.mock("../stores/taskStore", () => ({
+  useTaskStore: Object.assign(
+    (selector: (s: unknown) => unknown) => selector(taskState),
+    { getState: () => taskState },
+  ),
+}));
+
 const courseState = vi.hoisted(() => ({
   courses: [] as { id: number; title: string }[],
   slots: [] as unknown[],

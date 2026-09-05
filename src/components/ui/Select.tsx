@@ -5,7 +5,7 @@ export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {}
 export function Select({ className = "", children, ...rest }: SelectProps) {
   return (
     <select
-      className={`rounded-md border border-neutral-300 px-2 py-1.5 text-sm text-neutral-900 outline-none transition-colors focus:border-neutral-900 focus-visible:ring-2 focus-visible:ring-neutral-900/30 disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-400 ${className}`}
+      className={`rounded-[var(--radius-control)] border border-border-strong bg-surface px-2 py-1.5 text-sm text-text-primary outline-none transition-colors focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/30 disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-faint ${className}`}
       {...rest}
     >
       {children}

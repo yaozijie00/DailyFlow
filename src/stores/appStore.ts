@@ -1,11 +1,9 @@
 import { create } from "zustand";
 
-export type Page =
-  | "today"
-  | "focus"
-  | "goals"
-  | "statistics"
-  | "settings";
+/** Core 内置页面。 */
+export type CorePage = "today" | "focus" | "goals" | "statistics" | "settings";
+/** 当前页：Core 页 或 Extension 页（"ext:<id>" 由 Registry 解析）。 */
+export type Page = CorePage | string;
 export type DbStatus = "idle" | "ready" | "error";
 
 export type ToastType = "info" | "success" | "warning" | "error";

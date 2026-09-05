@@ -171,3 +171,51 @@ export const weeklySlots = sqliteTable("weekly_slots", {
   durationMinutes: integer("duration_minutes").notNull().default(60),
   createdAt: integer("created_at").notNull(),
 });
+
+/**
+ * Workflow Extension 专属数据（基础设施表，位于 Core 库；仅由 Workflow Extension
+ * 的 Repository 通过注入的 Storage API 访问）。迁移 0021 建立。
+ * 任务关联用 workflow_runs.task_id 整型引用（不加 FK，任务生命周期由 Core 管理）。
+ */
+export const workflows = sqliteTable("workflows", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  version: integer("version").notNull().default(1),
+  tagsJson: text("tags_json").notNull().default("[]"),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
+export const workflowNodes = sqliteTable("workflow_nodes", {
+  id: text("id").primaryKey(),
+  workflowId: text("workflow_id").notNull().references(() => workflows.id, { onDelete: "cascade" }),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  positionX: integer("position_x").notNull().default(0),
+  positionY: integer("position_y").notNull().default(0),
+  configJson: text("config_json").notNull().default("{}"),
+  createdAt: integer("created_at").notNull(),
+});
+
+export const workflowEdges = sqliteTable("workflow_edges", {
+  id: text("id").primaryKey(),
+  workflowId: text("workflow_id").notNull().references(() => workflows.id, { onDelete: "cascade" }),
+  source: text("source").notNull(),
+  target: text("target").notNull(),
+  createdAt: integer("created_at").notNull(),
+});
+
+export const workflowRuns = sqliteTable("workflow_runs", {
+  id: text("id").primaryKey(),
+  workflowId: text("workflow_id").notNull().references(() => workflows.id, { onDelete: "cascade" }),
+  /** 关联的 Core 任务 id（整型引用；不建 FK，任务由 Core 管理） */
+  taskId: integer("task_id"),
+  state: text("state").notNull().default("pending"),
+  currentNodeId: text("current_node_id"),
+  startedAt: integer("started_at"),
+  completedAt: integer("completed_at"),
+  errorJson: text("error_json"),
+  createdAt: integer("created_at").notNull(),
+});

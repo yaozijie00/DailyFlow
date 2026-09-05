@@ -48,18 +48,18 @@ export default function StorageSection() {
   };
 
   const fields: { key: keyof StoragePaths; label: string; hint: string }[] = [
-    { key: "dataDir", label: "SQLite 数据目录", hint: "dailyflow.db 存放位置；留空使用默认（安装目录\\data）" },
-    { key: "cacheDir", label: "缓存目录", hint: "留空使用默认（安装目录\\cache）；为新闻图片等缓存预留" },
+    { key: "dataDir", label: "SQLite 数据目录", hint: "dailyflow.db 存放位置；留空使用默认（%LOCALAPPDATA%\\DailyFlow，首次启动会自动迁移旧安装目录数据）" },
+    { key: "cacheDir", label: "缓存目录", hint: "留空使用默认（数据目录\\cache）；为新闻图片等缓存预留" },
     { key: "backupDir", label: "备份目录", hint: "备份文件存放位置；留空使用默认（数据目录\\backups）" },
   ];
 
   return (
-    <div className="space-y-4 rounded-md border border-neutral-200 bg-white p-5">
-      {!loaded && <p className="text-sm text-neutral-400">加载中…</p>}
+    <div className="space-y-4 rounded-md border border-border-subtle glass-surface p-5">
+      {!loaded && <p className="text-sm text-text-faint">加载中…</p>}
       {loaded &&
         fields.map((f) => (
           <div key={f.key}>
-            <label className="block text-sm text-neutral-700">{f.label}</label>
+            <label className="block text-sm text-text-secondary">{f.label}</label>
             <input
               value={paths[f.key]}
               onChange={(e) => {
@@ -67,14 +67,14 @@ export default function StorageSection() {
                 setMsg(null);
               }}
               placeholder="留空使用默认位置"
-              className={`mt-1 w-full rounded-md border px-2 py-1.5 text-sm ${
-                errors[f.key] ? "border-red-400" : "border-neutral-300"
+              className={`mt-1 w-full rounded-md border bg-surface px-2 py-1.5 text-sm ${
+                errors[f.key] ? "border-red-400" : "border-border-strong"
               }`}
             />
             {errors[f.key] ? (
               <p className="mt-1 text-xs text-red-600">{errors[f.key]}</p>
             ) : (
-              <p className="mt-1 text-xs text-neutral-400">{f.hint}</p>
+              <p className="mt-1 text-xs text-text-faint">{f.hint}</p>
             )}
           </div>
         ))}
@@ -82,7 +82,7 @@ export default function StorageSection() {
         <button
           onClick={handleSave}
           disabled={!loaded}
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-700 disabled:bg-neutral-300"
+          className="rounded-md bg-accent px-4 py-2 text-sm text-on-accent hover:bg-accent-hover disabled:bg-surface-muted disabled:text-text-faint"
         >
           保存
         </button>
@@ -92,7 +92,7 @@ export default function StorageSection() {
           </span>
         )}
       </div>
-      <p className="text-xs text-neutral-400">
+      <p className="text-xs text-text-faint">
         修改后不会自动移动现有数据；新目录首次启动会创建全新数据库。如需保留旧数据，请手动复制原目录中的 dailyflow.db，或使用「Data」页的备份恢复。
       </p>
     </div>

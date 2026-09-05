@@ -9,6 +9,7 @@ import PomodoroSection from "../components/settings/PomodoroSection";
 import StorageSection from "../components/settings/StorageSection";
 import DataSection from "../components/settings/DataSection";
 import AboutSection from "../components/settings/AboutSection";
+import ExtensionSection from "../components/settings/ExtensionSection";
 
 type Tab =
   | "general"
@@ -18,6 +19,7 @@ type Tab =
   | "shortcuts"
   | "notifications"
   | "data"
+  | "extensions"
   | "about";
 
 const TABS: { id: Tab; label: string }[] = [
@@ -28,6 +30,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "shortcuts", label: "快捷键" },
   { id: "notifications", label: "通知" },
   { id: "data", label: "数据" },
+  { id: "extensions", label: "扩展" },
   { id: "about", label: "关于" },
 ];
 
@@ -45,8 +48,8 @@ export default function Settings() {
             onClick={() => setTab(t.id)}
             className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
               tab === t.id
-                ? "bg-neutral-900 text-white"
-                : "text-neutral-600 hover:bg-neutral-100"
+                ? "bg-accent text-on-accent"
+                : "text-text-secondary hover:bg-surface-hover"
             }`}
           >
             {t.label}
@@ -58,7 +61,7 @@ export default function Settings() {
       {tab === "appearance" && <AppearanceSection />}
       {tab === "defaults" && (
         <div className="space-y-4">
-          <p className="text-xs text-neutral-500">
+          <p className="text-xs text-text-muted">
             默认执行参数：决定“我通常怎么专注”。专注页内的时长/休息调整只作用于本次，不回写这里的默认值。
           </p>
           <PomodoroSection />
@@ -73,6 +76,7 @@ export default function Settings() {
           <DataSection />
         </div>
       )}
+      {tab === "extensions" && <ExtensionSection />}
       {tab === "about" && <AboutSection />}
     </div>
   );

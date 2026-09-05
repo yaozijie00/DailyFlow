@@ -11,7 +11,7 @@ import {
 export const REMINDER_RAIL_WIDTH = 260;
 
 const ICON_BTN =
-  "rounded p-1 text-neutral-400 transition-colors hover:bg-black/5 hover:text-neutral-700";
+  "rounded p-1 text-text-faint transition-colors hover:bg-surface-hover hover:text-text-secondary";
 
 function CardHeader({
   icon,
@@ -33,9 +33,9 @@ function CardHeader({
   return (
     <div className="flex items-center gap-1.5">
       <span className="shrink-0">{icon}</span>
-      <span className="min-w-0 flex-1 truncate text-xs font-medium text-neutral-800">{title}</span>
+      <span className="min-w-0 flex-1 truncate text-xs font-medium text-text-primary">{title}</span>
       {badge != null && (
-        <span className="shrink-0 rounded-full bg-black/5 px-1.5 py-px text-[10px] font-semibold text-neutral-600">
+        <span className="shrink-0 rounded-full bg-surface-hover px-1.5 py-px text-[10px] font-semibold text-text-secondary">
           {badge}
         </span>
       )}
@@ -187,7 +187,7 @@ function PlanWarnCard({ dismissed, onDismiss }: { dismissed: boolean; onDismiss:
                   定位
                 </button>
               </div>
-              <div className="text-[10px] tabular-nums text-neutral-500">{c.rangeLabel}</div>
+              <div className="text-[10px] tabular-nums text-text-muted">{c.rangeLabel}</div>
             </div>
           ))}
           {!showAll && conflicts.length > 3 && (
@@ -199,7 +199,7 @@ function PlanWarnCard({ dismissed, onDismiss }: { dismissed: boolean; onDismiss:
             </button>
           )}
           {hasOverload && (
-            <div className="border-t border-neutral-200/70 pt-1.5">
+            <div className="border-t border-border-subtle/70 pt-1.5">
               <div className="flex items-center gap-1 text-amber-800">
                 <CalendarClock size={12} className="shrink-0 text-amber-500" />
                 超出建议容量 {formatDurationCompact(overload * 60)}

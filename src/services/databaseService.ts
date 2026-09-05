@@ -8,6 +8,21 @@ export interface InitResult {
   appliedMigrations?: string[];
 }
 
+/** 递归展开错误 cause 链（drizzle 包装 "Failed query" 后真实 SQLite 错误在 cause 深处）。 */
+function deepestError(e: unknown): string {
+  const parts: string[] = [];
+  let cur: unknown = e;
+  const seen = new Set<unknown>();
+  while (cur instanceof Error && !seen.has(cur)) {
+    seen.add(cur);
+    const m = cur.message;
+    // 跳过 drizzle 的纯包装前缀（真实信息在其 cause），但保留非 "Failed query" 的自身信息
+    if (parts.length === 0 || !m.startsWith("Failed query:")) parts.push(m);
+    cur = (cur as { cause?: unknown }).cause;
+  }
+  return parts.filter(Boolean).join(" → ") || String(e);
+}
+
 /** 数据库服务：初始化（迁移 + 默认分类种子），UI/Store 只通过它接触数据层。 */
 export const databaseService = {
   async init(): Promise<InitResult> {
@@ -21,10 +36,8 @@ export const databaseService = {
       await new CategoryRepository(getDb()).seedDefaults();
       return { ok: true, appliedMigrations };
     } catch (e) {
-      // 优先暴露底层 SQLite 错误原因（drizzle 会包一层 "Failed query" 掩盖真实信息）
-      const cause = e instanceof Error ? (e as unknown as { cause?: unknown }).cause : undefined;
-      const causeMsg = cause instanceof Error ? cause.message : null;
-      return { ok: false, error: causeMsg ?? (e instanceof Error ? e.message : String(e)) };
+      // 优先暴露底层 SQLite 错误原因（drizzle 会包多层掩盖真实信息）
+      return { ok: false, error: deepestError(e) };
     }
   },
 };

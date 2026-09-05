@@ -1,1 +1,165 @@
 @import "tailwindcss";
+
+/* Tailwind v4：dark 变体改为 class 驱动（html.dark），便于 JS 控制 */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ============================================================
+   DailyFlow Design Tokens（V2.4 三主题：浅色 / 深色 / 毛玻璃）
+   - 语义命名：surface/text/border/accent；
+   - Tailwind 依据 @theme 生成 bg-surface / text-primary / border-subtle 等工具类，
+     实际色值在 :root / html.dark / html.glass 中按主题覆盖；
+   - 玻璃主题卡片使用 .glass-surface（半透明 + backdrop blur + 细描边）。
+   ============================================================ */
+
+@theme {
+  /* 表面层级 */
+  --color-bg-app: #fafaf9;         /* 页面底色（浅） */
+  --color-surface: #ffffff;        /* 卡片/面板 */
+  --color-surface-hover: #f5f5f4;  /* hover / 分区底 */
+  --color-surface-muted: #f5f5f4;  /* 次级表面 */
+  --color-bg-elevated: #ffffff;    /* 浮层/弹窗 */
+  /* 描边 */
+  --color-border-subtle: #e7e5e4;
+  --color-border-strong: #d6d3d1;
+  /* 文字四级 */
+  --color-text-primary: #1c1917;
+  --color-text-secondary: #44403c;
+  --color-text-muted: #78716c;
+  --color-text-faint: #a8a29e;
+  /* 强调（靛蓝） */
+  --color-accent: #4f46e5;
+  --color-accent-hover: #4338ca;
+  --color-accent-soft: #eef2ff;
+  --color-accent-strong: #818cf8;  /* 深底上的强调文字 */
+  --color-on-accent: #ffffff;      /* 强调底上的文字 */
+  /* 语义（保留原 Tailwind 色；深色下如需微调在此统一） */
+  --color-danger: #dc2626;
+  --color-danger-soft: #fef2f2;
+  --color-success: #16a34a;
+  --color-success-soft: #f0fdf4;
+  --color-warning: #d97706;
+  --color-warning-soft: #fffbeb;
+
+  /* 间距 / 圆角 / 阴影语义 */
+  --spacing-page-x: 1.5rem;
+  --spacing-section: 1.25rem;
+  --radius-card: 0.75rem;
+  --radius-control: 0.5rem;
+  --shadow-card: 0 1px 2px 0 rgb(0 0 0 / 0.04), 0 1px 3px 0 rgb(0 0 0 / 0.06);
+  --shadow-popover: 0 10px 30px -6px rgb(0 0 0 / 0.18);
+}
+
+/* ---------- 浅色（默认） ---------- */
+:root {
+  --color-bg-app: #fafaf9;
+  --color-surface: #ffffff;
+  --color-surface-hover: #f5f5f4;
+  --color-surface-muted: #f5f5f4;
+  --color-bg-elevated: #ffffff;
+  --color-border-subtle: #e7e5e4;
+  --color-border-strong: #d6d3d1;
+  --color-text-primary: #1c1917;
+  --color-text-secondary: #44403c;
+  --color-text-muted: #78716c;
+  --color-text-faint: #a8a29e;
+  --color-accent: #4f46e5;
+  --color-accent-hover: #4338ca;
+  --color-accent-soft: #eef2ff;
+  --color-accent-strong: #4f46e5;
+  --color-on-accent: #ffffff;
+  --color-danger: #dc2626;
+  --color-danger-soft: #fef2f2;
+  --color-success: #16a34a;
+  --color-success-soft: #f0fdf4;
+  --color-warning: #d97706;
+  --color-warning-soft: #fffbeb;
+  color-scheme: light;
+}
+
+/* ---------- 深色（html.dark） ---------- */
+html.dark {
+  --color-bg-app: #16161a;
+  --color-surface: #202027;
+  --color-surface-hover: #2a2a33;
+  --color-surface-muted: #1b1b21;
+  --color-bg-elevated: #26262e;
+  --color-border-subtle: #32323c;
+  --color-border-strong: #454550;
+  --color-text-primary: #f4f4f5;
+  --color-text-secondary: #d4d4d8;
+  --color-text-muted: #a1a1aa;
+  --color-text-faint: #71717a;
+  --color-accent: #6366f1;
+  --color-accent-hover: #818cf8;
+  --color-accent-soft: rgb(99 102 241 / 0.16);
+  --color-accent-strong: #a5b4fc;
+  --color-on-accent: #ffffff;
+  --color-danger: #f87171;
+  --color-danger-soft: rgb(248 113 113 / 0.12);
+  --color-success: #4ade80;
+  --color-success-soft: rgb(74 222 128 / 0.12);
+  --color-warning: #fbbf24;
+  --color-warning-soft: rgb(251 191 36 / 0.12);
+  color-scheme: dark;
+}
+
+/* ---------- 毛玻璃（html.glass）：无色中性深灰透明 + 毛边（frosted edge） ----------
+   参考 frostpane/Apple 深色玻璃：半透明磨砂表面 + 上缘内高光毛边 + 柔和投影。 */
+html.glass {
+  --color-bg-app: transparent; /* 页面底透明，露出 body 渐变背景 */
+  --color-surface: rgb(24 24 30 / 0.42); /* 中性深灰半透明：磨砂可见且文字可读 */
+  --color-surface-hover: rgb(255 255 255 / 0.1);
+  --color-surface-muted: rgb(18 18 24 / 0.35);
+  --color-bg-elevated: rgb(34 34 42 / 0.6);
+  --color-border-subtle: rgb(255 255 255 / 0.1);
+  --color-border-strong: rgb(255 255 255 / 0.2);
+  --color-text-primary: #f5f5f6;
+  --color-text-secondary: #d0d0d4;
+  --color-text-muted: #a2a2aa;
+  --color-text-faint: #74747e;
+  --color-accent: #8b93ff;
+  --color-accent-hover: #a5acff;
+  --color-accent-soft: rgb(139 147 255 / 0.16);
+  --color-accent-strong: #c3c8ff;
+  --color-on-accent: #101014;
+  --color-danger: #f87171;
+  --color-danger-soft: rgb(248 113 113 / 0.12);
+  --color-success: #4ade80;
+  --color-success-soft: rgb(74 222 128 / 0.12);
+  --color-warning: #fbbf24;
+  --color-warning-soft: rgb(251 191 36 / 0.12);
+  color-scheme: dark;
+}
+
+/* 背景层：中性深灰（无色相）微渐变，仅保留极淡光斑让 blur 有内容可透 */
+html.glass body {
+  background:
+    radial-gradient(900px 700px at 12% -8%, rgb(120 122 132 / 0.1), transparent 62%),
+    radial-gradient(800px 600px at 108% 14%, rgb(96 98 108 / 0.08), transparent 58%),
+    linear-gradient(160deg, #17171c 0%, #101014 45%, #0a0a0e 100%);
+  background-attachment: fixed;
+}
+
+/* 磨砂表面工具类：背景随主题变量；仅毛玻璃主题叠加 backdrop blur。
+   毛边（frosted edge）：上缘 1px 内高光 + 极细整体内亮边 + 柔和外投影分离层级。 */
+@layer utilities {
+  .glass-surface {
+    background: var(--color-surface);
+  }
+  html.glass .glass-surface {
+    -webkit-backdrop-filter: blur(24px) saturate(120%);
+    backdrop-filter: blur(24px) saturate(120%);
+    /* 毛边高光：顶部 1px 亮边 + 四边细亮线（磨砂玻璃裁切感） */
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.14),
+      inset 0 0 0 0.5px rgb(255 255 255 / 0.05),
+      0 4px 20px -4px rgb(0 0 0 / 0.5);
+  }
+}
+
+/* 页内容器统一契约（沿用 A2）：各页主容器用此类保证横向留白一致 */
+@layer components {
+  .df-page {
+    @apply mx-auto w-full max-w-5xl;
+  }
+}

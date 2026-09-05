@@ -6,7 +6,10 @@ import {
   type RangePreset,
   type StatsTab,
 } from "../stores/statisticsStore";
+import { usePomodoroStore } from "../stores/pomodoroStore";
+import { useDataVersion } from "../lib/dataVersion";
 import { PageHeader } from "../components/ui/PageHeader";
+import { Card } from "../components/ui/Card";
 import { EmptyState } from "../components/ui/EmptyState";
 import { CategoryBarChart } from "../components/statistics/CategoryBarChart";
 import { HourlyLineChart } from "../components/statistics/HourlyLineChart";
@@ -31,14 +34,14 @@ const TOP_TABS: { key: StatsTab; label: string }[] = [
   { key: "achievements", label: "成就" },
 ];
 
-/** 汇总小卡：数值 + 标签。 */
+/** 汇总小卡：数值 + 标签（A2：统一 Card 契约）。 */
 function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-md border border-neutral-200 bg-white p-4">
-      <div className="text-xs text-neutral-500">{label}</div>
-      <div className="mt-1 text-2xl font-semibold text-neutral-900">{value}</div>
-      {sub != null && <div className="mt-0.5 text-xs text-neutral-400">{sub}</div>}
-    </div>
+    <Card>
+      <div className="text-xs text-text-muted">{label}</div>
+      <div className="mt-1 text-2xl font-semibold text-text-primary">{value}</div>
+      {sub != null && <div className="mt-0.5 text-xs text-text-faint">{sub}</div>}
+    </Card>
   );
 }
 
@@ -59,14 +62,19 @@ export default function Statistics() {
   const hourlyStats = useStatisticsStore((s) => s.hourlyStats);
   const overview = useStatisticsStore((s) => s.overview);
   const dailyTasks = useStatisticsStore((s) => s.dailyTasks);
+  const workflowExecution = useStatisticsStore((s) => s.workflowExecution);
   const setRange = useStatisticsStore((s) => s.setRange);
   const setCustomRange = useStatisticsStore((s) => s.setCustomRange);
+  // A1-P0Fix-④：数据变化（任务/专注落库）使统计/成就派生视图失效，自动刷新
+  const taskVersion = useDataVersion("task");
+  const focusVersionSignal = usePomodoroStore((s) => s.focusVersion);
 
   useEffect(() => {
     if (dbStatus === "ready") {
       void useStatisticsStore.getState().load();
     }
-  }, [dbStatus]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dbStatus, taskVersion, focusVersionSignal]);
 
   const hasData =
     overview != null && (overview.totalSeconds > 0 || overview.taskCreated > 0);
@@ -83,15 +91,15 @@ export default function Statistics() {
       />
 
       {/* 顶层 Tab：统计 / 成就 */}
-      <div className="flex rounded-md border border-neutral-200 bg-white p-0.5 self-start">
+      <div className="flex rounded-md border border-border-subtle bg-surface p-0.5 self-start">
         {TOP_TABS.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
             className={`rounded px-4 py-1.5 text-sm transition-colors ${
               tab === t.key
-                ? "bg-neutral-900 text-white"
-                : "text-neutral-600 hover:bg-neutral-100"
+                ? "bg-accent text-on-accent"
+                : "text-text-secondary hover:bg-surface-hover"
             }`}
           >
             {t.label}
@@ -107,15 +115,15 @@ export default function Statistics() {
         <>
           {/* 范围选择 */}
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex rounded-md border border-neutral-200 bg-white p-0.5">
+            <div className="flex rounded-md border border-border-subtle bg-surface p-0.5">
               {RANGE_TABS.map((t) => (
                 <button
                   key={t.key}
                   onClick={() => setRange(t.key)}
                   className={`rounded px-3 py-1.5 text-sm transition-colors ${
                     range === t.key
-                      ? "bg-neutral-900 text-white"
-                      : "text-neutral-600 hover:bg-neutral-100"
+                      ? "bg-accent text-on-accent"
+                      : "text-text-secondary hover:bg-surface-hover"
                   }`}
                 >
                   {t.label}
@@ -123,13 +131,13 @@ export default function Statistics() {
               ))}
             </div>
             {range === "custom" && (
-              <div className="flex items-center gap-2 text-sm text-neutral-600">
+              <div className="flex items-center gap-2 text-sm text-text-secondary">
                 <input
                   type="date"
                   value={customFrom}
                   max={customTo}
                   onChange={(e) => setCustomRange(e.target.value, customTo)}
-                  className="rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+                  className="rounded-md border border-border-strong bg-surface px-2 py-1.5 text-sm text-text-primary"
                 />
                 <span>至</span>
                 <input
@@ -137,14 +145,14 @@ export default function Statistics() {
                   value={customTo}
                   min={customFrom}
                   onChange={(e) => setCustomRange(customFrom, e.target.value)}
-                  className="rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+                  className="rounded-md border border-border-strong bg-surface px-2 py-1.5 text-sm text-text-primary"
                 />
               </div>
             )}
           </div>
 
           {loading && overview == null ? (
-            <div className="text-sm text-neutral-400">统计计算中…</div>
+            <div className="text-sm text-text-faint">统计计算中…</div>
           ) : !hasData ? (
             <EmptyState
               icon={<BarChart3 size={28} />}
@@ -184,11 +192,32 @@ export default function Statistics() {
                 />
               </div>
 
+              {/* A6：Workflow 执行指标（区间内存在已完成/失败 run 时显示） */}
+              {workflowExecution != null &&
+                (workflowExecution.completedRuns > 0 || workflowExecution.failedRuns > 0) && (
+                  <section className="glass-surface rounded-md border border-border-subtle p-5">
+                    <h2 className="mb-4 text-sm font-medium text-text-secondary">Workflow 执行</h2>
+                    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                      <StatCard label="完成流程" value={String(workflowExecution.completedRuns)} />
+                      <StatCard label="失败流程" value={String(workflowExecution.failedRuns)} />
+                      <StatCard
+                        label="平均执行时长"
+                        value={formatDurationCompact(workflowExecution.avgRunSeconds * 1000)}
+                      />
+                      <StatCard
+                        label="最常用流程"
+                        value={workflowExecution.topWorkflow ?? "—"}
+                        sub={workflowExecution.topWorkflow ? "按完成次数" : undefined}
+                      />
+                    </div>
+                  </section>
+                )}
+
               {/* 类别投入柱状图 */}
-              <section className="rounded-md border border-neutral-200 bg-white p-5">
-                <h2 className="mb-4 text-sm font-medium text-neutral-600">类别投入</h2>
+              <section className="glass-surface rounded-md border border-border-subtle p-5">
+                <h2 className="mb-4 text-sm font-medium text-text-secondary">类别投入</h2>
                 {overview!.categoryStats.length === 0 ? (
-                  <p className="text-sm text-neutral-400">暂无类别投入数据</p>
+                  <p className="text-sm text-text-faint">暂无类别投入数据</p>
                 ) : (
                   <CategoryBarChart data={overview!.categoryStats} />
                 )}
@@ -196,10 +225,10 @@ export default function Statistics() {
 
               {/* 预计 vs 实际（真实复盘：预计时长 vs 专注实际投入） */}
               {overview!.estimateRowCount > 0 && (
-                <section className="rounded-md border border-neutral-200 bg-white p-5">
-                  <h2 className="mb-4 text-sm font-medium text-neutral-600">
+                <section className="glass-surface rounded-md border border-border-subtle p-5">
+                  <h2 className="mb-4 text-sm font-medium text-text-secondary">
                     预计 vs 实际
-                    <span className="ml-2 text-xs font-normal text-neutral-400">
+                    <span className="ml-2 text-xs font-normal text-text-faint">
                       范围内完成任务 {overview!.estimateRowCount} 项 · 实际仅统计真实 Focus Session
                     </span>
                   </h2>
@@ -230,13 +259,13 @@ export default function Statistics() {
                       return (
                         <li
                           key={i}
-                          className="flex items-center gap-3 rounded-md px-2 py-1 text-xs text-neutral-700 odd:bg-neutral-50/60"
+                          className="flex items-center gap-3 rounded-md px-2 py-1 text-xs text-text-secondary odd:bg-surface-muted/60"
                         >
                           <span className="min-w-0 flex-1 truncate">{r.title}</span>
-                          <span className="shrink-0 tabular-nums text-neutral-400">
+                          <span className="shrink-0 tabular-nums text-text-faint">
                             预计 {formatDurationCompact(r.estimatedSeconds)}
                           </span>
-                          <span className="shrink-0 tabular-nums text-neutral-500">
+                          <span className="shrink-0 tabular-nums text-text-muted">
                             实际 {formatDurationCompact(r.actualSeconds)}
                           </span>
                           <span
@@ -245,7 +274,7 @@ export default function Statistics() {
                                 ? "text-amber-600"
                                 : diff < 0
                                   ? "text-green-600"
-                                  : "text-neutral-400"
+                                  : "text-text-faint"
                             }`}
                           >
                             {diff === 0 ? "±0" : diff > 0 ? `+${formatDurationCompact(diff)}` : formatDurationCompact(diff)}
@@ -259,48 +288,48 @@ export default function Statistics() {
 
               {/* 今日工作轨迹 / 每日投入趋势 */}
               {range === "today" ? (
-                <section className="rounded-md border border-neutral-200 bg-white p-5">
-                  <h2 className="mb-4 text-sm font-medium text-neutral-600">今日工作轨迹</h2>
+                <section className="glass-surface rounded-md border border-border-subtle p-5">
+                  <h2 className="mb-4 text-sm font-medium text-text-secondary">今日工作轨迹</h2>
                   <HourlyLineChart data={hourlyStats} />
                 </section>
               ) : (
                 overview!.dailyFocus.length > 0 && (
-                  <section className="rounded-md border border-neutral-200 bg-white p-5">
-                    <h2 className="mb-4 text-sm font-medium text-neutral-600">每日投入趋势</h2>
+                  <section className="glass-surface rounded-md border border-border-subtle p-5">
+                    <h2 className="mb-4 text-sm font-medium text-text-secondary">每日投入趋势</h2>
                     <DailyTrendChart data={overview!.dailyFocus} />
                   </section>
                 )
               )}
 
               {/* 每日任务（按 scheduledDate 分组；今日显示当天任务） */}
-              <section className="rounded-md border border-neutral-200 bg-white p-5">
-                <h2 className="mb-4 text-sm font-medium text-neutral-600">每日任务</h2>
+              <section className="glass-surface rounded-md border border-border-subtle p-5">
+                <h2 className="mb-4 text-sm font-medium text-text-secondary">每日任务</h2>
                 {dailyTasks.length === 0 ? (
-                  <p className="text-sm text-neutral-400">该时间段内暂无任务</p>
+                  <p className="text-sm text-text-faint">该时间段内暂无任务</p>
                 ) : (
                   <div className="space-y-4">
                     {dailyTasks.map((g) => (
                       <div key={g.date}>
-                        <div className="mb-1 text-xs text-neutral-400">{g.date}</div>
+                        <div className="mb-1 text-xs text-text-faint">{g.date}</div>
                         <ul className="space-y-1">
                           {g.tasks.map((t) => (
                             <li
                               key={t.id}
-                              className="flex items-center gap-2 text-sm text-neutral-700"
+                              className="flex items-center gap-2 text-sm text-text-secondary"
                             >
                               <span
                                 className={`h-2 w-2 shrink-0 rounded-full ${
                                   t.status === "COMPLETED"
                                     ? "bg-green-500"
                                     : t.status === "CANCELLED"
-                                      ? "bg-neutral-300"
-                                      : "bg-neutral-900"
+                                      ? "bg-text-faint"
+                                      : "bg-accent"
                                 }`}
                               />
                               <span
                                 className={`truncate ${
                                   t.status === "COMPLETED" || t.status === "CANCELLED"
-                                    ? "text-neutral-400 line-through decoration-neutral-300"
+                                    ? "text-text-faint line-through decoration-text-faint"
                                     : ""
                                 }`}
                               >
@@ -317,8 +346,8 @@ export default function Statistics() {
 
               {/* 每日完成任务 */}
               {overview!.dailyCompletedTasks.length > 0 && (
-                <section className="rounded-md border border-neutral-200 bg-white p-5">
-                  <h2 className="mb-4 text-sm font-medium text-neutral-600">每日完成任务</h2>
+                <section className="glass-surface rounded-md border border-border-subtle p-5">
+                  <h2 className="mb-4 text-sm font-medium text-text-secondary">每日完成任务</h2>
                   <CompletedTasksChart data={overview!.dailyCompletedTasks} />
                 </section>
               )}

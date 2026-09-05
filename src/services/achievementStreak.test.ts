@@ -29,6 +29,7 @@ function ctx(partial: Partial<AchievementContext> = {}): AchievementContext {
     weekendFocusCount: 0,
     maxDailyPomodoros: 0,
     highPriorityTasksCompleted: 0,
+    workflowRunsCompleted: 0,
     ...partial,
   };
 }

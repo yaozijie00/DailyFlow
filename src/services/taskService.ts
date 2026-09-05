@@ -166,18 +166,24 @@ export class TaskService {
     return this.tasks.delete(id);
   }
 
-  async completeTask(id: number): Promise<Task | null> {
+  /**
+   * 完成任务。
+   * @param silent true = 不记录撤销（外部系统动作，如 Workflow Finish→Task 完成；
+   *   撤销会导致 WorkflowRun.completed 与任务 TODO 矛盾，故此类完成不可撤销，
+   *   用户如需回退可手动 toggle）。
+   */
+  async completeTask(id: number, silent = false): Promise<Task | null> {
     const before = await this.tasks.findById(id);
     if (!before) return null;
     const completing = before.status !== "COMPLETED";
     if (completing && before.repeatRule) {
-      return this.completeWithRepeat(id, before);
+      return this.completeWithRepeat(id, before, silent);
     }
     const updated = await this.tasks.update(id, {
       status: "COMPLETED",
       completedAt: Date.now(),
     });
-    this.captureTaskUpdate(id, before, updated);
+    if (!silent) this.captureTaskUpdate(id, before, updated);
     return updated;
   }
 
@@ -201,7 +207,32 @@ export class TaskService {
    * 完成带重复规则的任务：完成 + 生成下一实例合并为一个复合撤销动作。
    * 下一实例复制标题/分类/预计/备注/目标/规则，日期取规则下一次（严格晚于本次）。
    */
-  private async completeWithRepeat(id: number, before: Task): Promise<Task | null> {
+  private async completeWithRepeat(id: number, before: Task, silent = false): Promise<Task | null> {
+    if (silent) {
+      // 静默模式：完成 + 生成下一实例，均不记录撤销
+      const updated = await this.tasks.update(id, {
+        status: "COMPLETED",
+        completedAt: Date.now(),
+      });
+      if (updated) {
+        const nextDate = nextOccurrenceDate(before.scheduledDate, before.repeatRule);
+        if (nextDate) {
+          const child = await this.tasks.create({
+            title: before.title,
+            scheduledDate: nextDate,
+            categoryId: before.categoryId,
+            status: "TODO",
+            estimatedDuration: before.estimatedDuration,
+            notes: before.notes,
+            goalId: before.goalId,
+            repeatRule: before.repeatRule,
+            priority: taskPriorityMeta(before.priority).value,
+          });
+          await this.tasks.reorderByTime(child.scheduledDate);
+        }
+      }
+      return updated;
+    }
     return undoManager.withBatchAsync(async () => {
       const updated = await this.tasks.update(id, {
         status: "COMPLETED",
@@ -275,4 +306,21 @@ export class TaskService {
     }
     return { totalSeconds, count: sessions.length, completedCount };
   }
+
+  /** 按项目聚合（全部日期，v2.3.x 项目卡片用）。 */
+  async getProjectSummaries(): Promise<Map<number, ProjectTaskSummary>> {
+    const rows = await this.tasks.projectAggregates();
+    const map = new Map<number, ProjectTaskSummary>();
+    for (const r of rows) {
+      map.set(r.projectId, { todo: r.todo, completed: r.completed, seconds: r.seconds });
+    }
+    return map;
+  }
+}
+
+/** 项目任务摘要（v2.3.x）：待办/已完成 任务数 + 关联专注累计秒数。 */
+export interface ProjectTaskSummary {
+  todo: number;
+  completed: number;
+  seconds: number;
 }

@@ -4,6 +4,7 @@ import { useAppStore } from "../../stores/appStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useCourseStore, courseService } from "../../stores/courseStore";
 import { useWindowDrag } from "../../hooks/useWindowDrag";
+import { useDataVersion } from "../../lib/dataVersion";
 import { startOfWeek, dateStringOf } from "../../lib/date";
 import {
   SCHEDULE_WEEKDAYS,
@@ -76,6 +77,8 @@ export default function CourseSchedule() {
   const [drag, setDrag] = useState<DragState | null>(null);
   const [draft, setDraft] = useState("");
   const [weekProgress, setWeekProgress] = useState<WeekProgressRow[]>([]);
+  // A1-P0Fix-④：任务完成/撤销后刷新「本周按时完成课程任务」状态
+  const taskVersion = useDataVersion("task");
 
   const colRefs = useRef<Array<HTMLDivElement | null>>([]);
   const rowDragMovedRef = useRef(false);
@@ -102,7 +105,7 @@ export default function CourseSchedule() {
     return () => {
       alive = false;
     };
-  }, [dbStatus, slots]);
+  }, [dbStatus, slots, taskVersion]);
 
   // 放置模式：Esc 取消
   useEffect(() => {
@@ -401,10 +404,10 @@ export default function CourseSchedule() {
 
   return (
     <section className="space-y-3">
-      <div className="flex items-center gap-1.5 text-sm font-medium text-neutral-700">
-        <BookOpen size={15} className="text-neutral-400" />
+      <div className="flex items-center gap-1.5 text-sm font-medium text-text-secondary">
+        <BookOpen size={15} className="text-text-faint" />
         课程表
-        <span className="text-xs font-normal text-neutral-400">
+        <span className="text-xs font-normal text-text-faint">
           每周固定安排 · 单击课程后点空白格添加，或按住课程拖入；拖色块换天/时间，拖上下边调时长
         </span>
       </div>
@@ -419,33 +422,33 @@ export default function CourseSchedule() {
               <span
                 key={p.courseId}
                 title="本周按时完成课程任务数 / 应出现次数"
-                className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-white py-0.5 pl-1.5 pr-2 text-[11px] text-neutral-500"
+                className="inline-flex items-center gap-1.5 rounded-full border border-border-subtle bg-surface py-0.5 pl-1.5 pr-2 text-[11px] text-text-muted"
               >
                 <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} />
-                <span className="font-medium text-neutral-800">{p.title}</span>
+                <span className="font-medium text-text-primary">{p.title}</span>
                 <span className={full ? "font-semibold text-green-600" : "tabular-nums"}>
                   {p.completed}/{p.occurrences}
                 </span>
               </span>
             );
           })}
-          <span className="text-[11px] text-neutral-400">本周按节完成</span>
+          <span className="text-[11px] text-text-faint">本周按节完成</span>
         </div>
       )}
 
       {/* 布局：左侧 = 周表格视图，右侧 = 我的课程（flex-row-reverse 视觉对调） */}
       <div className="flex flex-row-reverse items-start gap-3">
         {/* 课程库 */}
-        <aside className="w-48 shrink-0 select-none space-y-2 rounded-lg border border-neutral-200 bg-white p-3">
+        <aside className="w-48 shrink-0 select-none space-y-2 rounded-lg border border-border-subtle glass-surface p-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-xs font-semibold text-neutral-700">我的课程</h3>
+            <h3 className="text-xs font-semibold text-text-secondary">我的课程</h3>
             {courses.length > 0 && (
-              <span className="text-[10px] tabular-nums text-neutral-400">{courses.length}</span>
+              <span className="text-[10px] tabular-nums text-text-faint">{courses.length}</span>
             )}
           </div>
 
           {courses.length === 0 ? (
-            <p className="text-xs leading-relaxed text-neutral-400">
+            <p className="text-xs leading-relaxed text-text-faint">
               还没有课程，先新建一个，再点空白格或拖入排课
             </p>
           ) : (
@@ -472,7 +475,7 @@ export default function CourseSchedule() {
                         : "点击开始放置（点空白格添加 60 分钟）；按住可拖入周视图"
                     }
                     className={`group flex cursor-grab items-center gap-2 rounded-md px-2 py-1.5 text-xs transition-colors active:cursor-grabbing ${
-                      armed ? "" : "hover:bg-neutral-50"
+                      armed ? "" : "hover:bg-surface-hover"
                     }`}
                     style={
                       armed
@@ -487,11 +490,11 @@ export default function CourseSchedule() {
                       className="h-2.5 w-2.5 shrink-0 rounded-full"
                       style={{ backgroundColor: color }}
                     />
-                    <span className="min-w-0 flex-1 truncate font-medium text-neutral-800">
+                    <span className="min-w-0 flex-1 truncate font-medium text-text-primary">
                       {c.title}
                     </span>
                     {n > 0 && (
-                      <span className="shrink-0 text-[10px] tabular-nums text-neutral-400 group-hover:hidden">
+                      <span className="shrink-0 text-[10px] tabular-nums text-text-faint group-hover:hidden">
                         {n}节
                       </span>
                     )}
@@ -502,7 +505,7 @@ export default function CourseSchedule() {
                         void deleteCourse(c.id);
                       }}
                       aria-label={`删除课程 ${c.title}`}
-                      className="shrink-0 rounded p-0.5 text-neutral-300 opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100"
+                      className="shrink-0 rounded p-0.5 text-text-faint opacity-0 transition-opacity hover:text-red-500 group-hover:opacity-100"
                     >
                       <X size={12} />
                     </button>
@@ -520,44 +523,44 @@ export default function CourseSchedule() {
                 if (e.key === "Enter") submitCourse();
               }}
               placeholder="新课程名"
-              className="min-w-0 flex-1 rounded-md border border-neutral-300 px-2 py-1.5 text-xs outline-none transition-colors placeholder:text-neutral-400 focus:border-neutral-900"
+              className="min-w-0 flex-1 rounded-md border border-border-strong bg-surface px-2 py-1.5 text-xs text-text-primary outline-none transition-colors placeholder:text-text-faint focus:border-accent"
             />
             <button
               onClick={submitCourse}
               disabled={draft.trim().length === 0}
               aria-label="添加课程"
-              className="rounded-md bg-neutral-900 px-2 text-white transition-colors hover:bg-neutral-700 disabled:cursor-not-allowed disabled:bg-neutral-200"
+              className="rounded-md bg-accent px-2 text-on-accent transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-faint"
             >
               <Plus size={13} />
             </button>
           </div>
-          <p className="text-[10px] leading-relaxed text-neutral-400">
+          <p className="text-[10px] leading-relaxed text-text-faint">
             单击课程 = 开始放置；按住 = 拖入周视图；Esc 取消
           </p>
         </aside>
 
         {/* 周课程表 */}
-        <div className="min-w-0 flex-1 select-none overflow-hidden rounded-lg border border-neutral-200 bg-white">
+        <div className="min-w-0 flex-1 select-none overflow-hidden rounded-lg border border-border-subtle glass-surface">
           {/* 放置模式提示条 */}
           {armedCourse && !drag && (
-            <div className="flex items-center gap-2 border-b border-neutral-100 bg-neutral-50/70 px-3 py-1.5 text-xs">
+            <div className="flex items-center gap-2 border-b border-border-subtle bg-surface-muted/70 px-3 py-1.5 text-xs">
               <span
                 className="h-2 w-2 shrink-0 rounded-full"
                 style={{ backgroundColor: courseColor(armedCourse.id) }}
               />
-              <span className="text-neutral-700">
+              <span className="text-text-secondary">
                 正在添加{" "}
-                <span className="font-medium text-neutral-900">{armedCourse.title}</span>
+                <span className="font-medium text-text-primary">{armedCourse.title}</span>
                 ：点击左侧表格空白格放置（60 分钟）
               </span>
-              <span className="hidden text-neutral-400 sm:inline">· 再点课程 / Esc 取消</span>
+              <span className="hidden text-text-faint sm:inline">· 再点课程 / Esc 取消</span>
               <button
                 onClick={() => {
                   setArmedId(null);
                   setHover(null);
                 }}
                 aria-label="取消放置"
-                className="ml-auto rounded p-0.5 text-neutral-400 transition-colors hover:text-neutral-700"
+                className="ml-auto rounded p-0.5 text-text-faint transition-colors hover:text-text-secondary"
               >
                 <X size={12} />
               </button>
@@ -565,7 +568,7 @@ export default function CourseSchedule() {
           )}
 
           {/* 周几表头 */}
-          <div className="flex border-b border-neutral-200">
+          <div className="flex border-b border-border-subtle">
             <div className="w-11 shrink-0" />
             {colWeekdays.map((weekday) => {
               const active =
@@ -574,8 +577,8 @@ export default function CourseSchedule() {
               return (
                 <div
                   key={weekday}
-                  className={`min-w-0 flex-1 border-l border-neutral-100 py-1 text-center text-xs font-medium text-neutral-500 first:border-l-0 ${
-                    active ? "bg-neutral-100/70" : ""
+                  className={`min-w-0 flex-1 border-l border-border-subtle py-1 text-center text-xs font-medium text-text-muted first:border-l-0 ${
+                    active ? "bg-surface-muted/70" : ""
                   }`}
                 >
                   {SCHEDULE_WEEKDAYS[weekday - 1]}
@@ -590,7 +593,7 @@ export default function CourseSchedule() {
               {hours.map((h) => (
                 <div
                   key={h}
-                  className="border-t border-neutral-100 px-1 pt-0.5 text-right text-[10px] tabular-nums text-neutral-400"
+                  className="border-t border-border-subtle px-1 pt-0.5 text-right text-[10px] tabular-nums text-text-faint"
                   style={{ height: pxPerHour }}
                 >
                   {String(h).padStart(2, "0")}
@@ -618,14 +621,14 @@ export default function CourseSchedule() {
                   onMouseMove={(e) => onColumnMove(e, weekday)}
                   onMouseLeave={() => onColumnLeave(weekday)}
                   onMouseDown={(e) => onColumnMouseDown(e, weekday)}
-                  className={`relative min-w-0 flex-1 border-l border-neutral-100 first:border-l-0 transition-colors ${
+                  className={`relative min-w-0 flex-1 border-l border-border-subtle first:border-l-0 transition-colors ${
                     armedCourse && !drag ? "cursor-crosshair" : ""
-                  } ${colActive ? "bg-neutral-100/50" : ""}`}
+                  } ${colActive ? "bg-surface-muted/50" : ""}`}
                 >
                   {hours.map((h) => (
                     <div
                       key={h}
-                      className="border-t border-neutral-100/60"
+                      className="border-t border-border-subtle/60"
                       style={{ height: pxPerHour }}
                     />
                   ))}
@@ -653,10 +656,10 @@ export default function CourseSchedule() {
                         }}
                       >
                         <div className="pl-1.5 pt-1 pr-1">
-                          <div className="truncate text-[11px] font-medium leading-tight text-neutral-900 transition-[padding] group-hover:pr-6">
+                          <div className="truncate text-[11px] font-medium leading-tight text-text-primary transition-[padding] group-hover:pr-6">
                             {s.courseTitle ?? "课程"}
                           </div>
-                          <div className="truncate text-[9px] leading-tight tabular-nums text-neutral-500">
+                          <div className="truncate text-[9px] leading-tight tabular-nums text-text-muted">
                             {minutesLabel(s.startMinutes)}–{minutesLabel(s.startMinutes + s.durationMinutes)}
                           </div>
                         </div>
@@ -669,7 +672,7 @@ export default function CourseSchedule() {
                             }}
                             aria-label="删除课程安排"
                             title="删除该次安排"
-                            className="rounded bg-white/90 px-1 text-[9px] font-medium text-red-500 shadow-sm ring-1 ring-neutral-200 transition-colors hover:bg-red-50"
+                            className="rounded bg-surface/90 px-1 text-[9px] font-medium text-red-500 shadow-card ring-1 ring-border-subtle transition-colors hover:bg-red-50"
                           >
                             ✕
                           </button>
@@ -680,7 +683,7 @@ export default function CourseSchedule() {
                           title="拖动调整开始时间"
                           className="group absolute inset-x-0 top-0 z-20 h-2 cursor-ns-resize"
                         >
-                          <div className="h-full w-full rounded-t-[5px] transition-colors group-hover:bg-neutral-900/10" />
+                          <div className="h-full w-full rounded-t-[5px] transition-colors group-hover:bg-text-primary/10" />
                         </div>
                         {/* 下边缘：改结束时间（加长/缩短） */}
                         <div
@@ -688,7 +691,7 @@ export default function CourseSchedule() {
                           title="拖动调整结束时间"
                           className="group absolute inset-x-0 bottom-0 z-20 h-2.5 cursor-ns-resize"
                         >
-                          <div className="h-full w-full rounded-b-[5px] transition-colors group-hover:bg-neutral-900/10" />
+                          <div className="h-full w-full rounded-b-[5px] transition-colors group-hover:bg-text-primary/10" />
                         </div>
                       </div>
                     );
@@ -708,10 +711,10 @@ export default function CourseSchedule() {
                         borderRadius: 5,
                       }}
                     >
-                      <div className="truncate pl-1.5 pt-0.5 pr-1 text-[11px] font-medium leading-tight text-neutral-900">
+                      <div className="truncate pl-1.5 pt-0.5 pr-1 text-[11px] font-medium leading-tight text-text-primary">
                         {ghost.conflict ? "该时段已有安排" : ghost.title}
                       </div>
-                      <div className="truncate pl-1.5 text-[9px] leading-tight tabular-nums text-neutral-600">
+                      <div className="truncate pl-1.5 text-[9px] leading-tight tabular-nums text-text-secondary">
                         {minutesLabel(ghost.start!)}–{minutesLabel(ghost.start! + ghost.durationMinutes)}
                       </div>
                     </div>
@@ -723,7 +726,7 @@ export default function CourseSchedule() {
             {/* 空网格引导 */}
             {slots.length === 0 && (
               <div className="pointer-events-none absolute inset-0 z-[5] flex items-center justify-center">
-                <p className="rounded-md bg-white/70 px-3 py-1.5 text-xs text-neutral-400">
+                <p className="rounded-md bg-surface/70 px-3 py-1.5 text-xs text-text-faint">
                   {courses.length === 0
                     ? "先新建一门课程，再点空白格或拖入排课"
                     : "点右侧课程 → 在左侧表格点空白格放置；或把课程卡直接拖进来"}
@@ -740,7 +743,7 @@ export default function CourseSchedule() {
           className="pointer-events-none fixed z-[80]"
           style={{ left: drag.x + 12, top: drag.y - 6 }}
         >
-          <span className="inline-flex max-w-[260px] items-center gap-1.5 rounded-md bg-neutral-900 px-2 py-1 text-[10px] font-medium text-white shadow-lg">
+          <span className="inline-flex max-w-[260px] items-center gap-1.5 rounded-md bg-accent px-2 py-1 text-[10px] font-medium text-on-accent shadow-popover">
             {drag.kind === "library" && drag.courseId != null && (
               <span
                 className="h-2 w-2 shrink-0 rounded-full"
@@ -751,7 +754,7 @@ export default function CourseSchedule() {
               <span className="max-w-[120px] truncate">{drag.title}</span>
             )}
             {drag.weekday != null && drag.start != null ? (
-              <span className="tabular-nums text-white/90">
+              <span className="tabular-nums text-on-accent/90">
                 {minutesLabel(drag.start)}–{minutesLabel(drag.start + drag.durationMinutes)}
               </span>
             ) : (

@@ -12,12 +12,14 @@ const mockState = vi.hoisted(() => ({
   tasks: [] as Task[],
   categories: [] as { id: number; name: string; sortOrder: number; color: string | null; createdAt: number }[],
   selectedTaskId: null,
+  projectFilter: null as { id: number; title: string } | null,
   toggleComplete: vi.fn(),
   selectTask: vi.fn(),
   reorderTasks: vi.fn(),
   createTask: vi.fn(),
   startTaskDrag: vi.fn(),
   endTaskDrag: vi.fn(),
+  setProjectFilter: vi.fn(),
 }));
 
 const noteMockState = vi.hoisted(() => ({
@@ -87,6 +89,8 @@ describe("TaskList", () => {
     mockState.toggleComplete.mockClear();
     mockState.reorderTasks.mockClear();
     mockState.createTask.mockClear();
+    mockState.projectFilter = null;
+    mockState.setProjectFilter.mockClear();
     noteMockState.notes = [];
     noteMockState.update.mockClear();
   });
@@ -177,6 +181,20 @@ describe("TaskList", () => {
     expect(screen.getByText("待办甲")).toBeTruthy();
     expect(screen.queryByText("完成乙")).toBeNull();
     settingsState.settings.todayHideCompleted = false;
+  });
+
+  it("项目筛选：只显示该项目任务，并提供清除条", () => {
+    mockState.projectFilter = { id: 9, title: "PCG 学习" };
+    mockState.tasks = [
+      makeTask({ id: 1, title: "项目任务", projectId: 9 }),
+      makeTask({ id: 2, title: "其他任务", projectId: null }),
+    ];
+    render(<TaskList />);
+    expect(screen.getByText("项目任务")).toBeTruthy();
+    expect(screen.queryByText("其他任务")).toBeNull();
+    expect(screen.getByText(/PCG 学习/)).toBeTruthy();
+    fireEvent.click(screen.getByLabelText("清除项目筛选"));
+    expect(mockState.setProjectFilter).toHaveBeenCalledWith(null);
   });
 
   it("拖动排序：drop 到另一行触发 reorderTasks", () => {

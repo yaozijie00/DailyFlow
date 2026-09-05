@@ -54,30 +54,30 @@ export default function DataSection() {
   };
 
   return (
-    <div className="mt-6 space-y-4 rounded-md border border-neutral-200 bg-white p-5">
+    <div className="mt-6 space-y-4 rounded-md border border-border-subtle glass-surface p-5">
       <h2 className="text-base font-semibold">数据</h2>
 
       {/* 导出备份 */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <div className="text-sm text-neutral-700">导出备份</div>
-          <div className="text-xs text-neutral-400">
+          <div className="text-sm text-text-secondary">导出备份</div>
+          <div className="text-xs text-text-faint">
             生成 DailyFlow_Backup_YYYY-MM-DD.db（SQLite 完整快照）
           </div>
         </div>
         <button
           onClick={handleExport}
           disabled={busy}
-          className="flex items-center gap-1 rounded-md bg-neutral-900 px-3 py-1.5 text-sm text-white hover:bg-neutral-700 disabled:bg-neutral-300"
+          className="flex items-center gap-1 rounded-md bg-accent px-3 py-1.5 text-sm text-on-accent hover:bg-accent-hover disabled:bg-surface-muted disabled:text-text-faint"
         >
           <Download size={14} /> 导出备份
         </button>
       </div>
 
       {/* 恢复备份 */}
-      <div className="border-t border-neutral-100 pt-4">
-        <div className="text-sm text-neutral-700">恢复备份</div>
-        <div className="mt-1 text-xs text-neutral-400">
+      <div className="border-t border-border-subtle pt-4">
+        <div className="text-sm text-text-secondary">恢复备份</div>
+        <div className="mt-1 text-xs text-text-faint">
           从本地备份中选择一个文件恢复。恢复前会自动备份当前数据；备份版本与当前应用不一致时拒绝恢复。
         </div>
 
@@ -88,7 +88,7 @@ export default function DataSection() {
               setSelectedBackup(e.target.value);
               setConfirming(false);
             }}
-            className="min-w-0 flex-1 rounded-md border border-neutral-300 px-2 py-1.5 text-sm"
+            className="min-w-0 flex-1 rounded-md border border-border-strong bg-surface px-2 py-1.5 text-sm"
           >
             {backups.length === 0 && <option value="">暂无备份文件</option>}
             {backups.map((name) => (
@@ -100,7 +100,7 @@ export default function DataSection() {
           <button
             onClick={() => setConfirming(true)}
             disabled={busy || !selectedBackup}
-            className="flex items-center gap-1 rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-400"
+            className="flex items-center gap-1 rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm text-text-secondary hover:bg-surface-hover disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-faint"
           >
             <Upload size={14} /> 恢复
           </button>
@@ -126,7 +126,7 @@ export default function DataSection() {
               <button
                 onClick={() => setConfirming(false)}
                 disabled={busy}
-                className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs text-neutral-700 hover:bg-neutral-100"
+                className="rounded-md border border-border-strong px-3 py-1.5 text-xs text-text-secondary hover:bg-surface-hover"
               >
                 取消
               </button>

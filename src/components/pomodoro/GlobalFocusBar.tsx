@@ -85,18 +85,18 @@ export default function GlobalFocusBar() {
   return (
     <div
       ref={barRef}
-      className="fixed z-40 flex items-center gap-2.5 rounded-md border border-neutral-200 bg-white p-2.5 shadow-lg"
+      className="glass-surface fixed z-40 flex items-center gap-2.5 rounded-md border border-border-subtle p-2.5 shadow-popover"
       style={pos != null ? { left: pos.x, top: pos.y } : { bottom: "1rem", right: "1rem" }}
     >
       <span
         onMouseDown={startDrag}
         title="拖动调整位置"
         aria-label="拖动悬浮窗"
-        className="shrink-0 cursor-grab text-neutral-300 hover:text-neutral-500 active:cursor-grabbing"
+        className="shrink-0 cursor-grab text-text-faint hover:text-text-muted active:cursor-grabbing"
       >
         <GripHorizontal size={14} />
       </span>
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-neutral-900 text-white">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-on-accent">
         <Timer size={14} />
       </span>
       <button
@@ -104,10 +104,10 @@ export default function GlobalFocusBar() {
         title="打开专注页面"
         className="min-w-0 cursor-pointer text-left"
       >
-        <div className="max-w-[10rem] truncate text-sm font-medium text-neutral-900">
+        <div className="max-w-[10rem] truncate text-sm font-medium text-text-primary">
           {title}
         </div>
-        <div className="text-xs tabular-nums text-neutral-500">
+        <div className="text-xs tabular-nums text-text-muted">
           {status} · {formatTimer(snapshot.remainingMs)}
         </div>
       </button>
@@ -119,7 +119,7 @@ export default function GlobalFocusBar() {
         }}
         aria-label={paused ? "继续" : "暂停"}
         title={paused ? "继续" : "暂停"}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-neutral-300 text-neutral-700 transition-colors hover:bg-neutral-100"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border-strong bg-surface text-text-secondary transition-colors hover:bg-surface-hover"
       >
         {paused ? <Play size={14} /> : <Pause size={14} />}
       </button>
@@ -130,13 +130,13 @@ export default function GlobalFocusBar() {
         }}
         aria-label="结束专注"
         title="结束专注"
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-neutral-300 text-neutral-700 transition-colors hover:bg-neutral-100"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border-strong bg-surface text-text-secondary transition-colors hover:bg-surface-hover"
       >
         <Flag size={14} />
       </button>
       <button
         onClick={goFocus}
-        className="shrink-0 rounded-md border border-neutral-300 px-2 py-1 text-xs text-neutral-600 transition-colors hover:bg-neutral-100"
+        className="shrink-0 rounded-md border border-border-strong bg-surface px-2 py-1 text-xs text-text-secondary transition-colors hover:bg-surface-hover"
       >
         去专注
       </button>

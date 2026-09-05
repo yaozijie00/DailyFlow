@@ -10,7 +10,8 @@
     "hidden": false,
     "enabled": true,
     "chainId": "course-complete",
-    "order": 1
+    "order": 1,
+    "extensionId": "com.dailyflow.course-schedule"
   },
   {
     "id": "course-10",
@@ -23,6 +24,7 @@
     "hidden": false,
     "enabled": true,
     "chainId": "course-complete",
-    "order": 2
+    "order": 2,
+    "extensionId": "com.dailyflow.course-schedule"
   }
 ]

@@ -39,6 +39,8 @@ describe("SettingsService", () => {
       todayHideCompleted: false,
       todayShowNotes: true,
       weekStart: "monday",
+      defaultLayoutMode: "standard",
+      themeMode: "system",
     });
     const s = await service.getSettings();
     expect(s).toEqual(DEFAULT_SETTINGS);
@@ -75,6 +77,26 @@ describe("SettingsService", () => {
     const s = await service.getSettings();
     expect(s.closeBehavior).toBe("exit");
     expect(s.closeBehaviorConfigured).toBe(false);
+  });
+
+  it("theme_mode：默认 system；保存往返；非法值回退 system", async () => {
+    let s = await service.getSettings();
+    expect(s.themeMode).toBe("system");
+    // 保存往返
+    await service.update({ themeMode: "glass" });
+    s = await service.getSettings();
+    expect(s.themeMode).toBe("glass");
+    await service.update({ themeMode: "dark" });
+    s = await service.getSettings();
+    expect(s.themeMode).toBe("dark");
+    // 非法值（旧版本/损坏数据）回退默认
+    await repo.set("theme_mode", "neon");
+    s = await service.getSettings();
+    expect(s.themeMode).toBe("system");
+    // 显式改回浅色
+    await service.update({ themeMode: "light" });
+    s = await service.getSettings();
+    expect(s.themeMode).toBe("light");
   });
 
   it("关闭行为：保存/读取往返（tray + 已配置）", async () => {
@@ -130,7 +152,24 @@ describe("SettingsService", () => {
       todayHideCompleted: false,
       todayShowNotes: true,
       weekStart: "monday",
+      defaultLayoutMode: "standard",
+      themeMode: "system",
     });
+  });
+
+  it("A3：默认视图模式 保存往返与非法回退", async () => {
+    let s = await service.getSettings();
+    expect(s.defaultLayoutMode).toBe("standard");
+    await service.update({ defaultLayoutMode: "compact" });
+    s = await service.getSettings();
+    expect(s.defaultLayoutMode).toBe("compact");
+    await service.update({ defaultLayoutMode: "focus" });
+    s = await service.getSettings();
+    expect(s.defaultLayoutMode).toBe("focus");
+    // 非法值回退默认
+    await repo.set("layout_mode", "ultra");
+    s = await service.getSettings();
+    expect(s.defaultLayoutMode).toBe("standard");
   });
 
   it("update 夹取非法时间轴区间（end <= start 时自动扩到 start+1h）", async () => {

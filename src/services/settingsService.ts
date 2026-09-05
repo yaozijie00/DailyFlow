@@ -4,6 +4,7 @@ import {
   SHORTCUT_ACTIONS,
   type ShortcutMap,
 } from "../lib/shortcuts";
+import { isThemeMode, type ThemeMode } from "../lib/theme";
 
 /** 可设为「启动默认页」的页面（导航级页面）。 */
 export type DefaultPageId = "today" | "focus" | "goals" | "statistics" | "settings";
@@ -45,10 +46,17 @@ export interface AppSettings {
   todayShowNotes: boolean;
   /** 周起始日：周一 / 周日（v2.3.x；默认周一） */
   weekStart: WeekStart;
+  /** 默认视图模式（A3 Layout Modes）：standard / compact / focus（设置持久化默认） */
+  defaultLayoutMode: LayoutMode;
+  /** 界面主题（V2.4）：system=跟随系统 | light | dark | glass（毛玻璃） */
+  themeMode: ThemeMode;
 }
 
-/** 关闭窗口行为。 */
-export type CloseBehavior = "exit" | "tray";
+/** 视图模式（A3）：改变信息密度/布局/内容优先级，非颜色主题。 */
+export type LayoutMode = "standard" | "compact" | "focus";
+
+/** 关闭窗口行为：exit=退出 DailyFlow，tray=隐藏到系统托盘，mini=关闭时转 Mini 窗。 */
+export type CloseBehavior = "exit" | "tray" | "mini";
 
 export const DEFAULT_SETTINGS: AppSettings = {
   pomodoroDurationMinutes: 25,
@@ -67,7 +75,16 @@ export const DEFAULT_SETTINGS: AppSettings = {
   todayHideCompleted: false,
   todayShowNotes: true,
   weekStart: "monday",
+  defaultLayoutMode: "standard",
+  themeMode: "system",
 };
+
+/** 合法的视图模式白名单。 */
+const LAYOUT_MODES: LayoutMode[] = ["standard", "compact", "focus"];
+
+function isLayoutMode(v: unknown): v is LayoutMode {
+  return typeof v === "string" && (LAYOUT_MODES as string[]).includes(v);
+}
 
 /** 合法的「默认页」白名单。 */
 const DEFAULT_PAGE_IDS: DefaultPageId[] = ["today", "focus", "goals", "statistics", "settings"];
@@ -94,6 +111,8 @@ const KEY_DEFAULT_PAGE = "default_page";
 const KEY_TODAY_HIDE_COMPLETED = "today_hide_completed";
 const KEY_TODAY_SHOW_NOTES = "today_show_notes";
 const KEY_WEEK_START = "week_start";
+const KEY_LAYOUT_MODE = "layout_mode";
+const KEY_THEME_MODE = "theme_mode";
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
@@ -169,7 +188,11 @@ export class SettingsService {
       timelinePxPerMinute: parseFloatSafe(stored[KEY_TIMELINE_PX_PER_MINUTE], 1.5),
       notificationsEnabled: stored[KEY_NOTIFICATIONS] !== "0",
       closeBehavior:
-        stored[KEY_CLOSE_BEHAVIOR] === "tray" ? "tray" : "exit",
+        stored[KEY_CLOSE_BEHAVIOR] === "tray"
+          ? "tray"
+          : stored[KEY_CLOSE_BEHAVIOR] === "mini"
+            ? "mini"
+            : "exit",
       closeBehaviorConfigured: stored[KEY_CLOSE_BEHAVIOR_CONFIGURED] === "1",
       undoHistoryLimit: Math.round(parseIntSafe(stored[KEY_UNDO_LIMIT], 50)),
       defaultPage: isDefaultPageId(stored[KEY_DEFAULT_PAGE])
@@ -178,6 +201,12 @@ export class SettingsService {
       todayHideCompleted: stored[KEY_TODAY_HIDE_COMPLETED] === "1",
       todayShowNotes: stored[KEY_TODAY_SHOW_NOTES] !== "0",
       weekStart: stored[KEY_WEEK_START] === "sunday" ? "sunday" : "monday",
+      defaultLayoutMode: isLayoutMode(stored[KEY_LAYOUT_MODE])
+        ? stored[KEY_LAYOUT_MODE]
+        : DEFAULT_SETTINGS.defaultLayoutMode,
+      themeMode: isThemeMode(stored[KEY_THEME_MODE])
+        ? stored[KEY_THEME_MODE]
+        : DEFAULT_SETTINGS.themeMode,
     };
   }
 
@@ -221,7 +250,13 @@ export class SettingsService {
       writes.push([KEY_NOTIFICATIONS, partial.notificationsEnabled ? "1" : "0"]);
     }
     if (partial.closeBehavior !== undefined) {
-      writes.push([KEY_CLOSE_BEHAVIOR, partial.closeBehavior === "tray" ? "tray" : "exit"]);
+      const v =
+        partial.closeBehavior === "tray"
+          ? "tray"
+          : partial.closeBehavior === "mini"
+            ? "mini"
+            : "exit";
+      writes.push([KEY_CLOSE_BEHAVIOR, v]);
     }
     if (partial.closeBehaviorConfigured !== undefined) {
       writes.push([KEY_CLOSE_BEHAVIOR_CONFIGURED, partial.closeBehaviorConfigured ? "1" : "0"]);
@@ -241,6 +276,12 @@ export class SettingsService {
     }
     if (partial.weekStart !== undefined) {
       writes.push([KEY_WEEK_START, partial.weekStart === "sunday" ? "sunday" : "monday"]);
+    }
+    if (partial.defaultLayoutMode !== undefined && isLayoutMode(partial.defaultLayoutMode)) {
+      writes.push([KEY_LAYOUT_MODE, partial.defaultLayoutMode]);
+    }
+    if (partial.themeMode !== undefined && isThemeMode(partial.themeMode)) {
+      writes.push([KEY_THEME_MODE, partial.themeMode]);
     }
     for (const [k, v] of writes) {
       await this.repo.set(k, v);

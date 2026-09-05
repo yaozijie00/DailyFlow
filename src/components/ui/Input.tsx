@@ -5,7 +5,7 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {}
 export function Input({ className = "", ...rest }: InputProps) {
   return (
     <input
-      className={`w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 outline-none transition-colors placeholder:text-neutral-400 focus:border-neutral-900 focus-visible:ring-2 focus-visible:ring-neutral-900/30 disabled:cursor-not-allowed disabled:bg-neutral-100 disabled:text-neutral-400 ${className}`}
+      className={`w-full rounded-[var(--radius-control)] border border-border-strong bg-surface px-3 py-2 text-sm text-text-primary outline-none transition-colors placeholder:text-text-faint focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/30 disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-faint ${className}`}
       {...rest}
     />
   );

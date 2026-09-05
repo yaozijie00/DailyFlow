@@ -4,7 +4,7 @@ import { TaskRepository, type Task, type UpdateTaskInput } from "../db/repositor
 import { CategoryRepository, type Category } from "../db/repositories/categoryRepository";
 import { FocusSessionRepository } from "../db/repositories/focusSessionRepository";
 import { NoteRepository } from "../db/repositories/noteRepository";
-import { TaskService, type TaskCreateInput } from "../services/taskService";
+import { TaskService, type TaskCreateInput, type ProjectTaskSummary } from "../services/taskService";
 import { CategoryService } from "../services/categoryService";
 import { NoteService } from "../services/noteService";
 import { evaluateAndNotify } from "../services/achievementRuntime";
@@ -12,17 +12,20 @@ import { convertTaskToNote } from "../lib/noteConvert";
 import { undoManager } from "../lib/undoManager";
 import { taskPriorityMeta } from "../lib/taskPriority";
 import { todayString, yesterdayString } from "../lib/date";
+import { bumpDataVersion } from "../lib/dataVersion";
 import { useAppStore } from "./appStore";
 import { useNoteStore } from "./noteStore";
 
 const taskService = new TaskService(
   new TaskRepository(getDb()),
   new FocusSessionRepository(getDb()),
-);
-/** 共享任务服务单例（详情面板等只读查询复用，避免重复实例化）。 */
+);/** 共享任务服务单例（详情面板等只读查询复用，避免重复实例化）。 */
 export { taskService };
 const categoryService = new CategoryService(new CategoryRepository(getDb()));
 const noteService = new NoteService(new NoteRepository(getDb()));
+
+/** load 请求序号（A1-P0Fix-④）：丢弃过期异步响应，防止快速切日期时旧数据覆盖新视图。 */
+let loadSeq = 0;
 
 export interface CreateDraft {
   plannedStart?: number;
@@ -43,6 +46,10 @@ interface TaskState {
   createDraft: CreateDraft | null;
   /** 任务列表 → 时间轴拖拽中的瞬时状态（不落库，松开/取消后清空）。 */
   taskDrag: { taskId: number } | null;
+  /** 按项目聚合摘要（长期页「目标项目」卡片；全部日期） */
+  projectSummary: Record<number, ProjectTaskSummary>;
+  /** 今日任务列表的项目筛选（UI 态；长期页点项目卡跳转时设置） */
+  projectFilter: { id: number; title: string } | null;
 
   load: () => Promise<void>;
   /** 加载「今天」任务（专注页使用，始终今天） */
@@ -85,6 +92,10 @@ interface TaskState {
   moveCategory: (id: number, direction: -1 | 1) => Promise<void>;
   startTaskDrag: (taskId: number) => void;
   endTaskDrag: () => void;
+  /** 加载按项目聚合摘要（长期页项目卡） */
+  loadProjectSummary: () => Promise<void>;
+  /** 设置/清除今日任务列表的项目筛选（长期页点项目卡跳转用） */
+  setProjectFilter: (filter: { id: number; title: string } | null) => void;
 
   selectTask: (id: number | null) => void;
   openCreate: (draft?: CreateDraft | null) => void;
@@ -109,19 +120,24 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   editingTaskId: null,
   createDraft: null,
   taskDrag: null,
+  projectSummary: {},
+  projectFilter: null,
 
   load: async () => {
+    const seq = ++loadSeq; // A1-P0Fix-④：丢弃过期响应（快速切日期时旧查询不覆盖新视图）
     set({ loading: true });
     try {
       const [tasks, categories] = await Promise.all([
         taskService.getTasksByDate(get().selectedDate),
         categoryService.findAll(),
       ]);
+      if (seq !== loadSeq) return; // 已有更新的 load 发起 → 丢弃本次结果
       set({ tasks, categories });
+      bumpDataVersion("task"); // 派生视图（统计/成就/课程周进度等）据此刷新
     } catch {
-      fail("加载任务失败");
+      if (seq === loadSeq) fail("加载任务失败");
     } finally {
-      set({ loading: false });
+      if (seq === loadSeq) set({ loading: false });
     }
   },
 
@@ -406,4 +422,17 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   closeEdit: () => set({ editingTaskId: null }),
   startTaskDrag: (taskId) => set({ taskDrag: { taskId } }),
   endTaskDrag: () => set({ taskDrag: null }),
+
+  loadProjectSummary: async () => {
+    try {
+      const map = await taskService.getProjectSummaries();
+      const out: Record<number, ProjectTaskSummary> = {};
+      for (const [k, v] of map) out[k] = v;
+      set({ projectSummary: out });
+    } catch {
+      /* 静默：摘要加载失败不影响页面 */
+    }
+  },
+
+  setProjectFilter: (filter) => set({ projectFilter: filter }),
 }));

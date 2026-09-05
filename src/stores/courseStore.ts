@@ -1,17 +1,15 @@
 import { create } from "zustand";
 import { getDb } from "../db/db";
-import {
-  CourseRepository,
-  type Course,
-  type SlotView,
-} from "../db/repositories/courseRepository";
+import type { Course, SlotView } from "../db/repositories/courseRepository";
 import { CourseService } from "../services/courseService";
 import { TaskRepository } from "../db/repositories/taskRepository";
+import { ExtensionCourseRepository } from "../extensions/builtin/course-schedule/data/repository";
 import { useAppStore } from "./appStore";
 import { undoManager } from "../lib/undoManager";
 
+// 数据源：课程表 Extension 独立库（courses/weekly_slots 不再写入 Core 库）
 const courseService = new CourseService(
-  new CourseRepository(getDb()),
+  new ExtensionCourseRepository(),
   new TaskRepository(getDb()),
 );
 

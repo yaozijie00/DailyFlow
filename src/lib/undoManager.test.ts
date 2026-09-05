@@ -246,6 +246,83 @@ describe("UndoManager v1.6（批量 / 上限 / 订阅 / 错误）", () => {
     expect(manager.canRedo()).toBe(false);
   });
 
+  it("并发 undo 串行执行：前一动作完成前不会弹出/执行下一动作", async () => {
+    const log: string[] = [];
+    const gate: Array<() => void> = [];
+    const release = () => gate.shift()?.();
+    // undoStack 顶部是 B（最后 push），首次 undo 撤销 B
+    manager.push({
+      type: "a",
+      label: "A",
+      undo: async () => {
+        log.push("undo A");
+      },
+      redo: vi.fn(),
+    });
+    manager.push({
+      type: "b",
+      label: "B",
+      undo: async () => {
+        log.push("undo B start");
+        await new Promise<void>((r) => gate.push(r));
+        log.push("undo B end");
+      },
+      redo: vi.fn(),
+    });
+
+    // 同时发起两个 undo：不串行的话 A 会并发进入（B 尚未完成）
+    const p1 = manager.undo();
+    const p2 = manager.undo();
+    await Promise.resolve(); // 让第一个 undo 进入 action.undo()
+    expect(log).toEqual(["undo B start"]);
+    expect(log).not.toContain("undo A"); // A 未并发进入（B 尚未完成）
+    release();
+    await Promise.all([p1, p2]);
+    expect(log).toEqual(["undo B start", "undo B end", "undo A"]);
+    expect(manager.undoSize).toBe(0);
+  });
+
+  it("undo 失败 reject 后串行链不中断：后续排队动作仍正常执行", async () => {
+    const log: string[] = [];
+    manager.push({
+      type: "a",
+      label: "A",
+      undo: () => {
+        log.push("undo A");
+      },
+      redo: vi.fn(),
+    });
+    manager.push({
+      type: "b",
+      label: "B",
+      undo: () => {
+        throw new Error("boom");
+      },
+      redo: vi.fn(),
+    });
+
+    // B（栈顶）先撤销并失败 → reject 给调用方，B 放回栈顶
+    const p1 = manager.undo().catch((e: unknown) => {
+      expect((e as Error).message).toBe("boom");
+      return false;
+    });
+    await Promise.resolve(); // 让排队的失败撤销执行完（B 放回栈顶）
+    // 失败后再入栈新动作 C，排队 undo 应撤销 C（链未被失败卡死）
+    manager.push({
+      type: "c",
+      label: "C",
+      undo: () => {
+        log.push("undo C");
+      },
+      redo: vi.fn(),
+    });
+    const p2 = manager.undo();
+    await p1;
+    await p2;
+    expect(log).toEqual(["undo C"]);
+    expect(manager.undoSize).toBe(2); // A、B 仍在栈
+  });
+
   it("setMaxHistory 上限范围夹取（10-500 之间）", () => {
     manager.setMaxHistory(5);
     expect(manager.maxHistory).toBe(10);

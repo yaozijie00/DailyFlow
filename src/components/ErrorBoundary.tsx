@@ -35,12 +35,12 @@ export default class ErrorBoundary extends Component<Props, State> {
       const err = this.state.error;
       return (
         <div
+          className="text-danger"
           style={{
             position: "fixed",
             inset: 0,
             zIndex: 99999,
             background: "#fff",
-            color: "#c00",
             padding: 24,
             font: "13px/1.6 monospace",
             whiteSpace: "pre-wrap",

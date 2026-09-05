@@ -41,14 +41,14 @@ interface ReviewData {
 function Bar({ value, max, label, right }: { value: number; max: number; label: string; right: string }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="w-24 shrink-0 truncate text-xs text-neutral-600">{label}</span>
-      <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-neutral-100">
+      <span className="w-24 shrink-0 truncate text-xs text-text-secondary">{label}</span>
+      <div className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-surface-muted">
         <div
-          className="h-full rounded-full bg-neutral-800/80"
+          className="h-full rounded-full bg-accent/80"
           style={{ width: `${max > 0 ? Math.max(2, (value / max) * 100) : 0}%` }}
         />
       </div>
-      <span className="w-16 shrink-0 text-right text-xs tabular-nums text-neutral-500">{right}</span>
+      <span className="w-16 shrink-0 text-right text-xs tabular-nums text-text-muted">{right}</span>
     </div>
   );
 }
@@ -135,14 +135,14 @@ export default function ReviewView() {
   const label = PRESETS.find((p) => p.key === preset)?.label ?? "本周";
 
   if (!data) {
-    return <div className="text-sm text-neutral-400">复盘计算中…</div>;
+    return <div className="text-sm text-text-faint">复盘计算中…</div>;
   }
 
   const ov = data.overview;
   const hasAny = ov.totalSeconds > 0 || ov.taskCreated > 0;
   if (!hasAny) {
     return (
-      <div className="rounded-md border border-dashed border-neutral-300 p-8 text-center text-sm text-neutral-400">
+      <div className="rounded-md border border-dashed border-border-strong p-8 text-center text-sm text-text-faint">
         完成几个任务或一次专注后，这里会形成你的工作轨迹与复盘结论。
       </div>
     );
@@ -175,15 +175,15 @@ export default function ReviewView() {
   return (
     <div className="space-y-4">
       {/* 时段切换 */}
-      <div className="flex rounded-md border border-neutral-200 bg-white p-0.5 self-start">
+      <div className="flex rounded-md border border-border-subtle bg-surface p-0.5 self-start">
         {PRESETS.map((p) => (
           <button
             key={p.key}
             onClick={() => setPreset(p.key)}
             className={`rounded px-3 py-1.5 text-sm transition-colors ${
               preset === p.key
-                ? "bg-neutral-900 text-white"
-                : "text-neutral-600 hover:bg-neutral-100"
+                ? "bg-accent text-on-accent"
+                : "text-text-secondary hover:bg-surface-hover"
             }`}
           >
             {p.label}
@@ -193,48 +193,48 @@ export default function ReviewView() {
 
       {/* 概览数字（先数字后结论，便于速览） */}
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <div className="rounded-md border border-neutral-200 bg-white p-4">
-          <div className="text-xs text-neutral-500">总投入</div>
-          <div className="mt-1 text-xl font-semibold tabular-nums text-neutral-900">
+        <div className="rounded-md border border-border-subtle bg-surface p-4">
+          <div className="text-xs text-text-muted">总投入</div>
+          <div className="mt-1 text-xl font-semibold tabular-nums text-text-primary">
             {formatDurationCompact(ov.totalSeconds)}
           </div>
-          <div className="text-xs text-neutral-400">{ov.sessionCount} 次专注</div>
+          <div className="text-xs text-text-faint">{ov.sessionCount} 次专注</div>
         </div>
-        <div className="rounded-md border border-neutral-200 bg-white p-4">
-          <div className="text-xs text-neutral-500">完成任务</div>
-          <div className="mt-1 text-xl font-semibold tabular-nums text-neutral-900">
+        <div className="rounded-md border border-border-subtle bg-surface p-4">
+          <div className="text-xs text-text-muted">完成任务</div>
+          <div className="mt-1 text-xl font-semibold tabular-nums text-text-primary">
             {ov.taskCompleted}
           </div>
-          <div className="text-xs text-neutral-400">共创建 {ov.taskCreated}</div>
+          <div className="text-xs text-text-faint">共创建 {ov.taskCreated}</div>
         </div>
-        <div className="rounded-md border border-neutral-200 bg-white p-4">
-          <div className="text-xs text-neutral-500">完成率</div>
-          <div className="mt-1 text-xl font-semibold tabular-nums text-neutral-900">
+        <div className="rounded-md border border-border-subtle bg-surface p-4">
+          <div className="text-xs text-text-muted">完成率</div>
+          <div className="mt-1 text-xl font-semibold tabular-nums text-text-primary">
             {completionRate}%
           </div>
-          <div className="text-xs text-neutral-400">未完成 {ov.taskIncomplete}</div>
+          <div className="text-xs text-text-faint">未完成 {ov.taskIncomplete}</div>
         </div>
-        <div className="rounded-md border border-neutral-200 bg-white p-4">
-          <div className="text-xs text-neutral-500">平均每次专注</div>
-          <div className="mt-1 text-xl font-semibold tabular-nums text-neutral-900">
+        <div className="rounded-md border border-border-subtle bg-surface p-4">
+          <div className="text-xs text-text-muted">平均每次专注</div>
+          <div className="mt-1 text-xl font-semibold tabular-nums text-text-primary">
             {ov.sessionCount > 0
               ? formatDurationCompact(Math.round(ov.totalSeconds / ov.sessionCount))
               : "—"}
           </div>
-          <div className="text-xs text-neutral-400">走满 {ov.completedFocusCount} 个番茄</div>
+          <div className="text-xs text-text-faint">走满 {ov.completedFocusCount} 个番茄</div>
         </div>
       </section>
 
       {/* 叙述性复盘 */}
-      <section className="rounded-md border border-neutral-200 bg-white p-5">
-        <h2 className="mb-3 flex items-center gap-1.5 text-sm font-medium text-neutral-600">
+      <section className="glass-surface rounded-md border border-border-subtle p-5">
+        <h2 className="mb-3 flex items-center gap-1.5 text-sm font-medium text-text-secondary">
           <Sparkles size={14} className="text-amber-500" />
           {label}复盘
         </h2>
-        <ul className="space-y-1.5 text-sm text-neutral-700">
+        <ul className="space-y-1.5 text-sm text-text-secondary">
           {narrative.map((line, i) => (
             <li key={i} className="flex gap-1.5">
-              <span className="text-neutral-300">·</span>
+              <span className="text-text-faint">·</span>
               <span>{line}</span>
             </li>
           ))}
@@ -243,10 +243,10 @@ export default function ReviewView() {
 
       {/* 类别 / 项目 / 时段 Top */}
       <div className="grid gap-3 lg:grid-cols-3">
-        <section className="rounded-md border border-neutral-200 bg-white p-4">
-          <h3 className="mb-3 text-sm font-medium text-neutral-600">类别投入 Top</h3>
+        <section className="glass-surface rounded-md border border-border-subtle p-4">
+          <h3 className="mb-3 text-sm font-medium text-text-secondary">类别投入 Top</h3>
           {ov.categoryStats.length === 0 ? (
-            <p className="text-xs text-neutral-400">暂无数据</p>
+            <p className="text-xs text-text-faint">暂无数据</p>
           ) : (
             <div className="space-y-2">
               {ov.categoryStats.slice(0, 4).map((c) => (
@@ -261,10 +261,10 @@ export default function ReviewView() {
             </div>
           )}
         </section>
-        <section className="rounded-md border border-neutral-200 bg-white p-4">
-          <h3 className="mb-3 text-sm font-medium text-neutral-600">项目投入 Top</h3>
+        <section className="glass-surface rounded-md border border-border-subtle p-4">
+          <h3 className="mb-3 text-sm font-medium text-text-secondary">项目投入 Top</h3>
           {data.projects.length === 0 ? (
-            <p className="text-xs text-neutral-400">暂无数据</p>
+            <p className="text-xs text-text-faint">暂无数据</p>
           ) : (
             <div className="space-y-2">
               {data.projects.slice(0, 4).map((p) => (
@@ -279,10 +279,10 @@ export default function ReviewView() {
             </div>
           )}
         </section>
-        <section className="rounded-md border border-neutral-200 bg-white p-4">
-          <h3 className="mb-3 text-sm font-medium text-neutral-600">时段投入 Top</h3>
+        <section className="glass-surface rounded-md border border-border-subtle p-4">
+          <h3 className="mb-3 text-sm font-medium text-text-secondary">时段投入 Top</h3>
           {hourlyTop.length === 0 ? (
-            <p className="text-xs text-neutral-400">暂无数据</p>
+            <p className="text-xs text-text-faint">暂无数据</p>
           ) : (
             <div className="space-y-2">
               {hourlyTop.map((h) => (
@@ -316,7 +316,7 @@ export default function ReviewView() {
         </section>
       )}
 
-      <p className="text-[11px] text-neutral-400">
+      <p className="text-[11px] text-text-faint">
         口径：任务完成率按创建口径 · 最佳时段按专注开始小时 · 停滞指近 14 天无关联任务完成
       </p>
     </div>

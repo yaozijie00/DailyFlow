@@ -9,6 +9,7 @@ import {
   type AchievementProgressView,
 } from "../services/achievementService";
 import { loadAchievementDefinitions } from "../achievements/definitions";
+import { useExtensionStore } from "./extensionStore";
 
 const achievementService = new AchievementService(
   loadAchievementDefinitions(),
@@ -32,6 +33,18 @@ interface AchievementState {
   setFilter: (f: AchievementFilter) => void;
 }
 
+/**
+ * 归属扩展的成就（extensionId 非空）仅在对应扩展【启用】时展示；
+ * 禁用扩展 → 其成就（含已解锁）从成就页消失，解锁记录保留（重启用恢复）。
+ * @param isEnabled 查询扩展启用状态的函数（默认走 Extension Store；测试可注入）。
+ */
+export function filterByExtensionEnabled<T extends { extensionId?: string }>(
+  items: T[],
+  isEnabled: (extId: string) => boolean = (id) => useExtensionStore.getState().isEnabled(id),
+): T[] {
+  return items.filter((i) => !i.extensionId || isEnabled(i.extensionId));
+}
+
 export const useAchievementStore = create<AchievementState>((set) => ({
   items: [],
   totals: { unlocked: 0, total: 0 },
@@ -41,10 +54,13 @@ export const useAchievementStore = create<AchievementState>((set) => ({
   load: async () => {
     set({ loading: true });
     try {
-      const [items, all] = await Promise.all([
+      const [visibleAll, progressAll] = await Promise.all([
         achievementService.getVisibleAchievements(),
         achievementService.getProgressList(),
       ]);
+      // 只展示 Core 成就 + 已启用扩展的成就（禁用扩展的成就整组隐藏）
+      const items = filterByExtensionEnabled(visibleAll);
+      const all = filterByExtensionEnabled(progressAll);
       set({
         items,
         totals: {

@@ -16,6 +16,17 @@ describe("validateDefinition", () => {
     expect(d?.id).toBe("first_pomodoro");
     expect(d?.enabled).toBe(true);
     expect(d?.hidden).toBe(false);
+    expect(d?.extensionId).toBeUndefined();
+  });
+
+  it("extensionId（归属扩展）解析保留；空串视为无归属", () => {
+    const d = validateDefinition({
+      ...valid,
+      extensionId: "com.dailyflow.course-schedule",
+    });
+    expect(d?.extensionId).toBe("com.dailyflow.course-schedule");
+    const d2 = validateDefinition({ ...valid, extensionId: "   " });
+    expect(d2?.extensionId).toBeUndefined();
   });
 
   it("缺 id / name / description / icon 返回 null", () => {

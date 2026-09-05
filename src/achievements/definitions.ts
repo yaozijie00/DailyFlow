@@ -20,6 +20,12 @@ export interface AchievementDefinition {
   chainId: string | null;
   /** 成就链内顺序（升序；order 表示顺序而非条件目标值） */
   order: number;
+  /**
+   * 归属扩展 id（如 com.dailyflow.course-schedule）：
+   * 有值则仅在对应扩展【启用】时于成就页展示（解锁记录保留）；
+   * 无值 = Core 成就，始终展示。
+   */
+  extensionId?: string;
 }
 
 // 打包时静态收集 src/achievements/*.json（每文件一个数组）
@@ -49,6 +55,7 @@ export function validateDefinition(raw: unknown): AchievementDefinition | null {
     enabled: d.enabled !== false,
     chainId: typeof d.chainId === "string" && d.chainId.trim() ? d.chainId : null,
     order: typeof d.order === "number" && Number.isFinite(d.order) ? d.order : 0,
+    extensionId: typeof d.extensionId === "string" && d.extensionId.trim() ? d.extensionId : undefined,
   };
 }
 

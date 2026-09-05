@@ -98,6 +98,11 @@ export interface HighPriorityTasksCondition {
   type: "high_priority_tasks_completed";
   target: number;
 }
+/** A5：累计完成的 WorkflowRun 数（Workflow 扩展数据源经 Host Provider 提供）。 */
+export interface WorkflowRunsCompletedCondition {
+  type: "workflow_runs_completed";
+  target: number;
+}
 export interface AndCondition {
   type: "and";
   conditions: Condition[];
@@ -134,6 +139,7 @@ export type Condition =
   | WeekendSessionsCondition
   | DailyPomodorosCondition
   | HighPriorityTasksCondition
+  | WorkflowRunsCompletedCondition
   | AndCondition
   | OrCondition
   | NotCondition;
@@ -194,6 +200,8 @@ export interface AchievementContext {
   maxDailyPomodoros: number;
   /** 累计完成的高优先级任务数（优先级之王） */
   highPriorityTasksCompleted: number;
+  /** 累计完成的 WorkflowRun 数（A5；Workflow 扩展经 Host Provider 提供，缺省 0） */
+  workflowRunsCompleted: number;
 }
 
 function pct(current: number, target: number): number {
@@ -230,6 +238,7 @@ export function isValidCondition(cond: unknown): boolean {
     case "weekend_sessions":
     case "daily_pomodoros":
     case "high_priority_tasks_completed":
+    case "workflow_runs_completed":
       return typeof c.target === "number" && Number.isFinite(c.target) && c.target > 0;
     case "category_duration":
       return (
@@ -301,6 +310,8 @@ export const ConditionEngine = {
         return ctx.maxDailyPomodoros >= condition.target;
       case "high_priority_tasks_completed":
         return ctx.highPriorityTasksCompleted >= condition.target;
+      case "workflow_runs_completed":
+        return ctx.workflowRunsCompleted >= condition.target;
       case "and":
         return condition.conditions.every((c) => ConditionEngine.evaluate(c, ctx));
       case "or":
@@ -515,6 +526,16 @@ export const ConditionEngine = {
       }
       case "high_priority_tasks_completed": {
         const current = ctx.highPriorityTasksCompleted;
+        return {
+          current,
+          target: condition.target,
+          percentage: pct(current, condition.target),
+          completed: current >= condition.target,
+          unit: "count",
+        };
+      }
+      case "workflow_runs_completed": {
+        const current = ctx.workflowRunsCompleted;
         return {
           current,
           target: condition.target,
