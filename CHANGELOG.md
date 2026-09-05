@@ -1,5 +1,21 @@
 # Changelog
 
+## DailyFlow 3.0.0
+
+### Features（Core v2 + 三主题视觉系统 + Mini 窗）
+- **三主题视觉系统**：浅色（暖白 + 靛蓝）/ 深色（深炭）/ 毛玻璃（中性深灰半透明磨砂 + 毛边质感，参考 frostpane）；设置 → 外观新增「界面主题」（跟随系统 / 浅色 / 深色 / 毛玻璃），即时生效并持久化
+- **全站语义化**：约 90 个文件迁移为语义 token（surface/text/border/accent 体系），danger/success/warning 与分类/优先级/节点色保留；深浅主题下全站统一适配
+- **自绘标题栏**：无边框窗口 + 拖拽区（双击最大化）+ Mini / 最小化 / 最大化 / 关闭按钮；关闭行为扩展「关闭时转迷你窗」
+- **Mini 窗重设计**（360×560）：专注倒计时圆环（可暂停/继续）+ 今日进度环 + 快速添加任务 + 今日任务精简列表；入口：标题栏按钮 / 托盘「切换迷你窗」/ 关闭行为
+- 侧栏视图切换器改常驻三段按钮（标准/紧凑/专注，点击即切会话），启动默认在设置→外观
+- Core v2：默认数据目录迁移、0006 换表收敛守卫、备份/恢复覆盖扩展库与原子替换、state 失效机制（dataVersion）、Achievement Event→Rule→Unlock、Analytics 层、扩展平台（Workflow / 课程独立库）
+
+### Technical
+
+- 语义 token 三层结构（CSS 变量 @theme + html.dark/html.glass 覆盖）；theme.ts 解析（system/light/dark/glass + 系统跟随）
+- Mini 身份判定改窗口 label（修复 dev 下 query 丢失白屏）；Mini 窗口创建改 async command（修复同步建窗死锁主线程）
+- 测试 742/742 全绿；版本 3.0.0
+
 ## DailyFlow 2.3.0
 
 ### Features（产品优化批次：今日布局 / 课程表 / 长期 / 设置 / 统计 / 任务 / 专注 / 成就）

@@ -1,7 +1,7 @@
 [package]
 name = "dailyflow"
-version = "2.3.0"
-description = "DailyFlow - 个人本地时间管理工具"
+version = "3.0.0"
+description = "DailyFlow - 涓汉鏈湴鏃堕棿绠＄悊宸ュ叿"
 authors = ["you"]
 edition = "2021"
 
@@ -21,15 +21,15 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["protocol-asset", "tray-icon"] }
 tauri-plugin-sql = { version = "2", features = ["sqlite"] }
 tauri-plugin-notification = "2"
-# 单实例保护：重复启动时聚焦已有窗口，不新建第二个进程/窗口
+# 鍗曞疄渚嬩繚鎶わ細閲嶅鍚姩鏃惰仛鐒﹀凡鏈夌獥鍙ｏ紝涓嶆柊寤虹浜屼釜杩涚▼/绐楀彛
 tauri-plugin-single-instance = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 chrono = "0.4"
 windows-sys = { version = "0.59", features = ["Win32_UI_WindowsAndMessaging", "Win32_UI_Shell", "Win32_System_Com"] }
-# 专注完成原生桌面通知（与 tauri-plugin-notification 共用同一版本，无新增传递依赖）
+# 涓撴敞瀹屾垚鍘熺敓妗岄潰閫氱煡锛堜笌 tauri-plugin-notification 鍏辩敤鍚屼竴鐗堟湰锛屾棤鏂板浼犻€掍緷璧栵級
 notify-rust = "4"
-# 仅用于启动自诊断：探测 WebView2 加载器将使用的运行时版本
+# 浠呯敤浜庡惎鍔ㄨ嚜璇婃柇锛氭帰娴?WebView2 鍔犺浇鍣ㄥ皢浣跨敤鐨勮繍琛屾椂鐗堟湰
 webview2-com-sys = "0.38"
 webview2-com = "0.38"
 windows-core = "0.61"
