@@ -1,0 +1,206 @@
+[
+  {
+    "id": "exp_pomo_250",
+    "name": "炉火纯青",
+    "description": "累计完成 250 个番茄钟",
+    "icon": "Flame",
+    "category": "focus",
+    "chainId": "pomodoro_count",
+    "order": 6,
+    "hidden": true,
+    "condition": { "type": "event_count", "target": 250 }
+  },
+  {
+    "id": "exp_pomo_1000",
+    "name": "千锤百炼",
+    "description": "累计完成 1000 个番茄钟",
+    "icon": "Award",
+    "category": "focus",
+    "chainId": "pomodoro_count",
+    "order": 7,
+    "hidden": true,
+    "condition": { "type": "event_count", "target": 1000 }
+  },
+  {
+    "id": "exp_daily_6h",
+    "name": "火力全开之日",
+    "description": "单日投入达到 6 小时",
+    "icon": "Gauge",
+    "category": "focus",
+    "condition": { "type": "daily_duration", "target": 360 }
+  },
+  {
+    "id": "exp_deep_focus_90",
+    "name": "深度沉浸",
+    "description": "单日投入达到 4 小时（90 分钟级深度专注）",
+    "icon": "Waves",
+    "category": "focus",
+    "condition": { "type": "daily_duration", "target": 240 }
+  },
+  {
+    "id": "exp_streak_60",
+    "name": "双月恒心",
+    "description": "连续 60 天完成番茄钟",
+    "icon": "CalendarRange",
+    "category": "continuity",
+    "chainId": "streak",
+    "order": 5,
+    "hidden": true,
+    "condition": { "type": "streak_days", "target": 60 }
+  },
+  {
+    "id": "exp_streak_100",
+    "name": "百日修行",
+    "description": "连续 100 天完成番茄钟",
+    "icon": "Crown",
+    "category": "continuity",
+    "chainId": "streak",
+    "order": 6,
+    "hidden": true,
+    "condition": { "type": "streak_days", "target": 100 }
+  },
+  {
+    "id": "exp_tasks_500",
+    "name": "五百征程",
+    "description": "累计完成 500 个任务",
+    "icon": "Medal",
+    "category": "tasks",
+    "chainId": "tasks_completed",
+    "order": 5,
+    "hidden": true,
+    "condition": { "type": "tasks_completed", "target": 500 }
+  },
+  {
+    "id": "exp_tasks_1000",
+    "name": "千单传奇",
+    "description": "累计完成 1000 个任务",
+    "icon": "Trophy",
+    "category": "tasks",
+    "chainId": "tasks_completed",
+    "order": 6,
+    "hidden": true,
+    "condition": { "type": "tasks_completed", "target": 1000 }
+  },
+  {
+    "id": "exp_daily_20",
+    "name": "清单终结者",
+    "description": "单日完成 20 个任务",
+    "icon": "Rocket",
+    "category": "tasks",
+    "chainId": "daily_tasks",
+    "order": 3,
+    "hidden": true,
+    "condition": { "type": "daily_tasks_completed", "target": 20 }
+  },
+  {
+    "id": "exp_created_1000",
+    "name": "灵感喷泉",
+    "description": "累计创建 1000 个任务",
+    "icon": "Zap",
+    "category": "productivity",
+    "condition": { "type": "tasks_created", "target": 1000 }
+  },
+  {
+    "id": "exp_total_200h",
+    "name": "时光雕刻家",
+    "description": "累计投入 200 小时",
+    "icon": "Hourglass",
+    "category": "productivity",
+    "chainId": "total_duration",
+    "order": 5,
+    "condition": { "type": "total_duration", "target": 12000 }
+  },
+  {
+    "id": "exp_total_500h",
+    "name": "千时之约",
+    "description": "累计投入 500 小时",
+    "icon": "Gem",
+    "category": "productivity",
+    "chainId": "total_duration",
+    "order": 6,
+    "hidden": true,
+    "condition": { "type": "total_duration", "target": 30000 }
+  },
+  {
+    "id": "exp_cat_12",
+    "name": "多面人生",
+    "description": "在 12 个不同类别完成过工作",
+    "icon": "Layers",
+    "category": "productivity",
+    "chainId": "category-master",
+    "order": 3,
+    "hidden": true,
+    "condition": { "type": "category_count", "target": 12 }
+  },
+  {
+    "id": "exp_hi_prio_100",
+    "name": "攻坚元帅",
+    "description": "累计完成 100 个高优先级任务",
+    "icon": "Crown",
+    "category": "tasks",
+    "chainId": "priority-killer",
+    "order": 4,
+    "hidden": true,
+    "condition": { "type": "high_priority_tasks_completed", "target": 100 }
+  },
+  {
+    "id": "exp_early_100",
+    "name": "晨光领主",
+    "description": "上午 9 点前开始并走满 100 个番茄",
+    "icon": "Sunrise",
+    "category": "explore",
+    "chainId": "early-bird",
+    "order": 3,
+    "hidden": true,
+    "condition": { "type": "morning_sessions", "target": 100 }
+  },
+  {
+    "id": "exp_weekend_100",
+    "name": "周末传奇",
+    "description": "周末开始并走满 100 个番茄",
+    "icon": "PartyPopper",
+    "category": "explore",
+    "chainId": "weekend-warrior",
+    "order": 3,
+    "hidden": true,
+    "condition": { "type": "weekend_sessions", "target": 100 }
+  },
+  {
+    "id": "exp_undo_50",
+    "name": "后悔药供应商",
+    "description": "单日使用撤销 50 次",
+    "icon": "Undo2",
+    "category": "explore",
+    "hidden": true,
+    "condition": { "type": "undo_daily", "target": 50 }
+  },
+  {
+    "id": "exp_night_10",
+    "name": "夜之守护者",
+    "description": "23:00 后完成 10 次专注",
+    "icon": "MoonStar",
+    "category": "explore",
+    "hidden": true,
+    "condition": { "type": "night_sessions", "target": 10 }
+  },
+  {
+    "id": "exp_review_12",
+    "name": "季度复盘者",
+    "description": "累计完成 12 次周复盘",
+    "icon": "CalendarCheck",
+    "category": "review",
+    "chainId": "weekly-review",
+    "order": 5,
+    "hidden": true,
+    "condition": { "type": "weekly_reviews", "target": 12 }
+  },
+  {
+    "id": "exp_planned_100",
+    "name": "规划大师",
+    "description": "完成 100 个时间轴规划的任务",
+    "icon": "CalendarRange",
+    "category": "plan",
+    "hidden": true,
+    "condition": { "type": "planned_tasks_completed", "target": 100 }
+  }
+]

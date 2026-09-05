@@ -16,6 +16,7 @@ const mockState = vi.hoisted(() => ({
   deleteTask: vi.fn(),
   updateTask: vi.fn(),
   selectTask: vi.fn(),
+  openTaskDetail: vi.fn(),
   openEdit: vi.fn(),
 }));
 

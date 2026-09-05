@@ -122,8 +122,8 @@ export default function TaskFormModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="w-96 rounded-lg bg-bg-elevated p-6 shadow-popover">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4">
+      <div className="mx-auto mt-[6vh] w-full max-w-md rounded-lg bg-bg-elevated p-6 shadow-popover">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-text-primary">
             {editingTask ? "编辑任务" : "创建任务"}
@@ -148,7 +148,7 @@ export default function TaskFormModal() {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               autoFocus
-              placeholder="例如：写代码"
+              placeholder="输入任务名称"
               className="w-full rounded-md border border-border-strong bg-surface px-3 py-2 text-sm text-text-primary outline-none transition-colors focus:border-accent"
             />
           </div>
@@ -248,7 +248,6 @@ export default function TaskFormModal() {
               min={0}
               value={estimatedMinutes}
               onChange={(e) => setEstimatedMinutes(e.target.value)}
-              placeholder="例如：90"
               className="w-full rounded-md border border-border-strong bg-surface px-3 py-2 text-sm text-text-primary outline-none transition-colors focus:border-accent"
             />
           </div>

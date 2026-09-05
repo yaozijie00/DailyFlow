@@ -51,7 +51,7 @@ export function Dialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4"
       onMouseDown={(e) => {
         if (closeOnBackdrop && e.target === e.currentTarget) onClose();
       }}
@@ -62,7 +62,7 @@ export function Dialog({
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className="w-full max-w-md rounded-lg bg-bg-elevated p-6 shadow-popover outline-none"
+        className="mx-auto mt-[6vh] w-full max-w-md rounded-lg bg-bg-elevated p-6 shadow-popover outline-none"
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-text-primary">{title}</h2>

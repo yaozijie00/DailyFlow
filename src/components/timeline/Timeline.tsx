@@ -65,7 +65,7 @@ export default function Timeline() {
   const taskDrag = useTaskStore((s) => s.taskDrag);
   const endTaskDrag = useTaskStore((s) => s.endTaskDrag);
   const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
-  const selectTask = useTaskStore((s) => s.selectTask);
+  const openTaskDetail = useTaskStore((s) => s.openTaskDetail);
   const notes = useNoteStore((s) => s.notes);
   const updateNote = useNoteStore((s) => s.update);
   const settings = useSettingsStore((s) => s.settings);
@@ -699,7 +699,7 @@ export default function Timeline() {
                     }
                     blockDragRef.current = false;
                     lastDraggedBlockRef.current = null;
-                    selectTask(task.id); // 单击任务块 → 右侧详情面板
+                    openTaskDetail(task.id); // 单击任务块 → 右侧详情面板（含重复点击同一块）
                   }}
                   onDoubleClick={() => handleTaskDoubleClick(task)}
                   className={`group absolute cursor-grab select-none overflow-hidden rounded text-xs active:cursor-grabbing ${

@@ -125,7 +125,7 @@ function OverdueCard({ dismissed, onDismiss }: { dismissed: boolean; onDismiss: 
 function PlanWarnCard({ dismissed, onDismiss }: { dismissed: boolean; onDismiss: () => void }) {
   const tasks = useTaskStore((s) => s.tasks);
   const updateTask = useTaskStore((s) => s.updateTask);
-  const selectTask = useTaskStore((s) => s.selectTask);
+  const openTaskDetail = useTaskStore((s) => s.openTaskDetail);
   const [folded, setFolded] = useState(false);
   const [showAll, setShowAll] = useState(false);
 
@@ -180,7 +180,7 @@ function PlanWarnCard({ dismissed, onDismiss }: { dismissed: boolean; onDismiss:
                   「{c.a.title}」与「{c.b.title}」
                 </span>
                 <button
-                  onClick={() => selectTask(c.a.id)}
+                  onClick={() => openTaskDetail(c.a.id)}
                   title="在时间轴中定位该任务"
                   className="shrink-0 rounded border border-red-200 px-1.5 py-0.5 text-red-600 transition-colors hover:bg-red-100"
                 >

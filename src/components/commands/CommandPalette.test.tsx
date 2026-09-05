@@ -13,7 +13,7 @@ const appState = vi.hoisted(() => ({ setPage: vi.fn() }));
 const taskState = vi.hoisted(() => ({
   openCreate: vi.fn(),
   setSelectedDate: vi.fn(),
-  selectTask: vi.fn(),
+  openTaskDetail: vi.fn(),
   searchTasks: vi.fn(),
 }));
 const statsState = vi.hoisted(() => ({ setTab: vi.fn() }));
@@ -66,7 +66,7 @@ describe("CommandPalette（Ctrl+K 命令面板）", () => {
     appState.setPage.mockClear();
     taskState.openCreate.mockClear();
     taskState.setSelectedDate.mockClear();
-    taskState.selectTask.mockClear();
+    taskState.openTaskDetail.mockClear();
     taskState.searchTasks.mockReset();
     taskState.searchTasks.mockResolvedValue([]);
     statsState.setTab.mockClear();
@@ -120,7 +120,7 @@ describe("CommandPalette（Ctrl+K 命令面板）", () => {
 
     fireEvent.click(screen.getByText("写周报"));
     expect(taskState.setSelectedDate).toHaveBeenCalledWith("2026-08-27");
-    expect(taskState.selectTask).toHaveBeenCalledWith(7);
+    expect(taskState.openTaskDetail).toHaveBeenCalledWith(7);
     expect(appState.setPage).toHaveBeenCalledWith("today");
   });
 

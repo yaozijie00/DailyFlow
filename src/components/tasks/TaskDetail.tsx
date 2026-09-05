@@ -23,6 +23,7 @@ export default function TaskDetail() {
   const deleteTask = useTaskStore((s) => s.deleteTask);
   const updateTask = useTaskStore((s) => s.updateTask);
   const selectTask = useTaskStore((s) => s.selectTask);
+  const openTaskDetail = useTaskStore((s) => s.openTaskDetail);
   const openEdit = useTaskStore((s) => s.openEdit);
 
   const [notesEditing, setNotesEditing] = useState(false);
@@ -96,11 +97,11 @@ export default function TaskDetail() {
         </div>
         <div className="flex justify-between">
           <dt className="text-text-muted">预计</dt>
-          <dd className="text-text-primary">{formatDuration(task.estimatedDuration) || "未设置"}</dd>
+          <dd className="tabular-nums text-text-primary">{formatDuration(task.estimatedDuration) || "未设置"}</dd>
         </div>
         <div className="flex justify-between">
           <dt className="text-text-muted">实际</dt>
-          <dd className="text-text-primary">{formatDuration(task.actualDuration) || "0分钟"}</dd>
+          <dd className="tabular-nums text-text-primary">{formatDuration(task.actualDuration) || "0分钟"}</dd>
         </div>
         <div className="flex justify-between">
           <dt className="text-text-muted">状态</dt>
@@ -108,15 +109,15 @@ export default function TaskDetail() {
         </div>
         <div className="flex justify-between">
           <dt className="text-text-muted">创建时间</dt>
-          <dd className="text-text-primary">{formatDateTime(task.createdAt)}</dd>
+          <dd className="tabular-nums text-text-primary">{formatDateTime(task.createdAt)}</dd>
         </div>
         <div className="flex justify-between">
           <dt className="text-text-muted">完成时间</dt>
-          <dd className="text-text-primary">{formatDateTime(task.completedAt)}</dd>
+          <dd className="tabular-nums text-text-primary">{formatDateTime(task.completedAt)}</dd>
         </div>
         <div className="flex justify-between">
           <dt className="text-text-muted">Focus 投入</dt>
-          <dd className="text-text-primary">{formatDuration(focusStats.totalSeconds) || "0分钟"}</dd>
+          <dd className="tabular-nums text-text-primary">{formatDuration(focusStats.totalSeconds) || "0分钟"}</dd>
         </div>
         <div className="flex justify-between">
           <dt className="text-text-muted">专注次数</dt>
@@ -256,7 +257,7 @@ export default function TaskDetail() {
           <CornerDownRight size={13} className="text-text-faint" />
           属于「{parentTask.title}」
           <button
-            onClick={() => selectTask(parentTask.id)}
+            onClick={() => openTaskDetail(parentTask.id)}
             className="text-text-secondary underline underline-offset-2 hover:text-text-primary"
           >
             查看父任务

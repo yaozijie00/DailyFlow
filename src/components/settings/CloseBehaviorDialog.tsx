@@ -51,8 +51,8 @@ export default function CloseBehaviorDialog() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="glass-surface w-[26rem] rounded-lg border border-border-subtle p-6 shadow-popover">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4">
+      <div className="glass-surface mx-auto mt-[12vh] w-full max-w-md rounded-lg border border-border-subtle p-6 shadow-popover">
         <h2 className="text-lg font-semibold text-text-primary">
           {isFirst ? "关闭 DailyFlow" : "退出 DailyFlow"}
         </h2>

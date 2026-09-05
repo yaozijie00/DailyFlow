@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   CalendarDays,
   Timer,
@@ -7,6 +7,8 @@ import {
   Settings as SettingsIcon,
   BookOpen,
   Database,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import { useAppStore, type Page } from "../stores/appStore";
 import { useEnabledNavItems } from "../extensions/host";
@@ -38,7 +40,18 @@ const coreNavItems: NavItem[] = [
 /** 系统区：应用设置。 */
 const systemNavItems: NavItem[] = [{ page: "settings", label: "设置", icon: SettingsIcon }];
 
-function GroupTitle({ children }: { children: ReactNode }) {
+const SIDEBAR_KEY = "df.sidebarCollapsed";
+
+function readCollapsed(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function GroupTitle({ children, collapsed }: { children: ReactNode; collapsed: boolean }) {
+  if (collapsed) return null;
   return (
     <div className="px-3 pb-1 pt-3 text-[10px] font-medium uppercase tracking-wider text-text-faint">
       {children}
@@ -50,28 +63,34 @@ function NavButton({
   item,
   current,
   onNavigate,
+  collapsed,
 }: {
   item: NavItem;
   current: Page;
   onNavigate: (page: Page) => void;
+  collapsed: boolean;
 }) {
   const { page, label, icon: Icon } = item;
   return (
     <button
       onClick={() => onNavigate(page)}
       aria-current={current === page ? "page" : undefined}
-      className={`relative flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 ${
+      title={collapsed ? label : undefined}
+      aria-label={label}
+      className={`relative flex w-full items-center rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 ${
+        collapsed ? "justify-center px-0 py-2.5" : "gap-2 px-3 py-2"
+      } ${
         current === page
           ? "bg-accent-soft font-medium text-accent"
           : "text-text-secondary hover:bg-surface-hover hover:text-text-primary"
       } ${
-        current === page
+        current === page && !collapsed
           ? "before:absolute before:left-0 before:h-4 before:w-[3px] before:rounded-full before:bg-accent before:content-['']"
           : ""
       }`}
     >
-      <Icon size={16} />
-      {label}
+      <Icon size={16} className="shrink-0" />
+      {!collapsed && label}
     </button>
   );
 }
@@ -95,56 +114,133 @@ export default function Layout({ children }: { children: ReactNode }) {
   const layoutMode = useLayoutModeStore((s) => s.current);
   const mainPad = layoutMode === "compact" ? "p-4" : layoutMode === "focus" ? "p-5" : "p-6";
 
+  // 侧栏折叠（R2 响应式）：窄态为图标条（w-14），偏好本地记忆
+  const [collapsed, setCollapsed] = useState<boolean>(readCollapsed);
+  const toggleSidebar = useCallback(() => {
+    setCollapsed((c) => {
+      const next = !c;
+      try {
+        localStorage.setItem(SIDEBAR_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  }, []);
+
+  // 窄窗口（< 960px）首次自动折叠（仅在未手动设定过时）
+  const [autoApplied, setAutoApplied] = useState(false);
+  useEffect(() => {
+    if (autoApplied) return;
+    try {
+      if (localStorage.getItem(SIDEBAR_KEY) != null) {
+        setAutoApplied(true);
+        return;
+      }
+    } catch {
+      /* ignore */
+    }
+    const mq =
+      typeof window.matchMedia === "function"
+        ? window.matchMedia("(max-width: 959px)")
+        : null;
+    if (mq?.matches) setCollapsed(true);
+    setAutoApplied(true);
+  }, [autoApplied]);
+
   return (
     <div className="flex h-screen flex-col bg-bg-app text-text-primary" data-layout-mode={layoutMode}>
       <TitleBar />
       <div className="flex min-h-0 flex-1">
-        <aside className="glass-surface flex w-56 shrink-0 flex-col rounded-r-xl">
+        <aside
+          className={`glass-surface flex shrink-0 flex-col rounded-r-xl transition-[width] duration-200 ${
+            collapsed ? "w-14" : "w-56"
+          }`}
+        >
+          {/* 折叠开关 */}
+          <button
+            onClick={toggleSidebar}
+            aria-label={collapsed ? "展开侧栏" : "折叠侧栏"}
+            title={collapsed ? "展开侧栏" : "折叠侧栏"}
+            className={`flex items-center justify-center py-2 text-text-faint transition-colors hover:bg-surface-hover hover:text-text-primary ${
+              collapsed ? "" : "justify-end pr-2"
+            }`}
+          >
+            {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
+          </button>
           <nav className="flex-1 space-y-1 overflow-y-auto p-2" aria-label="主导航">
-            <GroupTitle>核心</GroupTitle>
+            <GroupTitle collapsed={collapsed}>核心</GroupTitle>
             {core.map((item) => (
-              <NavButton key={item.page} item={item} current={currentPage} onNavigate={setPage} />
+              <NavButton
+                key={item.page}
+                item={item}
+                current={currentPage}
+                onNavigate={setPage}
+                collapsed={collapsed}
+              />
             ))}
             {extensions.length > 0 && (
               <>
-                <GroupTitle>扩展</GroupTitle>
+                <GroupTitle collapsed={collapsed}>扩展</GroupTitle>
                 {extensions.map((item) => (
-                  <NavButton key={item.page} item={item} current={currentPage} onNavigate={setPage} />
+                  <NavButton
+                    key={item.page}
+                    item={item}
+                    current={currentPage}
+                    onNavigate={setPage}
+                    collapsed={collapsed}
+                  />
                 ))}
               </>
             )}
-            <GroupTitle>系统</GroupTitle>
+            <GroupTitle collapsed={collapsed}>系统</GroupTitle>
             {system.map((item) => (
-              <NavButton key={item.page} item={item} current={currentPage} onNavigate={setPage} />
+              <NavButton
+                key={item.page}
+                item={item}
+                current={currentPage}
+                onNavigate={setPage}
+                collapsed={collapsed}
+              />
             ))}
           </nav>
-          <div className="relative border-t border-border-subtle px-3 py-2">
-            <div className="mb-1 flex items-center justify-between">
-              <span className="text-[10px] font-medium uppercase tracking-wider text-text-faint">
-                视图模式
-              </span>
-              <span className="text-[10px] text-text-faint">会话</span>
+          {/* 折叠态隐藏次要行，仅保留视图模式入口 */}
+          {!collapsed && (
+            <>
+              <div className="df-layout-db relative border-t border-border-subtle px-3 py-2">
+                <div className="mb-1 flex items-center justify-between">
+                  <span className="text-[10px] font-medium uppercase tracking-wider text-text-faint">
+                    视图模式
+                  </span>
+                  <span className="text-[10px] text-text-faint">会话</span>
+                </div>
+                <LayoutModeSwitcher />
+              </div>
+              <div className="df-layout-status border-t border-border-subtle p-3 text-xs text-text-muted">
+                {dbStatus === "ready" && (
+                  <span className="flex items-center gap-1">
+                    <Database size={12} />
+                    SQLite 已连接
+                  </span>
+                )}
+                {dbStatus === "error" && (
+                  <span className="text-danger">数据库错误：{dbError}</span>
+                )}
+                {dbStatus === "idle" && "数据库初始化中…"}
+              </div>
+              <div className="df-layout-undo flex items-center justify-between border-t border-border-subtle px-3 py-2">
+                <span className="text-xs text-text-faint">撤销/重做</span>
+                <UndoButtons />
+              </div>
+            </>
+          )}
+          {collapsed && (
+            <div className="flex flex-col items-center gap-1 border-t border-border-subtle py-2">
+              <LayoutModeSwitcher collapsed />
             </div>
-            <LayoutModeSwitcher />
-          </div>
-          <div className="border-t border-border-subtle p-3 text-xs text-text-muted">
-            {dbStatus === "ready" && (
-              <span className="flex items-center gap-1">
-                <Database size={12} />
-                SQLite 已连接
-              </span>
-            )}
-            {dbStatus === "error" && (
-              <span className="text-danger">数据库错误：{dbError}</span>
-            )}
-            {dbStatus === "idle" && "数据库初始化中…"}
-          </div>
-          <div className="flex items-center justify-between border-t border-border-subtle px-3 py-2">
-            <span className="text-xs text-text-faint">撤销/重做</span>
-            <UndoButtons />
-          </div>
+          )}
         </aside>
-        <main className={`flex-1 overflow-auto ${mainPad}`}>{children}</main>
+        <main className={`min-w-0 flex-1 overflow-auto ${mainPad}`}>{children}</main>
       </div>
       <Toasts />
       <GlobalFocusBar />

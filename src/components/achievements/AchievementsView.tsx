@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { motion } from "motion/react";
 import { Trophy } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
 import {
@@ -234,12 +235,18 @@ export default function AchievementsView() {
         />
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {visible.map((item) => (
-            <AchievementCard
+          {visible.map((item, i) => (
+            <motion.div
               key={item.id}
-              item={item}
-              onOpen={() => setSelectedId(item.id)}
-            />
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2, delay: Math.min(i * 0.03, 0.3) }}
+            >
+              <AchievementCard
+                item={item}
+                onOpen={() => setSelectedId(item.id)}
+              />
+            </motion.div>
           ))}
         </div>
       )}

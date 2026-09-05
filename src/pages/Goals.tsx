@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { Check, Plus, Trash2, RotateCcw } from "lucide-react";
+import { CalendarDays, Check, LayoutGrid, Plus, RotateCcw, Trash2 } from "lucide-react";
 import { useAppStore } from "../stores/appStore";
 import { useGoalStore } from "../stores/goalStore";
 import { useProjectStore } from "../stores/projectStore";
@@ -7,7 +7,7 @@ import { useTaskStore } from "../stores/taskStore";
 import type { GoalWithProgress } from "../db/repositories/goalRepository";
 import { PageHeader } from "../components/ui/PageHeader";
 import MonthView from "../components/goals/MonthView";
-import ProjectManager from "../components/goals/ProjectManager";
+import GoalBoard from "../components/goals/GoalBoard";
 import { formatDuration } from "../lib/format";
 
 interface GoalFormState {
@@ -47,6 +47,8 @@ function payloadOf(form: GoalFormState) {
   };
 }
 
+type GoalView = "calendar" | "board";
+
 export default function Goals() {
   const dbStatus = useAppStore((s) => s.dbStatus);
   const goals = useGoalStore((s) => s.goals);
@@ -57,6 +59,7 @@ export default function Goals() {
   const complete = useGoalStore((s) => s.complete);
   const restore = useGoalStore((s) => s.restore);
   const remove = useGoalStore((s) => s.remove);
+  const [view, setView] = useState<GoalView>("calendar");
   const [showCreate, setShowCreate] = useState(false);
   const [form, setForm] = useState<GoalFormState>(emptyForm);
   const [editing, setEditing] = useState<GoalWithProgress | null>(null);
@@ -99,11 +102,28 @@ export default function Goals() {
     void update(goalId, { startDate, deadline: endDate });
   };
 
+  const openProject = (projectId: number) => {
+    const t = useTaskStore.getState();
+    const p = useProjectStore.getState().projects.find((x) => x.id === projectId);
+    void t.goToToday();
+    t.setProjectFilter(p ? { id: p.id, title: p.title } : { id: projectId, title: "项目" });
+    useAppStore.getState().setPage("today");
+  };
+
+  const completeGoal = (goal: GoalWithProgress) => {
+    void complete(goal.id);
+  };
+
+  const VIEW_TABS: { key: GoalView; label: string; icon: typeof CalendarDays }[] = [
+    { key: "calendar", label: "排期", icon: CalendarDays },
+    { key: "board", label: "看板", icon: LayoutGrid },
+  ];
+
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-5">
+    <div className="mx-auto flex max-w-6xl flex-col gap-4">
       <PageHeader
         title="长期"
-        description={`月规划 · 进行中 ${goals.length} · 已完成 ${completedGoals.length}；任务关联目标后进度自动统计`}
+        description="以月历规划时间跨度，以看板管理目标进度；任务关联目标后进度自动统计。"
         actions={
           <button
             onClick={() => {
@@ -118,16 +138,44 @@ export default function Goals() {
         }
       />
 
+      {/* 视图切换 + 统计 */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex rounded-md border border-border-subtle bg-surface p-0.5">
+          {VIEW_TABS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setView(t.key)}
+              aria-pressed={view === t.key}
+              className={`flex items-center gap-1.5 rounded px-3.5 py-1.5 text-sm transition-colors ${
+                view === t.key
+                  ? "bg-accent text-on-accent"
+                  : "text-text-secondary hover:bg-surface-hover"
+              }`}
+            >
+              <t.icon size={14} />
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2 text-xs text-text-faint">
+          <span className="rounded-full bg-surface px-2 py-0.5">进行中 {goals.length}</span>
+          {completedGoals.length > 0 && (
+            <span className="rounded-full bg-surface px-2 py-0.5">已完成 {completedGoals.length}</span>
+          )}
+        </div>
+      </div>
+
+      {/* 新建表单（内联，展开于视图上方） */}
       {showCreate && (
         <form
           onSubmit={submitCreate}
-          className="flex flex-col gap-2 rounded-md border border-border-subtle glass-surface p-4"
+          className="glass-surface flex flex-col gap-2 rounded-md border border-border-subtle p-4"
         >
           <input
             autoFocus
             value={form.title}
             onChange={(e) => setForm({ ...form, title: e.target.value })}
-            placeholder="名称，例如：完成 DailyFlow V2"
+            placeholder="目标名称"
             className="w-full rounded-md border border-border-strong bg-surface px-3 py-2 text-sm text-text-primary outline-none placeholder:text-text-faint focus:border-accent"
           />
           <textarea
@@ -166,7 +214,7 @@ export default function Goals() {
               max={100}
               value={form.manualProgress}
               onChange={(e) => setForm({ ...form, manualProgress: e.target.value })}
-              placeholder="进度%（留空自动）"
+              placeholder="进度%（0-100）"
               className="w-28 rounded-md border border-border-strong bg-surface px-2 py-1.5 text-sm text-text-primary placeholder:text-text-faint"
             />
           </div>
@@ -189,38 +237,74 @@ export default function Goals() {
         </form>
       )}
 
+      {/* 内容区 */}
       {loading && goals.length === 0 ? (
         <div className="text-sm text-text-faint">加载中…</div>
-      ) : (
+      ) : view === "calendar" ? (
         <MonthView
           goals={goals}
           onEdit={openEdit}
           onMoveRange={moveRange}
           onRequestCreate={createOnDates}
         />
+      ) : (
+        <GoalBoard goals={goals} onEdit={openEdit} onComplete={completeGoal} onOpenProject={openProject} />
       )}
 
-      {/* 目标下的项目管理（v1.8 Goal → Project；点击项目卡到今日筛选） */}
-      {goals.length > 0 && (
-        <ProjectManager
-          goals={goals}
-          onOpenProject={(projectId) => {
-            const t = useTaskStore.getState();
-            const p = useProjectStore.getState().projects.find((x) => x.id === projectId);
-            void t.goToToday();
-            t.setProjectFilter(p ? { id: p.id, title: p.title } : { id: projectId, title: "项目" });
-            useAppStore.getState().setPage("today");
-          }}
-        />
+      {/* 已完成目标（跨视图固定区） */}
+      {completedGoals.length > 0 && (
+        <div className="mt-1">
+          <button
+            onClick={() => setShowCompleted((v) => !v)}
+            className="text-sm text-text-muted hover:text-text-secondary"
+          >
+            {showCompleted ? "▾" : "▸"} 已完成（{completedGoals.length}）
+          </button>
+          {showCompleted && (
+            <div className="mt-2 space-y-1">
+              {completedGoals.map((g) => (
+                <div
+                  key={g.id}
+                  className="group flex items-center gap-2 rounded-md border border-border-subtle bg-surface px-3 py-2 text-sm text-text-muted"
+                >
+                  <Check size={14} className="shrink-0 text-green-600" />
+                  <span className="min-w-0 flex-1 truncate line-through decoration-text-faint">
+                    {g.title}
+                  </span>
+                  {g.deadline && (
+                    <span className="hidden shrink-0 text-xs text-text-faint sm:block">
+                      {g.deadline}
+                    </span>
+                  )}
+                  <span className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
+                    <button
+                      onClick={() => void restore(g.id)}
+                      aria-label="恢复长期任务"
+                      title="恢复为进行中（误完成可修正）"
+                      className="rounded p-0.5 text-text-faint hover:bg-green-50 hover:text-green-600"
+                    >
+                      <RotateCcw size={14} />
+                    </button>
+                    <button
+                      onClick={() => void remove(g.id)}
+                      aria-label="删除已完成任务"
+                      title="删除（可撤销）"
+                      className="rounded p-0.5 text-text-faint hover:bg-red-50 hover:text-red-600"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
-
-      {/* 课程表已迁至「课程」Extension 页（可在 设置 → 扩展 中禁用） */}
-
 
       {/* 编辑弹窗 */}
       {editing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-96 rounded-lg bg-bg-elevated p-6 shadow-popover">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4">
+          <div className="mx-auto mt-[6vh] w-full max-w-md rounded-lg bg-bg-elevated p-6 shadow-popover">
             <h2 className="mb-4 text-lg font-semibold text-text-primary">编辑长期任务</h2>
             <form onSubmit={submitEdit} className="space-y-3">
               <input
@@ -267,7 +351,7 @@ export default function Goals() {
                   max={100}
                   value={editForm.manualProgress}
                   onChange={(e) => setEditForm({ ...editForm, manualProgress: e.target.value })}
-                  placeholder="进度%（留空自动）"
+                  placeholder="进度%（0-100）"
                   className="flex-1 rounded-md border border-border-strong bg-surface px-2 py-1.5 text-sm text-text-primary placeholder:text-text-faint"
                 />
               </div>
@@ -275,26 +359,28 @@ export default function Goals() {
                 进度：{editing.progressPercent}% · 关联任务 {editing.completedTasks}/{editing.totalTasks} · 专注投入 {formatDuration(editing.focusSeconds) || "0分钟"}
               </div>
               <div className="flex items-center justify-between pt-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    void complete(editing.id);
-                    setEditing(null);
-                  }}
-                  className="flex items-center gap-1 rounded-md border border-green-200 px-3 py-1.5 text-sm text-green-600 hover:bg-green-50"
-                >
-                  <Check size={14} /> 完成
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void remove(editing.id);
-                    setEditing(null);
-                  }}
-                  className="flex items-center gap-1 rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50"
-                >
-                  <Trash2 size={14} /> 删除
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void complete(editing.id);
+                      setEditing(null);
+                    }}
+                    className="flex items-center gap-1 rounded-md border border-green-200 px-3 py-1.5 text-sm text-green-600 hover:bg-green-50"
+                  >
+                    <Check size={14} /> 完成
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void remove(editing.id);
+                      setEditing(null);
+                    }}
+                    className="flex items-center gap-1 rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50"
+                  >
+                    <Trash2 size={14} /> 删除
+                  </button>
+                </div>
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -313,55 +399,6 @@ export default function Goals() {
               </div>
             </form>
           </div>
-        </div>
-      )}
-
-      {completedGoals.length > 0 && (
-        <div className="mt-2">
-          <button
-            onClick={() => setShowCompleted((v) => !v)}
-            className="text-sm text-text-muted hover:text-text-secondary"
-          >
-            {showCompleted ? "▾" : "▸"} 已完成（{completedGoals.length}）
-          </button>
-          {showCompleted && (
-            <div className="mt-2 space-y-1">
-              {completedGoals.map((g) => (
-                <div
-                  key={g.id}
-                  className="group flex items-center gap-2 rounded-md border border-border-subtle bg-surface px-3 py-2 text-sm text-text-muted"
-                >
-                  <Check size={14} className="shrink-0 text-green-600" />
-                  <span className="min-w-0 flex-1 truncate line-through decoration-text-faint">
-                    {g.title}
-                  </span>
-                  {g.deadline && (
-                    <span className="hidden shrink-0 text-xs text-text-faint sm:block">
-                      {g.deadline}
-                    </span>
-                  )}
-                  <span className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
-                    <button
-                      onClick={() => void restore(g.id)}
-                      aria-label="恢复长期任务"
-                      title="恢复为进行中（误完成可修正）"
-                      className="rounded p-0.5 text-text-faint hover:bg-green-50 hover:text-green-600"
-                    >
-                      <RotateCcw size={14} />
-                    </button>
-                    <button
-                      onClick={() => void remove(g.id)}
-                      aria-label="删除已完成任务"
-                      title="删除（可撤销）"
-                      className="rounded p-0.5 text-text-faint hover:bg-red-50 hover:text-red-600"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       )}
     </div>

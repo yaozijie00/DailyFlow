@@ -14,7 +14,7 @@ const mockState = vi.hoisted(() => ({
   selectedTaskId: null,
   projectFilter: null as { id: number; title: string } | null,
   toggleComplete: vi.fn(),
-  selectTask: vi.fn(),
+  openTaskDetail: vi.fn(),
   reorderTasks: vi.fn(),
   createTask: vi.fn(),
   startTaskDrag: vi.fn(),
@@ -121,6 +121,13 @@ describe("TaskList", () => {
     render(<TaskList />);
     fireEvent.click(screen.getByLabelText("恢复为未完成"));
     expect(mockState.toggleComplete).toHaveBeenCalledWith(7);
+  });
+
+  it("点击任务行触发 openTaskDetail（详情面板展开入口）", () => {
+    mockState.tasks = [makeTask({ id: 7, title: "写代码" })];
+    render(<TaskList />);
+    fireEvent.click(screen.getByText("写代码"));
+    expect(mockState.openTaskDetail).toHaveBeenCalledWith(7);
   });
 
   it("按状态筛选：点「已完成」只显示已完成任务", () => {

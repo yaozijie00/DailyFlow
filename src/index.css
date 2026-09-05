@@ -163,3 +163,65 @@ html.glass body {
     @apply mx-auto w-full max-w-5xl;
   }
 }
+
+/* ---------- 图表色 token（E1：自绘 SVG 与 Recharts 共用；随主题换肤） ---------- */
+:root {
+  --chart-line: #171717;
+  --chart-grid: #e5e5e5;
+  --chart-axis: #a3a3a3;
+  --chart-area: rgb(23 23 23 / 0.06);
+  --chart-1: #4f46e5; /* 靛蓝主序列 */
+  --chart-2: #0ea5e9; /* 青 */
+  --chart-3: #10b981; /* 绿 */
+  --chart-4: #f59e0b; /* 琥珀 */
+  --chart-5: #ec4899; /* 粉 */
+}
+html.dark {
+  --chart-line: #e4e4e7;
+  --chart-grid: #3f3f46;
+  --chart-axis: #71717a;
+  --chart-area: rgb(228 228 231 / 0.08);
+}
+html.glass {
+  --chart-line: #f4f4f5;
+  --chart-grid: rgb(255 255 255 / 0.16);
+  --chart-axis: rgb(255 255 255 / 0.5);
+  --chart-area: rgb(244 244 245 / 0.08);
+}
+
+/* ---------- 布局模式差异化（A3 增强：compact 高密度 / focus 减干扰） ---------- */
+/* Compact：侧栏更窄、导航项更紧凑、底部次要行压缩 */
+[data-layout-mode="compact"] aside {
+  width: 13rem;
+}
+[data-layout-mode="compact"] aside nav {
+  padding: 0.375rem;
+}
+[data-layout-mode="compact"] aside nav > button {
+  padding-top: 0.3rem;
+  padding-bottom: 0.3rem;
+  font-size: 0.8125rem;
+}
+[data-layout-mode="compact"] aside .df-layout-status,
+[data-layout-mode="compact"] aside .df-layout-db {
+  padding-top: 0.375rem;
+  padding-bottom: 0.375rem;
+}
+/* Focus：侧栏最窄、隐藏状态/撤销/视图说明，导航更精简 */
+[data-layout-mode="focus"] aside {
+  width: 11.5rem;
+}
+[data-layout-mode="focus"] aside .df-layout-db,
+[data-layout-mode="focus"] aside .df-layout-status,
+[data-layout-mode="focus"] aside .df-layout-undo {
+  display: none;
+}
+[data-layout-mode="focus"] aside nav {
+  padding-top: 0.75rem;
+}
+[data-layout-mode="focus"] .df-page {
+  max-width: none; /* Focus：主内容充分利用宽度 */
+}
+[data-layout-mode="focus"] .glass-surface {
+  box-shadow: none; /* 减干扰：弱化卡片阴影 */
+}

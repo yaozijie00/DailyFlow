@@ -439,11 +439,11 @@ export default function MonthView({ goals, onEdit, onMoveRange, onRequestCreate 
       {/* 「+N 更多」当日任务列表 */}
       {dayDetail && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4"
           onMouseDown={() => setDayDetail(null)}
         >
           <div
-            className="w-80 rounded-lg bg-bg-elevated p-4 shadow-popover"
+            className="mx-auto mt-[8vh] w-full max-w-sm rounded-lg bg-bg-elevated p-4 shadow-popover"
             onMouseDown={(e) => e.stopPropagation()}
           >
             <h3 className="mb-3 text-sm font-semibold text-text-primary">

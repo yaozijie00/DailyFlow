@@ -15,6 +15,7 @@ import { CategoryBarChart } from "../components/statistics/CategoryBarChart";
 import { HourlyLineChart } from "../components/statistics/HourlyLineChart";
 import { DailyTrendChart } from "../components/statistics/DailyTrendChart";
 import { CompletedTasksChart } from "../components/statistics/CompletedTasksChart";
+import { HourSlotsChart } from "../components/statistics/HourSlotsChart";
 import AchievementsView from "../components/achievements/AchievementsView";
 import ReviewView from "../components/statistics/ReviewView";
 import { formatDurationCompact } from "../lib/format";
@@ -286,12 +287,18 @@ export default function Statistics() {
                 </section>
               )}
 
-              {/* 今日工作轨迹 / 每日投入趋势 */}
+              {/* 今日工作轨迹 / 时段分布 / 每日投入趋势 */}
               {range === "today" ? (
-                <section className="glass-surface rounded-md border border-border-subtle p-5">
-                  <h2 className="mb-4 text-sm font-medium text-text-secondary">今日工作轨迹</h2>
-                  <HourlyLineChart data={hourlyStats} />
-                </section>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <section className="glass-surface rounded-md border border-border-subtle p-5">
+                    <h2 className="mb-4 text-sm font-medium text-text-secondary">今日工作轨迹</h2>
+                    <HourlyLineChart data={hourlyStats} />
+                  </section>
+                  <section className="glass-surface rounded-md border border-border-subtle p-5">
+                    <h2 className="mb-4 text-sm font-medium text-text-secondary">时段分布</h2>
+                    <HourSlotsChart hourly={hourlyStats} />
+                  </section>
+                </div>
               ) : (
                 overview!.dailyFocus.length > 0 && (
                   <section className="glass-surface rounded-md border border-border-subtle p-5">
@@ -300,6 +307,52 @@ export default function Statistics() {
                   </section>
                 )
               )}
+
+              {/* 投入 × 完成 效率洞察（范围视图）：完成数/百分钟投入 的“产出效率” */}
+              {range !== "today" &&
+                overview!.dailyFocus.length > 0 &&
+                overview!.taskCompleted > 0 && (
+                  <section className="glass-surface rounded-md border border-border-subtle p-5">
+                    <h2 className="mb-3 text-sm font-medium text-text-secondary">投入产出效率</h2>
+                    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                      <StatCard
+                        label="每专注小时完成任务"
+                        value={
+                          overview!.totalSeconds > 0
+                            ? (overview!.taskCompleted / (overview!.totalSeconds / 3600)).toFixed(1)
+                            : "—"
+                        }
+                        sub="完成任务 ÷ 专注小时"
+                      />
+                      <StatCard
+                        label="平均每次专注产出"
+                        value={
+                          overview!.sessionCount > 0
+                            ? (overview!.taskCompleted / overview!.sessionCount).toFixed(1)
+                            : "—"
+                        }
+                        sub="完成任务 ÷ 专注次数"
+                      />
+                      <StatCard
+                        label="单日最高投入"
+                        value={formatDurationCompact(
+                          Math.max(0, ...overview!.dailyFocus.map((d) => d.seconds)),
+                        )}
+                        sub="效率高峰参考"
+                      />
+                      <StatCard
+                        label="单日最高完成"
+                        value={String(
+                          Math.max(0, ...overview!.dailyCompletedTasks.map((d) => d.count)),
+                        )}
+                        sub="清单一口气清空的那天"
+                      />
+                    </div>
+                    <p className="mt-3 text-xs text-text-faint">
+                      复盘视角：投入不必然等于产出——关注「每专注小时的完成数」是否随投入增加而下降（可能陷入了低效忙碌）。
+                    </p>
+                  </section>
+                )}
 
               {/* 每日任务（按 scheduledDate 分组；今日显示当天任务） */}
               <section className="glass-surface rounded-md border border-border-subtle p-5">

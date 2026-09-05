@@ -176,7 +176,7 @@ export default function CommandPalette() {
       app.setPage("today");
       const s = useTaskStore.getState();
       s.setSelectedDate(t.scheduledDate);
-      s.selectTask(t.id);
+      s.openTaskDetail(t.id);
     },
   }));
 

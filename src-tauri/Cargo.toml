@@ -1,6 +1,6 @@
 [package]
 name = "dailyflow"
-version = "3.0.0"
+version = "3.1.0"
 description = "DailyFlow - 涓汉鏈湴鏃堕棿绠＄悊宸ュ叿"
 authors = ["you"]
 edition = "2021"

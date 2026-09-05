@@ -41,6 +41,12 @@ interface TaskState {
   /** 当前查看的日期（YYYY-MM-DD），今日页据此加载任务/时间轴 */
   selectedDate: string;
   selectedTaskId: number | null;
+  /**
+   * 详情面板展开信号（Today 页消费）：每次「点任务查看详情」单调 +1。
+   * 修复：selectTask 传相同 id 时值不变、订阅者不重渲染 → 详情无法再展开；
+   * 改用单调计数保证「每次点击任务都必然触发详情展开」。
+   */
+  detailOpenSeq: number;
   isCreateOpen: boolean;
   editingTaskId: number | null;
   createDraft: CreateDraft | null;
@@ -98,6 +104,8 @@ interface TaskState {
   setProjectFilter: (filter: { id: number; title: string } | null) => void;
 
   selectTask: (id: number | null) => void;
+  /** 点任务查看详情：设置选中并递增 detailOpenSeq（保证同任务重复点击也触发详情展开） */
+  openTaskDetail: (id: number) => void;
   openCreate: (draft?: CreateDraft | null) => void;
   closeCreate: () => void;
   openEdit: (id: number) => void;
@@ -116,6 +124,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   overdue: [],
   selectedDate: todayString(),
   selectedTaskId: null,
+  detailOpenSeq: 0,
   isCreateOpen: false,
   editingTaskId: null,
   createDraft: null,
@@ -416,6 +425,8 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   },
 
   selectTask: (id) => set({ selectedTaskId: id }),
+  openTaskDetail: (id) =>
+    set((s) => ({ selectedTaskId: id, detailOpenSeq: s.detailOpenSeq + 1 })),
   openCreate: (draft = null) => set({ isCreateOpen: true, createDraft: draft }),
   closeCreate: () => set({ isCreateOpen: false, createDraft: null }),
   openEdit: (id) => set({ editingTaskId: id }),

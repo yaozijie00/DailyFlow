@@ -48,6 +48,7 @@ export default function Today() {
   const loading = useTaskStore((s) => s.loading);
   const openCreate = useTaskStore((s) => s.openCreate);
   const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
+  const detailOpenSeq = useTaskStore((s) => s.detailOpenSeq);
   const selectedDate = useTaskStore((s) => s.selectedDate);
   const setSelectedDate = useTaskStore((s) => s.setSelectedDate);
   const [showDetail, setShowDetail] = useState(true);
@@ -93,18 +94,27 @@ export default function Today() {
     }
   }
 
-  // 空间不足（详情未开、提醒卡单独占列会挤到 Timeline 最小宽度）时：
-  // 不整条横排、不压缩时间轴 → 提醒改为页头右上角入口，点开展浮层。
+  // 详情面板展示模式（R3 响应式）：容器 <1180 时详情改浮层（不占常驻列），
+  // 保时间轴与任务列表为主要可视区；次级面板（详情/提醒）此时一律按需（浮层/页头入口）。
+  const [detailOverlay, setDetailOverlay] = useState(false);
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const measure = () => {
-      const overhead = showRail && !showDetail ? REMINDER_RAIL_WIDTH : 0;
-      setRailNarrow(
-        showRail &&
-          !showDetail &&
-          el.clientWidth < TASK_LIST_WIDTH + overhead + TIMELINE_FLOOR + 24,
-      );
+      const overlay = el.clientWidth < 1180;
+      setDetailOverlay(overlay);
+      // 浮层模式：提醒不横排占列（走页头铃铛入口浮层）；
+      // 横排模式：仅当详情未开且空间不足（挤到时间轴下限）时收提醒
+      if (overlay) {
+        setRailNarrow(true);
+      } else {
+        const overhead = showRail && !showDetail ? REMINDER_RAIL_WIDTH : 0;
+        setRailNarrow(
+          showRail &&
+            !showDetail &&
+            el.clientWidth < TASK_LIST_WIDTH + overhead + TIMELINE_FLOOR + 24,
+        );
+      }
     };
     measure();
     const ro = new ResizeObserver(measure);
@@ -121,10 +131,36 @@ export default function Today() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 选中任务时自动展开右侧详情
+  // 点击任务（含重复点击同一任务）→ 必然展开详情面板。
+  // 依赖 detailOpenSeq（单调递增）：selectTask 相同 id 值不变不会触发订阅，
+  // 而 openTaskDetail 每次都 +1 → 任何一次任务点击都会走这里把详情打开。
   useEffect(() => {
     if (selectedTaskId != null) setShowDetail(true);
-  }, [selectedTaskId]);
+  }, [detailOpenSeq]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 浮层模式（空间过窄）下首次进入时若详情处于「横排常驻」残留 → 自动收起为按需；
+  // 之后（用户点任务/点页头按钮）不再自动收，避免「点开瞬间被收回」导致看似打不开。
+  const overlayEntryRef = useRef(detailOverlay);
+  useEffect(() => {
+    const enteredOverlay = detailOverlay && !overlayEntryRef.current;
+    overlayEntryRef.current = detailOverlay;
+    if (enteredOverlay && showDetail && selectedTaskId == null) {
+      setShowDetail(false);
+    }
+    // 仅关注「进入浮层模式」这一瞬；之后 showDetail 完全由用户操作控制。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detailOverlay]);
+
+  // 选中被清除（详情内延期/删除 → selectTask(null)）→ 浮层模式下的详情随之收起，
+  // 不留空占位浮层；宽容器横排右列保持旧行为（显示空态占位提示）。
+  const prevSelectedRef = useRef(selectedTaskId);
+  useEffect(() => {
+    const prev = prevSelectedRef.current;
+    prevSelectedRef.current = selectedTaskId;
+    if (detailOverlay && prev != null && selectedTaskId == null && showDetail) {
+      setShowDetail(false);
+    }
+  }, [detailOverlay, selectedTaskId, showDetail]);
 
   useEffect(() => {
     if (dbStatus === "ready") {
@@ -262,10 +298,14 @@ export default function Today() {
           </ExtensionErrorBoundary>
         ))}
 
-      {/* 主区：任务 | 时间轴 | 右列（提醒卡在详情面板上方；二者都不占用 Timeline 纵向空间） */}
-      <div className="flex min-h-0 flex-1" ref={containerRef}>
-        {/* 左：任务列表 + 便签（持久区域） */}
-        <aside className="flex w-72 shrink-0 flex-col pr-4">
+      {/* 主区：任务 | 时间轴 | 右列（详情/提醒；窄窗详情=浮层不占宽，次级面板按需） */}
+      <div className="relative flex min-h-0 flex-1" ref={containerRef}>
+        {/* 左：任务列表 + 便签（持久区域；窄窗略收窄让时间轴更宽） */}
+        <aside
+          className={`flex shrink-0 flex-col pr-4 transition-[width] duration-200 ${
+            detailOverlay ? "w-64" : "w-72"
+          }`}
+        >
           <div className="min-h-0 flex-1 overflow-y-auto">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-medium text-text-secondary">今日任务</h2>
@@ -283,52 +323,91 @@ export default function Today() {
               <TaskList />
             )}
           </div>
-          {/* 便签区：固定高度、独立滚动（可在设置中隐藏） */}
+          {/* 便签区：固定高度、独立滚动（可在设置中隐藏；次级面板窄窗自动收缩高度） */}
           {settings.todayShowNotes && (
-            <div className="max-h-44 shrink-0 overflow-y-auto pt-1">
+            <div
+              className={`shrink-0 overflow-y-auto pt-1 transition-[max-height] duration-200 ${
+                detailOverlay ? "max-h-32" : "max-h-44"
+              }`}
+            >
               <NoteList />
             </div>
           )}
         </aside>
 
-        {/* 中：时间轴（自身负责滚动） */}
-        <main className="min-w-0 min-h-0 flex-1 overflow-hidden rounded-md border border-border-subtle glass-surface">
-          <Timeline />
-        </main>
+        {/* 右半区（时间轴 + 浮层/右列）：浮层只覆盖此区，不盖左栏（左栏保持可点选任务） */}
+        <div className="relative flex min-w-0 min-h-0 flex-1">
+          {/* 中：时间轴（自身负责滚动；详情浮层模式时间轴保持全宽） */}
+          <main className="min-w-0 min-h-0 flex-1 overflow-hidden rounded-md border border-border-subtle glass-surface">
+            <Timeline />
+          </main>
 
-        {/* 右列：提醒卡（详情面板正上方）+ 详情面板（共用一列，提醒出现/消失不影响 Timeline） */}
-        {(showDetail || (showRail && !railNarrow)) && (
-          <>
-            {showDetail && (
-              <div
-                onMouseDown={startResize}
-                onDoubleClick={resetWidth}
-                role="separator"
-                aria-orientation="vertical"
-                aria-label="调整详情宽度"
-                title="拖动调整宽度，双击恢复默认"
-                className="group flex w-3 shrink-0 cursor-col-resize items-center justify-center"
-              >
-                <div className="h-full w-px bg-border-subtle transition-colors group-hover:bg-border-strong" />
-              </div>
-            )}
-            <div
-              className="flex min-h-0 shrink-0 flex-col"
-              style={{ width: showDetail ? detailWidth : REMINDER_RAIL_WIDTH }}
-            >
-              {showRail && !railNarrow && (
-                <div className="max-h-[45%] shrink-0 overflow-y-auto pb-2">
-                  <ReminderRail />
+          {/* 右列（宽容器横排模式）：提醒卡 + 详情面板 共用一列 */}
+          {!detailOverlay && (showDetail || (showRail && !railNarrow)) && (
+            <>
+              {showDetail && (
+                <div
+                  onMouseDown={startResize}
+                  onDoubleClick={resetWidth}
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-label="调整详情宽度"
+                  title="拖动调整宽度，双击恢复默认"
+                  className="group flex w-3 shrink-0 cursor-col-resize items-center justify-center"
+                >
+                  <div className="h-full w-px bg-border-subtle transition-colors group-hover:bg-border-strong" />
                 </div>
               )}
-              {showDetail && (
-                <div className="min-h-0 flex-1 overflow-y-auto">
+              <div
+                className="flex min-h-0 shrink-0 flex-col"
+                style={{ width: showDetail ? detailWidth : REMINDER_RAIL_WIDTH }}
+              >
+                {showRail && !railNarrow && (
+                  <div className="max-h-[45%] shrink-0 overflow-y-auto pb-2">
+                    <ReminderRail />
+                  </div>
+                )}
+                {showDetail && (
+                  <div className="min-h-0 flex-1 overflow-y-auto">
+                    <TaskDetail />
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* 详情浮层（窄容器模式）：覆盖时间轴右侧，不占列宽也不盖左栏 */}
+          {detailOverlay && showDetail && (
+            <>
+              <div
+                className="absolute inset-0 z-20 bg-black/10"
+                onClick={() => {
+                  setShowDetail(false);
+                  useTaskStore.getState().selectTask(null);
+                }}
+              />
+              <div className="glass-surface absolute inset-y-0 right-0 z-30 flex w-[min(380px,86%)] flex-col border-l border-border-subtle shadow-popover">
+                <div className="flex items-center justify-between border-b border-border-subtle px-3 py-1.5">
+                  <span className="text-xs font-medium text-text-secondary">任务详情</span>
+                  <button
+                    onClick={() => {
+                      setShowDetail(false);
+                      useTaskStore.getState().selectTask(null);
+                    }}
+                    aria-label="关闭详情"
+                    title="关闭详情"
+                    className="rounded p-0.5 text-text-faint hover:bg-surface-hover hover:text-text-primary"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto p-3">
                   <TaskDetail />
                 </div>
-              )}
-            </div>
-          </>
-        )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       <TaskFormModal />

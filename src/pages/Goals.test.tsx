@@ -241,22 +241,24 @@ describe("Goals 页面（长期月视图）", () => {
     expect(mockState.remove).toHaveBeenCalledWith(9);
   });
 
-  it("目标下可添加项目", () => {
+  it("目标下可添加项目（看板视图）", () => {
     mockState.goals = [makeGoal()];
     projectState.create.mockResolvedValue(true);
     render(<Goals />);
-    expect(screen.getByText("目标项目")).toBeTruthy();
-    fireEvent.change(screen.getByPlaceholderText(/添加项目到/), {
+    fireEvent.click(screen.getByRole("button", { name: /看板/ }));
+    expect(screen.getByText("完成 DailyFlow V2")).toBeTruthy();
+    fireEvent.change(screen.getByPlaceholderText("添加项目…"), {
       target: { value: "PCG 学习" },
     });
-    fireEvent.click(screen.getByText("添加"));
+    fireEvent.click(screen.getByLabelText(/添加项目到 完成 DailyFlow V2/));
     expect(projectState.create).toHaveBeenCalledWith(1, "PCG 学习");
   });
 
-  it("项目可删除（撤销兜底）", () => {
+  it("项目可删除（看板视图，撤销兜底）", () => {
     mockState.goals = [makeGoal()];
     projectState.projects = [{ id: 7, goalId: 1, title: "PCG 学习", goalTitle: null }];
     render(<Goals />);
+    fireEvent.click(screen.getByRole("button", { name: /看板/ }));
     fireEvent.click(screen.getByLabelText("删除项目"));
     expect(projectState.remove).toHaveBeenCalledWith(7);
   });

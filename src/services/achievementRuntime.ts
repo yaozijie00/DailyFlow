@@ -6,6 +6,7 @@ import { AchievementProgressRepository } from "../db/repositories/achievementPro
 import { AchievementService } from "./achievementService";
 import { loadAchievementDefinitions } from "../achievements/definitions";
 import { useAppStore } from "../stores/appStore";
+import { celebrateUnlock } from "../lib/celebrate";
 
 /**
  * 成就运行时（模块级单例）：专注落库 / 任务变更后统一评估入口。
@@ -24,6 +25,7 @@ export async function evaluateAndNotify(): Promise<void> {
     const newly = await achievementService.evaluate();
     for (const a of newly) {
       useAppStore.getState().pushAchievement(a.name, a.description);
+      celebrateUnlock(); // 解锁庆祝彩屑（轻量；单次解锁触发一次）
     }
   } catch {
     // 成就评估失败静默：不阻断专注/任务操作

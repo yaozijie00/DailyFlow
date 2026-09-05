@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check } from "lucide-react";
+import { Check, LayoutGrid } from "lucide-react";
 import { useAppStore } from "../stores/appStore";
 import { useLayoutModeStore } from "../lib/layoutMode";
 import type { LayoutMode } from "../services/settingsService";
@@ -10,11 +10,15 @@ const MODES: { key: LayoutMode; label: string; short: string; desc: string }[] =
   { key: "focus", label: "Focus", short: "专注", desc: "减少干扰，强调当前任务" },
 ];
 
+const ORDER: LayoutMode[] = ["standard", "compact", "focus"];
+
 /**
- * 侧栏底部视图模式切换（A3）：常驻三段按钮，点击即切换「会话级」模式，
- * 无需弹层；启动默认模式请在 设置 → 外观 → 界面主题/默认视图模式 中设置。
+ * 侧栏底部视图模式切换（A3）：
+ * - 展开态：常驻三段按钮，点击即切换「会话级」模式；
+ * - 折叠态（collapsed）：单图标按钮，点击循环切换并 toast 提示当前模式。
+ * 启动默认请在 设置 → 外观 中设置。
  */
-export function LayoutModeSwitcher() {
+export function LayoutModeSwitcher({ collapsed = false }: { collapsed?: boolean }) {
   const [tip, setTip] = useState<LayoutMode | null>(null);
   const current = useLayoutModeStore((s) => s.current);
   const setCurrent = useLayoutModeStore((s) => s.setCurrent);
@@ -24,6 +28,27 @@ export function LayoutModeSwitcher() {
     setCurrent(m); // 只影响本次会话
     pushToast("info", `已切换为${MODES.find((x) => x.key === m)?.short}视图（可在设置→外观设为启动默认）`);
   };
+
+  const cycle = () => {
+    const idx = ORDER.indexOf(current);
+    pick(ORDER[(idx + 1) % ORDER.length]);
+  };
+
+  if (collapsed) {
+    const cur = MODES.find((m) => m.key === current);
+    return (
+      <button
+        onClick={cycle}
+        onMouseEnter={() => setTip(current)}
+        onMouseLeave={() => setTip(null)}
+        aria-label={`切换视图（当前 ${cur?.label ?? current}）`}
+        title={cur ? `${cur.label}：${cur.desc}（点击切换）` : "切换视图模式"}
+        className="flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-surface-hover hover:text-text-primary"
+      >
+        <LayoutGrid size={15} />
+      </button>
+    );
+  }
 
   return (
     <div className="flex w-full items-stretch gap-0.5 rounded-md border border-border-subtle bg-surface-muted p-0.5">

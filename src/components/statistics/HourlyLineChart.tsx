@@ -43,8 +43,8 @@ export function HourlyLineChart({ data }: { data: HourlyStatistic[] }) {
         const gy = y(maxSeconds * r);
         return (
           <g key={r}>
-            <line x1={PAD_X} x2={W - PAD_X} y1={gy} y2={gy} stroke="#e5e5e5" strokeWidth="1" />
-            <text x={PAD_X - 6} y={gy + 3} textAnchor="end" fontSize="9" fill="#a3a3a3">
+            <line x1={PAD_X} x2={W - PAD_X} y1={gy} y2={gy} stroke="var(--chart-grid)" strokeWidth="1" />
+            <text x={PAD_X - 6} y={gy + 3} textAnchor="end" fontSize="9" fill="var(--chart-axis)">
               {formatDurationCompact(maxSeconds * r)}
             </text>
           </g>
@@ -52,11 +52,11 @@ export function HourlyLineChart({ data }: { data: HourlyStatistic[] }) {
       })}
 
       {/* 面积 + 折线 */}
-      <path d={areaPath} fill="rgba(23, 23, 23, 0.06)" />
+      <path d={areaPath} fill="var(--chart-area)" />
       <polyline
         points={points}
         fill="none"
-        stroke="#171717"
+        stroke="var(--chart-line)"
         strokeWidth="1.75"
         strokeLinejoin="round"
         strokeLinecap="round"
@@ -70,7 +70,7 @@ export function HourlyLineChart({ data }: { data: HourlyStatistic[] }) {
             cx={x(i)}
             cy={y(d.seconds)}
             r="2.5"
-            fill="#171717"
+            fill="var(--chart-line)"
           >
             <title>{`${String(i).padStart(2, "0")}:00 · ${formatDurationCompact(d.seconds)}`}</title>
           </circle>
@@ -79,7 +79,7 @@ export function HourlyLineChart({ data }: { data: HourlyStatistic[] }) {
 
       {/* 横轴刻度 */}
       {X_TICKS.map((h) => (
-        <text key={h} x={x(h)} y={H - 4} textAnchor="middle" fontSize="9" fill="#a3a3a3">
+        <text key={h} x={x(h)} y={H - 4} textAnchor="middle" fontSize="9" fill="var(--chart-axis)">
           {String(h).padStart(2, "0")}
         </text>
       ))}

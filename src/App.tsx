@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { motion } from "motion/react";
 import Layout from "./components/Layout";
 import CloseBehaviorDialog from "./components/settings/CloseBehaviorDialog";
 import { useAppStore, type CorePage } from "./stores/appStore";
@@ -89,17 +90,36 @@ function App() {
     <Layout>
       {ActivePage ? (
         isExtensionPage ? (
-          <ExtensionErrorBoundary label={currentPage}>
-            <ActivePage />
+          <ExtensionErrorBoundary key={currentPage} label={currentPage}>
+            <PageTransition>
+              <ActivePage />
+            </PageTransition>
           </ExtensionErrorBoundary>
         ) : (
-          <ActivePage />
+          <PageTransition key={currentPage}>
+            <ActivePage />
+          </PageTransition>
         )
       ) : (
         <div className="text-sm text-text-faint">页面不存在</div>
       )}
       <CloseBehaviorDialog />
     </Layout>
+  );
+}
+
+/** 页面切换过渡：轻量淡入 + 上移（respect 减少动态偏好）。 */
+function PageTransition({ children }: { children: React.ReactNode }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.18, ease: "easeOut" }}
+      className="flex h-full min-h-0 flex-col"
+    >
+      {children}
+    </motion.div>
   );
 }
 

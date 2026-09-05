@@ -11,7 +11,7 @@ const mockState = vi.hoisted(() => ({
   tasks: [] as Task[],
   carryOver: vi.fn(),
   updateTask: vi.fn(),
-  selectTask: vi.fn(),
+  openTaskDetail: vi.fn(),
 }));
 
 vi.mock("../../stores/taskStore", () => ({
@@ -60,7 +60,7 @@ describe("ReminderRail（今日右侧提醒栏）", () => {
     mockState.tasks = [];
     mockState.carryOver.mockClear();
     mockState.updateTask.mockClear();
-    mockState.selectTask.mockClear();
+    mockState.openTaskDetail.mockClear();
     mockState.updateTask.mockResolvedValue(undefined);
     mockState.carryOver.mockResolvedValue(undefined);
   });
@@ -102,7 +102,7 @@ describe("ReminderRail（今日右侧提醒栏）", () => {
     expect(screen.getByText("时间冲突")).toBeTruthy();
     expect(screen.getByText(/「开发」与「会议」/)).toBeTruthy();
     fireEvent.click(screen.getByText("定位"));
-    expect(mockState.selectTask).toHaveBeenCalledWith(1);
+    expect(mockState.openTaskDetail).toHaveBeenCalledWith(1);
   });
 
   it("日程超载卡：展示超载并支持「移到明天」", () => {

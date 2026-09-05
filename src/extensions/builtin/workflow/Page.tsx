@@ -453,8 +453,8 @@ export default function WorkflowPage() {
       )}
 
       {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="glass-surface w-96 rounded-lg border border-border-subtle p-6 shadow-popover">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4">
+          <div className="glass-surface mx-auto mt-[6vh] w-full max-w-md rounded-lg border border-border-subtle p-6 shadow-popover">
             <h2 className="mb-4 text-lg font-semibold">
               {modal.kind === "create" ? "新建 Workflow" : "编辑属性"}
             </h2>
@@ -467,7 +467,7 @@ export default function WorkflowPage() {
             >
               <div>
                 <label className="mb-1 block text-sm text-text-secondary">名称</label>
-                <input autoFocus value={name} onChange={(e) => setName(e.target.value)} className={inputCls} placeholder="例如：石材材质制作流程" />
+                <input autoFocus value={name} onChange={(e) => setName(e.target.value)} className={inputCls} placeholder="流程名称" />
               </div>
               <div>
                 <label className="mb-1 block text-sm text-text-secondary">描述（可选）</label>
@@ -475,7 +475,7 @@ export default function WorkflowPage() {
               </div>
               <div>
                 <label className="mb-1 block text-sm text-text-secondary">标签（逗号分隔，可选）</label>
-                <input value={tagsText} onChange={(e) => setTagsText(e.target.value)} className={inputCls} placeholder="Substance, 石材" />
+                <input value={tagsText} onChange={(e) => setTagsText(e.target.value)} className={inputCls} placeholder="标签用逗号分隔" />
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setModal(null)} className="rounded-md px-3 py-2 text-sm text-text-secondary hover:bg-surface-hover">
@@ -496,8 +496,8 @@ export default function WorkflowPage() {
 
       {/* Phase 6：按任务运行选择器（关联今日待办任务；经 ctx 只读，完成经 ctx.tasks.complete） */}
       {picker && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="glass-surface w-[26rem] rounded-lg border border-border-subtle p-6 shadow-popover">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4">
+          <div className="glass-surface mx-auto mt-[8vh] w-full max-w-md rounded-lg border border-border-subtle p-6 shadow-popover">
             <h2 className="mb-1 text-lg font-semibold">按任务运行</h2>
             <p className="mb-4 text-xs text-text-muted">
               Workflow「{picker.wfName}」将关联所选任务：到达终点后需你确认，才把该任务标记完成。

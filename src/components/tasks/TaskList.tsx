@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { Check, Circle, GripVertical, StickyNote } from "lucide-react";
 import { useTaskStore } from "../../stores/taskStore";
 import { useNoteStore } from "../../stores/noteStore";
@@ -14,6 +15,7 @@ import {
 } from "../../lib/noteConvert";
 import { undoManager } from "../../lib/undoManager";
 import { formatDuration } from "../../lib/format";
+import { useLayoutModeStore } from "../../lib/layoutMode";
 import { TASK_STATUS_LABEL } from "../../lib/taskLabels";
 import { NO_CATEGORY_COLOR } from "../../lib/categoryColors";
 import { TASK_PRIORITIES, taskPriorityMeta } from "../../lib/taskPriority";
@@ -33,7 +35,7 @@ export default function TaskList() {
   const projectFilter = useTaskStore((s) => s.projectFilter);
   const setProjectFilter = useTaskStore((s) => s.setProjectFilter);
   const toggleComplete = useTaskStore((s) => s.toggleComplete);
-  const selectTask = useTaskStore((s) => s.selectTask);
+  const openTaskDetail = useTaskStore((s) => s.openTaskDetail);
   const reorderTasks = useTaskStore((s) => s.reorderTasks);
   const createTask = useTaskStore((s) => s.createTask);
   const notes = useNoteStore((s) => s.notes);
@@ -49,6 +51,9 @@ export default function TaskList() {
   );
   const [categoryFilter, setCategoryFilter] = useState("");
   const [priorityFilter, setPriorityFilter] = useState("");
+  // Compact 布局：任务行精简为「完成钮 + 任务名」，隐藏优先级/状态等次要标签（保任务名完整）
+  const layoutMode = useLayoutModeStore((s) => s.current);
+  const compact = layoutMode === "compact";
 
   // 设置「默认隐藏已完成」：开启时若仍处于「全部」，自动切到待办
   useEffect(() => {
@@ -245,7 +250,7 @@ export default function TaskList() {
                           didDragRef.current = false; // 拖拽后的 click 不触发选择
                           return;
                         }
-                        selectTask(task.id);
+                        openTaskDetail(task.id);
                       }}
                       className={`flex cursor-pointer select-none items-center gap-3 rounded-md border px-3 py-2 ${
                         selected
@@ -262,20 +267,42 @@ export default function TaskList() {
                         aria-label={done ? "恢复为未完成" : "完成任务"}
                         title={done ? "恢复为未完成" : "完成任务"}
                       >
-                        {done ? (
-                          <Check size={18} className="text-green-600" />
-                        ) : (
-                          <Circle size={18} />
-                        )}
+                        <AnimatePresence mode="wait" initial={false}>
+                          {done ? (
+                            <motion.span
+                              key="done"
+                              initial={{ scale: 0.4, opacity: 0, rotate: -30 }}
+                              animate={{ scale: 1, opacity: 1, rotate: 0 }}
+                              exit={{ scale: 0.4, opacity: 0 }}
+                              transition={{ type: "spring", stiffness: 500, damping: 22 }}
+                              className="inline-flex"
+                            >
+                              <Check size={18} className="text-green-600" />
+                            </motion.span>
+                          ) : (
+                            <motion.span
+                              key="todo"
+                              initial={{ scale: 0.6, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              exit={{ scale: 0.6, opacity: 0 }}
+                              transition={{ duration: 0.12 }}
+                              className="inline-flex"
+                            >
+                              <Circle size={18} />
+                            </motion.span>
+                          )}
+                        </AnimatePresence>
                       </button>
-                      {/* 优先级标签 */}
-                      <span
-                        className="shrink-0 rounded px-1 py-px text-[10px] font-medium leading-tight"
-                        style={{ color: pMeta.text, backgroundColor: pMeta.bg }}
-                        title={`优先级：${pMeta.label}`}
-                      >
-                        {pMeta.label}
-                      </span>
+                      {/* 优先级标签（Compact 隐藏：让任务名完整可读） */}
+                      {!compact && (
+                        <span
+                          className="shrink-0 rounded px-1 py-px text-[10px] font-medium leading-tight"
+                          style={{ color: pMeta.text, backgroundColor: pMeta.bg }}
+                          title={`优先级：${pMeta.label}`}
+                        >
+                          {pMeta.label}
+                        </span>
+                      )}
                       <span className="min-w-0 flex-1">
                         <span className="flex items-center gap-1.5">
                           <span
@@ -297,21 +324,27 @@ export default function TaskList() {
                             {task.title}
                           </span>
                         </span>
-                        <span className="block truncate text-xs text-text-muted">
-                          {task.categoryId != null
-                            ? (categoryMap.get(task.categoryId) ?? "")
-                            : ""}
-                          {task.estimatedDuration != null
-                            ? `${task.categoryId != null ? " · " : ""}${formatDuration(task.estimatedDuration)}`
-                            : ""}
-                          {childTasks.length > 0
-                            ? `${task.categoryId != null || task.estimatedDuration != null ? " · " : ""}子任务 ${childDone}/${childTasks.length}`
-                            : ""}
+                        {/* 副行：类别/时长/子任务（Compact 隐藏，单行任务名） */}
+                        {!compact && (
+                          <span className="block truncate text-xs text-text-muted">
+                            {task.categoryId != null
+                              ? (categoryMap.get(task.categoryId) ?? "")
+                              : ""}
+                            {task.estimatedDuration != null
+                              ? `${task.categoryId != null ? " · " : ""}${formatDuration(task.estimatedDuration)}`
+                              : ""}
+                            {childTasks.length > 0
+                              ? `${task.categoryId != null || task.estimatedDuration != null ? " · " : ""}子任务 ${childDone}/${childTasks.length}`
+                              : ""}
+                          </span>
+                        )}
+                      </span>
+                      {/* 右侧状态文本（Compact 隐藏） */}
+                      {!compact && (
+                        <span className="shrink-0 text-xs text-text-faint">
+                          {TASK_STATUS_LABEL[task.status] ?? task.status}
                         </span>
-                      </span>
-                      <span className="shrink-0 text-xs text-text-faint">
-                        {TASK_STATUS_LABEL[task.status] ?? task.status}
-                      </span>
+                      )}
                       {/* 转为便签手柄（拖到便签区） */}
                       <span
                         onMouseDown={(e) => startTaskToNoteDrag(e, task.id)}
@@ -353,7 +386,7 @@ export default function TaskList() {
                           return (
                             <li key={child.id}>
                               <div
-                                onClick={() => selectTask(child.id)}
+                                onClick={() => openTaskDetail(child.id)}
                                 className={`flex cursor-pointer select-none items-center gap-2.5 rounded-md px-2.5 py-1.5 ${
                                   child.id === selectedTaskId
                                     ? "bg-surface-hover"
@@ -369,11 +402,31 @@ export default function TaskList() {
                                   title={childDone_ ? "恢复为未完成" : "完成子任务"}
                                   className="shrink-0 text-text-faint hover:text-green-600"
                                 >
-                                  {childDone_ ? (
-                                    <Check size={15} className="text-green-600" />
-                                  ) : (
-                                    <Circle size={15} />
-                                  )}
+                                  <AnimatePresence mode="wait" initial={false}>
+                                    {childDone_ ? (
+                                      <motion.span
+                                        key="done"
+                                        initial={{ scale: 0.4, opacity: 0 }}
+                                        animate={{ scale: 1, opacity: 1 }}
+                                        exit={{ scale: 0.4, opacity: 0 }}
+                                        transition={{ type: "spring", stiffness: 500, damping: 22 }}
+                                        className="inline-flex"
+                                      >
+                                        <Check size={15} className="text-green-600" />
+                                      </motion.span>
+                                    ) : (
+                                      <motion.span
+                                        key="todo"
+                                        initial={{ scale: 0.6, opacity: 0 }}
+                                        animate={{ scale: 1, opacity: 1 }}
+                                        exit={{ scale: 0.6, opacity: 0 }}
+                                        transition={{ duration: 0.12 }}
+                                        className="inline-flex"
+                                      >
+                                        <Circle size={15} />
+                                      </motion.span>
+                                    )}
+                                  </AnimatePresence>
                                 </button>
                                 <span
                                   className={`min-w-0 flex-1 truncate text-sm ${

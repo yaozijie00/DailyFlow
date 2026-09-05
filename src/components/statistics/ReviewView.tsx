@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Sparkles } from "lucide-react";
+import { ProgressRing } from "../mini/ProgressRing";
 import { useAppStore } from "../../stores/appStore";
 import {
   statisticsService,
@@ -51,6 +52,31 @@ function Bar({ value, max, label, right }: { value: number; max: number; label: 
       <span className="w-16 shrink-0 text-right text-xs tabular-nums text-text-muted">{right}</span>
     </div>
   );
+}
+
+/**
+ * 叙述行内数字高亮：把「X 小时 / Y 分钟 / Z% / N 次/项/个」中的**数字**包成强调片段，
+ * 单位留在原文（避免重复），使复盘结论从纯文字变为「数字即重点」。
+ * 排除：HH:MM 时间段、YYYY-MM-DD 日期、分子式 3/4（避免拆散）。
+ */
+export function highlightNumbers(line: string): React.ReactNode[] {
+  const out: React.ReactNode[] = [];
+  // 匹配「数字」其前不是 : - / 数字，其后跟 空格?+中文单位 或 %（单位不消费，留原文）
+  const re = /(?<![:：\-/\d])(\d+(?:\.\d+)?)(?=\s*(小时|分钟|%|次|天|个|周|条|项|h|min))/g;
+  let last = 0;
+  let m: RegExpExecArray | null;
+  let k = 0;
+  while ((m = re.exec(line)) !== null) {
+    if (m.index > last) out.push(line.slice(last, m.index));
+    out.push(
+      <span key={k++} className="font-semibold tabular-nums text-accent">
+        {m[1]}
+      </span>,
+    );
+    last = m.index + m[1].length;
+  }
+  if (last < line.length) out.push(line.slice(last));
+  return out.length ? out : [line];
 }
 
 /**
@@ -225,6 +251,67 @@ export default function ReviewView() {
         </div>
       </section>
 
+      {/* 复盘仪表：完成率环 + 番茄质量 + 高效时段（数字可视化，替代纯文字） */}
+      <section className="grid gap-3 sm:grid-cols-3">
+        <div className="glass-surface flex items-center gap-4 rounded-md border border-border-subtle p-4">
+          <ProgressRing progress={completionRate / 100} size={76} stroke={7}>
+            <span className="text-base font-semibold tabular-nums text-text-primary">
+              {completionRate}%
+            </span>
+          </ProgressRing>
+          <div className="min-w-0">
+            <div className="text-xs text-text-muted">任务完成率</div>
+            <div className="mt-0.5 text-xs text-text-faint">
+              完成 {ov.taskCompleted} / 创建 {ov.taskCreated}
+            </div>
+          </div>
+        </div>
+        <div className="glass-surface flex items-center gap-4 rounded-md border border-border-subtle p-4">
+          <ProgressRing
+            progress={
+              ov.sessionCount > 0 ? ov.completedFocusCount / ov.sessionCount : 0
+            }
+            size={76}
+            stroke={7}
+            color="var(--chart-2)"
+          >
+            <span className="text-sm font-semibold tabular-nums text-text-primary">
+              {ov.sessionCount > 0
+                ? Math.round((ov.completedFocusCount / ov.sessionCount) * 100)
+                : 0}
+              %
+            </span>
+          </ProgressRing>
+          <div className="min-w-0">
+            <div className="text-xs text-text-muted">番茄走满率</div>
+            <div className="mt-0.5 text-xs text-text-faint">
+              走满 {ov.completedFocusCount} / 共 {ov.sessionCount} 次
+            </div>
+          </div>
+        </div>
+        <div className="glass-surface flex items-center gap-4 rounded-md border border-border-subtle p-4">
+          {derived && derived.bestHour >= 0 ? (
+            <>
+              <div className="flex h-[76px] w-[76px] shrink-0 flex-col items-center justify-center rounded-full bg-accent-soft text-accent">
+                <span className="text-lg font-bold tabular-nums">
+                  {String(derived.bestHour).padStart(2, "0")}:00
+                </span>
+              </div>
+              <div className="min-w-0">
+                <div className="text-xs text-text-muted">高能时段</div>
+                <div className="mt-0.5 text-xs text-text-faint">
+                  投入 {formatDurationCompact(derived.bestSeconds)}
+                  <br />
+                  复盘后把重要任务排到此时段
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-text-faint">暂无时段数据</p>
+          )}
+        </div>
+      </section>
+
       {/* 叙述性复盘 */}
       <section className="glass-surface rounded-md border border-border-subtle p-5">
         <h2 className="mb-3 flex items-center gap-1.5 text-sm font-medium text-text-secondary">
@@ -235,7 +322,10 @@ export default function ReviewView() {
           {narrative.map((line, i) => (
             <li key={i} className="flex gap-1.5">
               <span className="text-text-faint">·</span>
-              <span>{line}</span>
+              {/* 数字高亮：把行内时长/百分比/次数等关键数字以强调色呈现（替代纯文字） */}
+              <span>
+                {highlightNumbers(line)}
+              </span>
             </li>
           ))}
         </ul>
