@@ -89,3 +89,17 @@ export function newEdgeId(): string {
 export function newRunId(): string {
   return newId("wfrun");
 }
+
+export type {
+  PlannedEffect,
+  ValidationIssue,
+  WorkflowCapability,
+  WorkflowEdgeV2,
+  WorkflowNodeResult,
+  WorkflowNodeV2,
+  WorkflowV2,
+  WorkflowVariableDefinition,
+  WorkflowVariableType,
+  WorkflowVariableValue,
+  WorkflowVariableValues,
+} from "./domain/types";
