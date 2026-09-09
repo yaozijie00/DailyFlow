@@ -341,25 +341,25 @@ git commit -m "feat(workflow): add side-effect-free execution planner"
 - Modify: `src/extensions/types.ts`
 - Modify: `src/extensions/builtin/workflow/index.ts`
 
-- [ ] **Step 1: 写 Rust 路径与冲突策略测试**
+- [x] **Step 1: 写 Rust 路径与冲突策略测试**
 
 覆盖：拒绝相对路径；创建嵌套目录；已有文件的 fail/skip/rename；UTF-8 文本写入；复制目录不得静默覆盖；命令参数使用数组。
 
-- [ ] **Step 2: 实现窄化 Tauri 命令**
+- [x] **Step 2: 实现窄化 Tauri 命令**
 
 增加 `workflow_inspect_paths`、`workflow_create_directories`、`workflow_write_text_file`、`workflow_copy_path` 和 `workflow_execute_process`。所有写入命令接收结构化参数并返回实际影响路径；不接收整段 shell 字符串。
 
-- [ ] **Step 3: 注册命令并运行 Rust 门禁**
+- [x] **Step 3: 注册命令并运行 Rust 门禁**
 
 Run: `cargo fmt -- --check && cargo clippy --all-targets -- -D warnings && cargo test`
 
 Expected: 0 个格式或 Clippy 错误，全部 Rust 测试通过。
 
-- [ ] **Step 4: 实现 TypeScript bridge**
+- [x] **Step 4: 实现 TypeScript bridge**
 
 Bridge 只负责 `invoke` 参数映射与错误归一化。扩展能力清单增加 `files.read`、`files.write`、`system.open`、`process.launch` 和 `process.execute`，Workflow manifest 只声明实际启用的能力。
 
-- [ ] **Step 5: 通过 bridge 测试并提交**
+- [x] **Step 5: 通过 bridge 测试并提交**
 
 Run: `npm test -- src/extensions/builtin/workflow/systemBridge.test.ts src/extensions/platform.test.ts`
 
@@ -379,21 +379,21 @@ git commit -m "feat(workflow): add safe desktop automation bridge"
 - Create: `src/extensions/builtin/workflow/nodes/builtInNodes.test.ts`
 - Modify: `src/extensions/builtin/workflow/nodes/builtInRegistry.ts`
 
-- [ ] **Step 1: 写节点预览与执行测试**
+- [x] **Step 1: 写节点预览与执行测试**
 
 每类节点至少验证成功、配置错误、权限缺失和系统失败。文件节点额外验证 fail/skip/overwrite/rename 四种冲突策略，以及预览路径与实际结果一致。
 
-- [ ] **Step 2: 实现节点定义**
+- [x] **Step 2: 实现节点定义**
 
 所有节点通过注册表公开 `configSchema`、`capabilities`、`validate`、`preview` 和 `execute`。`system.execute-process` 默认返回权限阻断，只有偏好已开启且运行时再次确认后执行。
 
-- [ ] **Step 3: 运行节点测试**
+- [x] **Step 3: 运行节点测试**
 
 Run: `npm test -- src/extensions/builtin/workflow/nodes/builtInNodes.test.ts`
 
 Expected: PASS。
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git add src/extensions/builtin/workflow/nodes
@@ -410,15 +410,15 @@ git commit -m "feat(workflow): add built-in automation nodes"
 - Modify: `src/extensions/builtin/workflow/services/workflowRunner.test.ts`
 - Modify: `src/extensions/builtin/workflow/repository/workflowRepository.ts`
 
-- [ ] **Step 1: 写运行状态失败测试**
+- [x] **Step 1: 写运行状态失败测试**
 
 覆盖：开始时冻结快照；逐节点写日志；checkpoint 恢复；失败节点重试；非幂等成功节点不重复；取消后不可继续；任务完成失败时状态补偿。
 
-- [ ] **Step 2: 运行测试确认红灯**
+- [x] **Step 2: 运行测试确认红灯**
 
 Run: `npm test -- src/extensions/builtin/workflow/services/workflowRunner.test.ts`
 
-- [ ] **Step 3: 实现 `plan/start/retry` API**
+- [x] **Step 3: 实现 `plan/start/retry` API**
 
 ```ts
 interface WorkflowRunner {
@@ -433,7 +433,7 @@ interface WorkflowRunner {
 
 运行只接受已经重新验证且 `executable=true` 的计划。重试从失败步骤开始，并检查 Workflow 快照而非当前模板。
 
-- [ ] **Step 4: 通过运行器测试并提交**
+- [x] **Step 4: 通过运行器测试并提交**
 
 Run: `npm test -- src/extensions/builtin/workflow/services/workflowRunner.test.ts src/extensions/builtin/workflow/engine/workflowEngine.test.ts`
 
@@ -452,19 +452,19 @@ git commit -m "feat(workflow): persist run snapshots and step results"
 - Create: `src/extensions/builtin/workflow/templates/templateService.test.ts`
 - Modify: `src/extensions/builtin/workflow/services/workflowService.ts`
 
-- [ ] **Step 1: 写模板服务测试**
+- [x] **Step 1: 写模板服务测试**
 
 验证内置模板只读、编辑会创建个人副本、收藏与最近使用排序、搜索名称/说明/标签、路径变量不含固定盘符。
 
-- [ ] **Step 2: 实现六个内置模板**
+- [x] **Step 2: 实现六个内置模板**
 
 模板 id 使用稳定的 `builtin.*` 命名，包含：通用项目目录、前端项目资料、设计项目、每日工作启动、每日复盘归档、固定工作环境。文件类模板默认冲突策略为 `fail`。
 
-- [ ] **Step 3: 实现统一查询服务并通过测试**
+- [x] **Step 3: 实现统一查询服务并通过测试**
 
 Run: `npm test -- src/extensions/builtin/workflow/templates/templateService.test.ts`
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git add src/extensions/builtin/workflow/templates src/extensions/builtin/workflow/services/workflowService.ts
