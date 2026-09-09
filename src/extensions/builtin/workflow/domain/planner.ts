@@ -16,7 +16,7 @@ function graphIssue(code: string, message: string, nodeId?: string): ValidationI
   return { code, message, severity: "error", ...(nodeId ? { nodeId } : {}) };
 }
 
-function validateAndOrderGraph(workflow: WorkflowV2): {
+export function validateAndOrderWorkflowGraph(workflow: WorkflowV2): {
   order: WorkflowNodeV2[];
   issues: ValidationIssue[];
 } {
@@ -79,7 +79,7 @@ export async function planWorkflow(
 ): Promise<WorkflowPlan> {
   const definitionIssues = validateVariableDefinitions(workflow.variables);
   const valueResult = validateVariableValues(workflow.variables, inputValues);
-  const graph = validateAndOrderGraph(workflow);
+  const graph = validateAndOrderWorkflowGraph(workflow);
   const issues: ValidationIssue[] = [...definitionIssues, ...valueResult.issues, ...graph.issues];
   const resolvedByNode = new Map<string, Record<string, unknown>>();
   const capabilities = new Set<WorkflowPlan["requiredCapabilities"][number]>();

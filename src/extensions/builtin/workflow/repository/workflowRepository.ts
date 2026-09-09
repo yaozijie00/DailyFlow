@@ -88,6 +88,36 @@ function mapRunRow(r: typeof workflowRuns.$inferSelect): WorkflowRun {
   };
 }
 
+function mapRunV2Row(r: typeof workflowRuns.$inferSelect): WorkflowRunV2 | null {
+  if (
+    r.workflowVersion === null ||
+    r.workflowSnapshotJson === null ||
+    r.variablesSnapshotJson === null
+  ) {
+    return null;
+  }
+  const workflowSnapshot = safeParseJson<WorkflowV2 | null>(r.workflowSnapshotJson, null);
+  const variablesSnapshot = safeParseJson<WorkflowVariableValues | null>(
+    r.variablesSnapshotJson,
+    null,
+  );
+  if (!workflowSnapshot || !variablesSnapshot || workflowSnapshot.schemaVersion !== 2) return null;
+  return {
+    id: r.id,
+    workflowId: r.workflowId,
+    taskId: r.taskId,
+    state: r.state as WorkflowRunV2["state"],
+    currentNodeId: r.currentNodeId,
+    startedAt: r.startedAt,
+    completedAt: r.completedAt,
+    error: safeParseJson<WorkflowRunV2["error"]>(r.errorJson, null),
+    workflowVersion: r.workflowVersion,
+    workflowSnapshot,
+    variablesSnapshot,
+    createdAt: r.createdAt,
+  };
+}
+
 function mapRunStepRow(r: typeof workflowRunSteps.$inferSelect): WorkflowRunStep {
   return {
     id: r.id,
@@ -632,6 +662,27 @@ export class WorkflowRepository {
   async getRun(id: string): Promise<WorkflowRun | null> {
     const row = await this.db.select().from(workflowRuns).where(eq(workflowRuns.id, id)).get();
     return row ? mapRunRow(row) : null;
+  }
+
+  async getRunV2(id: string): Promise<WorkflowRunV2 | null> {
+    const row = await this.db.select().from(workflowRuns).where(eq(workflowRuns.id, id)).get();
+    return row ? mapRunV2Row(row) : null;
+  }
+
+  /** V2 专用重试入口。只有带快照的失败运行可以重新进入 running。 */
+  async retryFailedRun(id: string): Promise<WorkflowRunV2 | null> {
+    const current = await this.getRunV2(id);
+    if (!current) return null;
+    if (current.state !== "failed") {
+      throw new Error(`Run 不在失败态（当前 ${current.state}），无法重试`);
+    }
+    const rows = await this.db
+      .update(workflowRuns)
+      .set({ state: "running", completedAt: null, errorJson: null })
+      .where(eq(workflowRuns.id, id))
+      .returning()
+      .all();
+    return rows[0] ? mapRunV2Row(rows[0]) : null;
   }
 
   /**
