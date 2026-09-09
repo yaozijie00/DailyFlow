@@ -5,7 +5,7 @@ import {
 } from "../../types";
 import { registerWorkflowRunCompletedProvider, unregisterWorkflowRunCompletedProvider } from "../../registry";
 import WorkflowPage from "./Page";
-import { setTaskCompleter } from "./runnerHost";
+import { setTaskCompleter, setWorkflowTaskOps } from "./runnerHost";
 import { WorkflowRepository } from "./repository/workflowRepository";
 import WorkflowSettings from "./Settings";
 import {
@@ -67,6 +67,7 @@ export function activate(ctx: CoreContext) {
       throw new Error(`任务完成失败（taskId=${taskId}）：任务不存在或已删除`);
     }
   });
+  setWorkflowTaskOps(ctx.tasks);
   // A5：WorkflowRun 完成成就数据源（Core 成就引擎统一评估；经 Host Provider 通道）
   registerWorkflowRunCompletedProvider(manifest.id, async () => {
     const repo = await lazyRepo();
@@ -75,6 +76,7 @@ export function activate(ctx: CoreContext) {
   ctx.lifecycle.onDispose(() => {
     unregisterWorkflowRunCompletedProvider(manifest.id);
     setTaskCompleter(null);
+    setWorkflowTaskOps(null);
   });
   return {
     nav: { page: "ext:workflow", label: "Workflow" },
@@ -87,4 +89,5 @@ export function activate(ctx: CoreContext) {
 export function deactivate(_ctx: CoreContext): void {
   unregisterWorkflowRunCompletedProvider(manifest.id);
   setTaskCompleter(null);
+  setWorkflowTaskOps(null);
 }

@@ -2,7 +2,7 @@ import { create } from "zustand";
 
 export type WorkflowTopView = "library" | "editor" | "runs";
 export type WorkflowLibrarySource = "all" | "builtin" | "personal" | "favorite";
-export type WorkflowRunnerStage = "variables" | "preview" | "executing" | "result";
+export type WorkflowRunnerStage = "variables" | "preview" | "running" | "result";
 
 export interface WorkflowRunnerUiState {
   templateId: string;

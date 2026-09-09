@@ -106,7 +106,8 @@ export class WorkflowTemplateService {
 
   async list(query: WorkflowTemplateQuery = {}): Promise<WorkflowTemplate[]> {
     const [metadata, summaries] = await Promise.all([this.metadata(), this.repo.list()]);
-    const personal = (await Promise.all(summaries.map((summary) => this.repo.getV2(summary.id))))
+    const personalSummaries = summaries.filter((summary) => !summary.id.startsWith("builtin."));
+    const personal = (await Promise.all(personalSummaries.map((summary) => this.repo.getV2(summary.id))))
       .filter((item): item is WorkflowV2 => item !== null)
       .map((item) => withMetadata(item, "personal", metadata[item.id]));
     const templates = [

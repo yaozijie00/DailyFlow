@@ -64,6 +64,29 @@ export const workflowService = {
 
   markTemplateUsed: (id: string) => templates().then((service) => service.markUsed(id)),
 
+  prepareTemplateForRun: async (id: string) => {
+    const [repository, service] = await Promise.all([repo(), templates()]);
+    const template = await service.get(id);
+    if (!template) throw new Error(`模板不存在：${id}`);
+    const workflow = {
+      id: template.id,
+      schemaVersion: template.schemaVersion,
+      name: template.name,
+      description: template.description,
+      version: template.version,
+      variables: template.variables,
+      nodes: template.nodes,
+      edges: template.edges,
+      tags: template.tags,
+      createdAt: template.createdAt,
+      updatedAt: template.updatedAt,
+    };
+    if (template.source === "builtin" && !(await repository.getV2(id))) {
+      await repository.saveMigratedWorkflow(workflow);
+    }
+    return workflow;
+  },
+
   list: () => repo().then((r) => r.list()),
 
   get: (id: string) => repo().then((r) => r.get(id)),

@@ -122,7 +122,10 @@ export function createWorkflowRunnerV2(
           await repo.updateRunStep(step.id, {
             state: "failed",
             completedAt,
-            output: result.output ?? null,
+            output:
+              result.output || result.affectedPaths
+                ? { ...(result.output ?? {}), ...(result.affectedPaths ? { affectedPaths: result.affectedPaths } : {}) }
+                : null,
             error: { message, retryable: result.retryable ?? false },
           });
           await repo.updateRun(runId, {
@@ -137,7 +140,10 @@ export function createWorkflowRunnerV2(
         await repo.updateRunStep(step.id, {
           state: "completed",
           completedAt,
-          output: result.output ?? null,
+          output:
+            result.output || result.affectedPaths
+              ? { ...(result.output ?? {}), ...(result.affectedPaths ? { affectedPaths: result.affectedPaths } : {}) }
+              : null,
           error: null,
         });
         events.push(`node=${node.id} completed`);

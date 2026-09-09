@@ -7,6 +7,8 @@ import { getWorkflowPreferences } from "./preferences";
 import { WorkflowShell } from "./components/WorkflowShell";
 import { useWorkflowUiStore } from "./store/workflowUiStore";
 import { TemplateLibrary } from "./components/library/TemplateLibrary";
+import { WorkflowRunDialog } from "./components/runner/WorkflowRunDialog";
+import type { WorkflowTemplate } from "./templates/templateService";
 
 type ModalMode = { kind: "create" } | null;
 
@@ -26,10 +28,12 @@ export default function WorkflowPage() {
   const navigate = useWorkflowUiStore((s) => s.navigate);
   const openEditorView = useWorkflowUiStore((s) => s.openEditor);
   const openRunnerView = useWorkflowUiStore((s) => s.openRunner);
+  const closeRunnerView = useWorkflowUiStore((s) => s.closeRunner);
   const [modal, setModal] = useState<ModalMode>(null);
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
   const [tagsText, setTagsText] = useState("");
+  const [runTemplate, setRunTemplate] = useState<WorkflowTemplate | null>(null);
 
   useEffect(() => {
     void loadList();
@@ -169,9 +173,21 @@ export default function WorkflowPage() {
     <WorkflowShell view={view} onViewChange={navigate} onCreate={openCreate}>
 
       <TemplateLibrary
-        onRun={(template) => openRunnerView(template.id)}
+        onRun={(template) => {
+          setRunTemplate(template);
+          openRunnerView(template.id);
+        }}
         onEdit={(template) => openEditor(template.id)}
       />
+      {runTemplate && (
+        <WorkflowRunDialog
+          template={runTemplate}
+          onClose={() => {
+            setRunTemplate(null);
+            closeRunnerView();
+          }}
+        />
+      )}
 
       {modal && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4">
