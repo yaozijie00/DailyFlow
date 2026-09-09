@@ -1,6 +1,6 @@
 # Workflow Redesign Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** 将 Workflow 扩展升级为以模板快速运行、文件系统自动化、安全预览和可扩展节点为核心的实用工作台，同时只对 DailyFlow 本体做一致性优化。
 
@@ -74,7 +74,7 @@ flowchart TD
 - Create: `src/extensions/builtin/workflow/domain/nodeRegistry.test.ts`
 - Modify: `src/extensions/builtin/workflow/models.ts`
 
-- [ ] **Step 1: 写注册表失败测试**
+- [x] **Step 1: 写注册表失败测试**
 
 覆盖：注册后可查询；重复 `type` 被拒绝；非法版本被拒绝；能力去重；未知节点返回可读错误。
 
@@ -86,13 +86,13 @@ it("rejects duplicate node types", () => {
 });
 ```
 
-- [ ] **Step 2: 运行测试并确认红灯**
+- [x] **Step 2: 运行测试并确认红灯**
 
 Run: `npm test -- src/extensions/builtin/workflow/domain/nodeRegistry.test.ts`
 
 Expected: FAIL，提示模块尚不存在。
 
-- [ ] **Step 3: 定义稳定领域契约**
+- [x] **Step 3: 定义稳定领域契约**
 
 `types.ts` 至少定义：
 
@@ -123,13 +123,13 @@ export interface WorkflowV2 {
 
 `nodeDefinition.ts` 定义设计规格中的 `WorkflowNodeDefinition`、端口、配置字段、校验问题、计划效果和执行结果。`nodeRegistry.ts` 仅负责注册与查找，不依赖 React、数据库或 Tauri。
 
-- [ ] **Step 4: 实现注册表并通过测试**
+- [x] **Step 4: 实现注册表并通过测试**
 
 Run: `npm test -- src/extensions/builtin/workflow/domain/nodeRegistry.test.ts`
 
 Expected: PASS。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/extensions/builtin/workflow/domain src/extensions/builtin/workflow/models.ts
@@ -147,17 +147,17 @@ git commit -m "feat(workflow): add versioned node registry"
 - Create: `src/extensions/builtin/workflow/domain/legacyMigration.test.ts`
 - Modify: `src/extensions/builtin/workflow/engine/workflowEngine.ts`
 
-- [ ] **Step 1: 写 V1 映射测试**
+- [x] **Step 1: 写 V1 映射测试**
 
 验证 `goal/action/checkpoint/finish/app/file/folder` 分别映射为 `core.start/core.manual-step/core.checkpoint/core.finish/system.launch-app/system.open-file/system.open-folder`，并保留 id、标题、说明、位置和配置。
 
-- [ ] **Step 2: 运行测试并确认红灯**
+- [x] **Step 2: 运行测试并确认红灯**
 
 Run: `npm test -- src/extensions/builtin/workflow/domain/legacyMigration.test.ts`
 
 Expected: FAIL，提示 `migrateLegacyWorkflow` 尚不存在。
 
-- [ ] **Step 3: 实现纯函数迁移器**
+- [x] **Step 3: 实现纯函数迁移器**
 
 ```ts
 const LEGACY_TYPE_MAP: Record<WorkflowNodeType, string> = {
@@ -173,17 +173,17 @@ const LEGACY_TYPE_MAP: Record<WorkflowNodeType, string> = {
 
 迁移返回 `{ workflow, issues }`，遇到未知类型时不写库并返回阻断错误。
 
-- [ ] **Step 4: 让执行引擎通过注册表获取执行器**
+- [x] **Step 4: 让执行引擎通过注册表获取执行器**
 
 保留现有状态转换；将 `createDefaultExecutors()` 的硬编码分派替换为 `registry.get(node.type).execute`。原有引擎测试必须继续通过。
 
-- [ ] **Step 5: 运行相关测试**
+- [x] **Step 5: 运行相关测试**
 
 Run: `npm test -- src/extensions/builtin/workflow/domain/legacyMigration.test.ts src/extensions/builtin/workflow/engine/workflowEngine.test.ts`
 
 Expected: PASS。
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add src/extensions/builtin/workflow/domain src/extensions/builtin/workflow/nodes src/extensions/builtin/workflow/engine/workflowEngine.ts
@@ -201,17 +201,17 @@ git commit -m "refactor(workflow): migrate legacy nodes to registry"
 - Modify: `src/extensions/builtin/workflow/repository/workflowRepository.ts`
 - Modify: `src/extensions/builtin/workflow/repository/workflowRepository.test.ts`
 
-- [ ] **Step 1: 写仓库失败测试**
+- [x] **Step 1: 写仓库失败测试**
 
 覆盖：新 Workflow 保存 `schemaVersion=2` 和变量；运行保存 Workflow/变量快照；步骤按顺序读取；迁移失败保留 V1 原记录。
 
-- [ ] **Step 2: 运行仓库测试并确认红灯**
+- [x] **Step 2: 运行仓库测试并确认红灯**
 
 Run: `npm test -- src/extensions/builtin/workflow/repository/workflowRepository.test.ts`
 
 Expected: FAIL，提示 V2 字段或步骤方法不存在。
 
-- [ ] **Step 3: 添加迁移 SQL**
+- [x] **Step 3: 添加迁移 SQL**
 
 迁移增加：
 
@@ -237,17 +237,17 @@ CREATE TABLE workflow_run_steps (
 );
 ```
 
-- [ ] **Step 4: 更新 Drizzle schema 与仓库 API**
+- [x] **Step 4: 更新 Drizzle schema 与仓库 API**
 
 增加 `saveMigratedWorkflow`、`createRunWithSnapshot`、`appendRunStep`、`updateRunStep` 和 `listRunSteps`。所有 JSON 读取继续使用安全解析并对错误数据返回诊断。
 
-- [ ] **Step 5: 通过仓库与迁移测试**
+- [x] **Step 5: 通过仓库与迁移测试**
 
 Run: `npm test -- src/extensions/builtin/workflow/repository/workflowRepository.test.ts src/db/migrate.test.ts`
 
 Expected: PASS。
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add src/db src/extensions/builtin/workflow/repository
@@ -262,7 +262,7 @@ git commit -m "feat(workflow): persist v2 definitions and run steps"
 - Create: `src/extensions/builtin/workflow/domain/variables.ts`
 - Create: `src/extensions/builtin/workflow/domain/variables.test.ts`
 
-- [ ] **Step 1: 写变量行为测试**
+- [x] **Step 1: 写变量行为测试**
 
 覆盖八种变量类型、必填校验、默认值、未知变量、非法键、路径规范化、敏感值脱敏和嵌套对象字符串解析。
 
@@ -273,17 +273,17 @@ expect(resolveTemplate("{{root}}\\{{name}}", values, definitions)).toEqual({
 });
 ```
 
-- [ ] **Step 2: 运行测试并确认红灯**
+- [x] **Step 2: 运行测试并确认红灯**
 
 Run: `npm test -- src/extensions/builtin/workflow/domain/variables.test.ts`
 
 Expected: FAIL。
 
-- [ ] **Step 3: 实现变量模块**
+- [x] **Step 3: 实现变量模块**
 
 导出 `validateVariableDefinitions`、`validateVariableValues`、`resolveTemplate`、`resolveConfigTemplates` 和 `redactSensitiveValues`。变量键限定为 `/^[a-z][a-z0-9_]*$/`，不使用 `eval` 或正则替换执行代码。
 
-- [ ] **Step 4: 通过测试并提交**
+- [x] **Step 4: 通过测试并提交**
 
 Run: `npm test -- src/extensions/builtin/workflow/domain/variables.test.ts`
 
@@ -301,11 +301,11 @@ git commit -m "feat(workflow): add typed template variables"
 - Create: `src/extensions/builtin/workflow/domain/planner.test.ts`
 - Modify: `src/extensions/builtin/workflow/engine/workflowEngine.ts`
 
-- [ ] **Step 1: 写计划器失败测试**
+- [x] **Step 1: 写计划器失败测试**
 
 验证：按线性顺序调用节点 `preview`；聚合能力；保留节点来源；阻断错误时不执行后续预览；规划过程不调用 `execute`。
 
-- [ ] **Step 2: 实现结构化计划结果**
+- [x] **Step 2: 实现结构化计划结果**
 
 ```ts
 export interface WorkflowPlan {
@@ -321,7 +321,7 @@ export interface WorkflowPlan {
 
 `planWorkflow()` 依次执行结构校验、变量解析、节点校验和节点预览，禁止产生系统写入。
 
-- [ ] **Step 3: 运行测试并提交**
+- [x] **Step 3: 运行测试并提交**
 
 Run: `npm test -- src/extensions/builtin/workflow/domain/planner.test.ts src/extensions/builtin/workflow/engine/workflowEngine.test.ts`
 
