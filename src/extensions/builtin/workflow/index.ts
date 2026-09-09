@@ -33,6 +33,11 @@ export const manifest = {
     "tasks.write",
     "storage.core",
     "storage.extension",
+    "files.read",
+    "files.write",
+    "system.open",
+    "process.launch",
+    "process.execute",
   ],
   author: "DailyFlow",
 } satisfies ExtensionManifest;

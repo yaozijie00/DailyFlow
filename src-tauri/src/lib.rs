@@ -1070,6 +1070,240 @@ fn workflow_path_exists(path: String) -> Result<bool, String> {
     Ok(p.exists())
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WorkflowPathInspection {
+    path: String,
+    exists: bool,
+    kind: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum WorkflowConflictStrategy {
+    Fail,
+    Skip,
+    Overwrite,
+    Rename,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WorkflowWriteTextInput {
+    path: String,
+    content: String,
+    conflict: WorkflowConflictStrategy,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WorkflowCopyPathInput {
+    source: String,
+    target: String,
+    conflict: WorkflowConflictStrategy,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WorkflowFileResult {
+    outcome: String,
+    actual_path: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WorkflowExecuteProcessInput {
+    executable: String,
+    arguments: Vec<String>,
+    working_directory: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WorkflowProcessResult {
+    exit_code: i32,
+    stdout: String,
+    stderr: String,
+}
+
+fn renamed_path(path: &Path) -> PathBuf {
+    let parent = path.parent().unwrap_or_else(|| Path::new(""));
+    let stem = path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("item");
+    let extension = path.extension().and_then(|value| value.to_str());
+    for index in 1..=10_000 {
+        let name = match extension {
+            Some(extension) => format!("{stem} ({index}).{extension}"),
+            None => format!("{stem} ({index})"),
+        };
+        let candidate = parent.join(name);
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+    parent.join(format!("{stem}-{}", now_ms()))
+}
+
+fn prepare_workflow_target(
+    target: &Path,
+    strategy: &WorkflowConflictStrategy,
+) -> Result<(PathBuf, &'static str, bool), String> {
+    if !target.exists() {
+        return Ok((target.to_path_buf(), "created", true));
+    }
+    match strategy {
+        WorkflowConflictStrategy::Fail => {
+            Err(format!("目标已存在，冲突策略为 fail：{}", target.display()))
+        }
+        WorkflowConflictStrategy::Skip => Ok((target.to_path_buf(), "skipped", false)),
+        WorkflowConflictStrategy::Overwrite => {
+            if target.is_dir() {
+                fs::remove_dir_all(target)
+                    .map_err(|error| format!("无法覆盖目录 {}：{error}", target.display()))?;
+            } else {
+                fs::remove_file(target)
+                    .map_err(|error| format!("无法覆盖文件 {}：{error}", target.display()))?;
+            }
+            Ok((target.to_path_buf(), "overwritten", true))
+        }
+        WorkflowConflictStrategy::Rename => Ok((renamed_path(target), "renamed", true)),
+    }
+}
+
+fn copy_workflow_path(source: &Path, target: &Path) -> Result<(), String> {
+    if source.is_file() {
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|error| format!("无法创建目录 {}：{error}", parent.display()))?;
+        }
+        fs::copy(source, target).map_err(|error| {
+            format!(
+                "复制文件失败 {} → {}：{error}",
+                source.display(),
+                target.display()
+            )
+        })?;
+        return Ok(());
+    }
+    if !source.is_dir() {
+        return Err(format!("复制来源不存在：{}", source.display()));
+    }
+    fs::create_dir_all(target)
+        .map_err(|error| format!("无法创建目录 {}：{error}", target.display()))?;
+    for entry in fs::read_dir(source)
+        .map_err(|error| format!("无法读取目录 {}：{error}", source.display()))?
+    {
+        let entry = entry.map_err(|error| error.to_string())?;
+        copy_workflow_path(&entry.path(), &target.join(entry.file_name()))?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn workflow_inspect_paths(paths: Vec<String>) -> Result<Vec<WorkflowPathInspection>, String> {
+    paths
+        .into_iter()
+        .map(|path| {
+            let resolved = ensure_absolute_path(&path)?;
+            let kind = if resolved.is_file() {
+                "file"
+            } else if resolved.is_dir() {
+                "directory"
+            } else {
+                "missing"
+            };
+            Ok(WorkflowPathInspection {
+                path: resolved.to_string_lossy().to_string(),
+                exists: resolved.exists(),
+                kind: kind.to_string(),
+            })
+        })
+        .collect()
+}
+
+#[tauri::command]
+fn workflow_create_directories(paths: Vec<String>) -> Result<Vec<String>, String> {
+    let mut created = Vec::with_capacity(paths.len());
+    for path in paths {
+        let resolved = ensure_absolute_path(&path)?;
+        fs::create_dir_all(&resolved)
+            .map_err(|error| format!("无法创建目录 {}：{error}", resolved.display()))?;
+        created.push(resolved.to_string_lossy().to_string());
+    }
+    Ok(created)
+}
+
+#[tauri::command]
+fn workflow_write_text_file(input: WorkflowWriteTextInput) -> Result<WorkflowFileResult, String> {
+    let target = ensure_absolute_path(&input.path)?;
+    let (actual, outcome, should_write) = prepare_workflow_target(&target, &input.conflict)?;
+    if should_write {
+        if let Some(parent) = actual.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|error| format!("无法创建目录 {}：{error}", parent.display()))?;
+        }
+        fs::write(&actual, input.content.as_bytes())
+            .map_err(|error| format!("无法写入文件 {}：{error}", actual.display()))?;
+    }
+    Ok(WorkflowFileResult {
+        outcome: outcome.to_string(),
+        actual_path: actual.to_string_lossy().to_string(),
+    })
+}
+
+#[tauri::command]
+fn workflow_copy_path(input: WorkflowCopyPathInput) -> Result<WorkflowFileResult, String> {
+    let source = ensure_absolute_path(&input.source)?;
+    if !source.exists() {
+        return Err(format!("复制来源不存在：{}", source.display()));
+    }
+    let target = ensure_absolute_path(&input.target)?;
+    let (actual, outcome, should_copy) = prepare_workflow_target(&target, &input.conflict)?;
+    if should_copy {
+        copy_workflow_path(&source, &actual)?;
+    }
+    Ok(WorkflowFileResult {
+        outcome: outcome.to_string(),
+        actual_path: actual.to_string_lossy().to_string(),
+    })
+}
+
+#[tauri::command]
+fn workflow_execute_process(
+    input: WorkflowExecuteProcessInput,
+) -> Result<WorkflowProcessResult, String> {
+    const OUTPUT_LIMIT: usize = 64 * 1024;
+    let executable = ensure_absolute_path(&input.executable)?;
+    if !executable.is_file() {
+        return Err(format!("程序不存在：{}", executable.display()));
+    }
+    let mut command = std::process::Command::new(executable);
+    command.args(input.arguments);
+    if let Some(directory) = input.working_directory {
+        if !directory.trim().is_empty() {
+            let resolved = ensure_absolute_path(&directory)?;
+            if !resolved.is_dir() {
+                return Err(format!("工作目录不存在：{}", resolved.display()));
+            }
+            command.current_dir(resolved);
+        }
+    }
+    let output = command
+        .output()
+        .map_err(|error| format!("执行程序失败：{error}"))?;
+    let truncate = |bytes: &[u8]| {
+        let end = bytes.len().min(OUTPUT_LIMIT);
+        String::from_utf8_lossy(&bytes[..end]).to_string()
+    };
+    Ok(WorkflowProcessResult {
+        exit_code: output.status.code().unwrap_or(-1),
+        stdout: truncate(&output.stdout),
+        stderr: truncate(&output.stderr),
+    })
+}
+
 /// 启动失败时弹出可读提示（避免「白屏挂起」无从排查）。
 fn show_startup_error(message: &str) {
     let title: Vec<u16> = "DailyFlow 启动失败"
@@ -1218,7 +1452,12 @@ pub fn run() {
             workflow_launch_process,
             workflow_open_file,
             workflow_open_folder,
-            workflow_path_exists
+            workflow_path_exists,
+            workflow_inspect_paths,
+            workflow_create_directories,
+            workflow_write_text_file,
+            workflow_copy_path,
+            workflow_execute_process
         ])
         .run(tauri::generate_context!());
 
@@ -1352,6 +1591,83 @@ mod tests {
         let r = super::workflow_open_folder(missing);
         assert!(r.is_err());
         assert!(r.unwrap_err().contains("路径不存在"));
+    }
+
+    #[test]
+    fn workflow_create_directories_builds_nested_tree() {
+        let root = std::env::temp_dir().join(format!(
+            "wf_dirs_{}_{}",
+            std::process::id(),
+            super::now_ms()
+        ));
+        let nested = root.join("assets").join("source");
+        let result = super::workflow_create_directories(vec![nested.to_string_lossy().to_string()]);
+        assert!(result.is_ok());
+        assert!(nested.is_dir());
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn workflow_write_text_file_obeys_conflict_strategies() {
+        let root = std::env::temp_dir().join(format!(
+            "wf_write_{}_{}",
+            std::process::id(),
+            super::now_ms()
+        ));
+        std::fs::create_dir_all(&root).unwrap();
+        let file = root.join("README.md");
+        let create = super::workflow_write_text_file(super::WorkflowWriteTextInput {
+            path: file.to_string_lossy().to_string(),
+            content: "first".to_string(),
+            conflict: super::WorkflowConflictStrategy::Fail,
+        })
+        .unwrap();
+        assert_eq!(create.outcome, "created");
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "first");
+
+        let fail = super::workflow_write_text_file(super::WorkflowWriteTextInput {
+            path: file.to_string_lossy().to_string(),
+            content: "second".to_string(),
+            conflict: super::WorkflowConflictStrategy::Fail,
+        });
+        assert!(fail.is_err());
+
+        let renamed = super::workflow_write_text_file(super::WorkflowWriteTextInput {
+            path: file.to_string_lossy().to_string(),
+            content: "renamed".to_string(),
+            conflict: super::WorkflowConflictStrategy::Rename,
+        })
+        .unwrap();
+        assert_eq!(renamed.outcome, "renamed");
+        assert_ne!(renamed.actual_path, file.to_string_lossy());
+        assert_eq!(
+            std::fs::read_to_string(renamed.actual_path).unwrap(),
+            "renamed"
+        );
+
+        let overwrite = super::workflow_write_text_file(super::WorkflowWriteTextInput {
+            path: file.to_string_lossy().to_string(),
+            content: "overwritten".to_string(),
+            conflict: super::WorkflowConflictStrategy::Overwrite,
+        })
+        .unwrap();
+        assert_eq!(overwrite.outcome, "overwritten");
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "overwritten");
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn workflow_execute_process_rejects_missing_executable() {
+        let result = super::workflow_execute_process(super::WorkflowExecuteProcessInput {
+            executable: std::env::temp_dir()
+                .join("dailyflow_missing_process.exe")
+                .to_string_lossy()
+                .to_string(),
+            arguments: vec!["--safe".to_string()],
+            working_directory: None,
+        });
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("程序不存在"));
     }
 
     // ---- A1-P0Fix-①：默认数据目录迁移 ----

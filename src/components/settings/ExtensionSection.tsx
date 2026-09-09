@@ -11,6 +11,11 @@ const CAPABILITY_LABELS = {
   "storage.core": "主库存储",
   "storage.extension": "扩展存储",
   "legacy.read": "读取旧数据",
+  "files.read": "读取文件",
+  "files.write": "写入文件",
+  "system.open": "打开系统资源",
+  "process.launch": "启动程序",
+  "process.execute": "执行程序",
 } as const;
 
 /**

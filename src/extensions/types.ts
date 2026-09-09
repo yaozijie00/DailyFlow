@@ -25,6 +25,11 @@ export const EXTENSION_CAPABILITIES = [
   "storage.core",
   "storage.extension",
   "legacy.read",
+  "files.read",
+  "files.write",
+  "system.open",
+  "process.launch",
+  "process.execute",
 ] as const;
 
 export type ExtensionCapability = (typeof EXTENSION_CAPABILITIES)[number];
