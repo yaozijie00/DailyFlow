@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { motion } from "motion/react";
+import { lazy, Suspense, useEffect, useRef } from "react";
+import { MotionConfig, motion } from "motion/react";
 import Layout from "./components/Layout";
 import CloseBehaviorDialog from "./components/settings/CloseBehaviorDialog";
 import { useAppStore, type CorePage } from "./stores/appStore";
@@ -9,23 +9,19 @@ import { usePomodoroStore } from "./stores/pomodoroStore";
 import { useGoalStore } from "./stores/goalStore";
 import { getExtensionPageFor, ExtensionErrorBoundary } from "./extensions/host";
 import { createCoreContext } from "./extensions/context";
-import Today from "./pages/Today";
-import Focus from "./pages/Focus";
-import Goals from "./pages/Goals";
-import Statistics from "./pages/Statistics";
-import Settings from "./pages/Settings";
 import { useShortcuts } from "./hooks/useShortcuts";
 import { databaseService } from "./services/databaseService";
 import { initWindowBehavior } from "./services/windowBehaviorService";
+import { measureStartupPhase } from "./services/startupDiagnostics";
 import { undoManager } from "./lib/undoManager";
 import { useLayoutModeStore } from "./lib/layoutMode";
 
 const pages = {
-  today: Today,
-  focus: Focus,
-  goals: Goals,
-  statistics: Statistics,
-  settings: Settings,
+  today: lazy(() => import("./pages/Today")),
+  focus: lazy(() => import("./pages/Focus")),
+  goals: lazy(() => import("./pages/Goals")),
+  statistics: lazy(() => import("./pages/Statistics")),
+  settings: lazy(() => import("./pages/Settings")),
 } as const;
 
 function App() {
@@ -69,42 +65,68 @@ function App() {
   useEffect(() => initWindowBehavior(), []);
 
   useEffect(() => {
-    databaseService.init().then((result) => {
-      setDbStatus(result.ok ? "ready" : "error", result.error ?? null);
-    });
+    void measureStartupPhase("database", "本机数据库", async () => {
+      const result = await databaseService.init();
+      if (!result.ok) throw new Error(result.error ?? "数据库初始化失败");
+      return result;
+    })
+      .then(() => setDbStatus("ready", null))
+      .catch((error: unknown) => {
+        setDbStatus("error", error instanceof Error ? error.message : String(error));
+      });
   }, [setDbStatus]);
 
   // 数据库就绪后加载设置与 Extension（加载失败不阻塞启动；错误在「设置 → 扩展」展示）
   useEffect(() => {
     if (dbStatus === "ready") {
-      useSettingsStore.getState().load();
-      useExtensionStore.getState().init(createCoreContext()).catch(() => {});
+      void measureStartupPhase("settings", "用户设置", () =>
+        useSettingsStore.getState().load(),
+      ).catch(() => {});
+      void measureStartupPhase("extensions", "扩展系统", () =>
+        useExtensionStore.getState().init(createCoreContext()),
+      ).catch(() => {});
       // 加载长期目标（供「长期」页与任务表单的「关联目标」下拉使用）
-      useGoalStore.getState().load();
+      void measureStartupPhase("goals", "长期目标", () =>
+        useGoalStore.getState().load(),
+      ).catch(() => {});
       // 恢复进行中的专注（若存在未结束的 focus_session）
-      usePomodoroStore.getState().restoreActiveFocus().catch(() => {});
+      void measureStartupPhase("focus-restore", "专注恢复", () =>
+        usePomodoroStore.getState().restoreActiveFocus(),
+      ).catch(() => {});
     }
   }, [dbStatus]);
 
   return (
-    <Layout>
-      {ActivePage ? (
-        isExtensionPage ? (
-          <ExtensionErrorBoundary key={currentPage} label={currentPage}>
-            <PageTransition>
-              <ActivePage />
-            </PageTransition>
-          </ExtensionErrorBoundary>
-        ) : (
-          <PageTransition key={currentPage}>
-            <ActivePage />
-          </PageTransition>
-        )
-      ) : (
-        <div className="text-sm text-text-faint">页面不存在</div>
-      )}
-      <CloseBehaviorDialog />
-    </Layout>
+    <MotionConfig reducedMotion="user">
+      <Layout>
+        <Suspense fallback={<PageLoading />}>
+          {ActivePage ? (
+            isExtensionPage ? (
+              <ExtensionErrorBoundary key={currentPage} label={currentPage}>
+                <PageTransition>
+                  <ActivePage />
+                </PageTransition>
+              </ExtensionErrorBoundary>
+            ) : (
+              <PageTransition key={currentPage}>
+                <ActivePage />
+              </PageTransition>
+            )
+          ) : (
+            <div className="text-sm text-text-faint">页面不存在</div>
+          )}
+        </Suspense>
+        <CloseBehaviorDialog />
+      </Layout>
+    </MotionConfig>
+  );
+}
+
+function PageLoading() {
+  return (
+    <div className="flex h-full items-center justify-center text-sm text-text-faint" role="status">
+      正在打开页面…
+    </div>
   );
 }
 

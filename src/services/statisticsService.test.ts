@@ -260,6 +260,33 @@ describe("StatisticsService", () => {
       expect(o.dailyCompletedTasks).toEqual([]);
     });
 
+    it("没有实际计时的已完成任务不参与估算准确率，并单独计数", async () => {
+      const untracked = await tasks.create({
+        title: "未记录实际时间",
+        scheduledDate: "2026-08-27",
+        estimatedDuration: 3600,
+      });
+      const tracked = await tasks.create({
+        title: "有记录",
+        scheduledDate: "2026-08-27",
+        estimatedDuration: 1800,
+      });
+      await tasks.update(untracked.id, { status: "COMPLETED", completedAt: FROM + 1000 });
+      await tasks.update(tracked.id, {
+        status: "COMPLETED",
+        completedAt: FROM + 2000,
+        actualDuration: 2400,
+      });
+
+      const o = await service.getOverview(FROM, TO);
+      expect(o.estimateRows).toEqual([
+        { title: "有记录", estimatedSeconds: 1800, actualSeconds: 2400 },
+      ]);
+      expect(o.estimatedTotalSeconds).toBe(1800);
+      expect(o.actualTotalSeconds).toBe(2400);
+      expect(o.untrackedEstimateCount).toBe(1);
+    });
+
     it("空数据：各项为 0/空，不抛错", async () => {
       const o = await service.getOverview(FROM, TO);
       expect(o.totalSeconds).toBe(0);

@@ -5,9 +5,11 @@ import {
   getExtensionPageComponent,
   getLoadedExtensions,
   getNavContribution,
+  getSettingsContributions,
   getSlotComponents,
 } from "./registry";
-import type { ExtensionSlotId } from "./types";
+import type { ExtensionCapability, ExtensionSlotId } from "./types";
+import { log } from "../lib/startupLog";
 
 /* ==================== React 订阅层（Core UI 与 Registry 之间的薄绑定） ==================== */
 
@@ -36,6 +38,28 @@ export function useEnabledSlotComponents(slot: ExtensionSlotId): Array<{
   return getSlotComponents(slot).filter((x) => enabled[x.id]);
 }
 
+/** 启用扩展贡献的设置分组（Settings 页面用）。 */
+export function useEnabledSettingsSections(): Array<{
+  key: string;
+  extensionId: string;
+  extensionName: string;
+  label: string;
+  Component: ComponentType;
+}> {
+  const enabled = useExtensionStore((s) => s.enabled);
+  const revision = useExtensionStore((s) => s.revision);
+  void revision;
+  return getSettingsContributions()
+    .filter((item) => enabled[item.extensionId])
+    .map((item) => ({
+      key: `ext:${item.extensionId}:${item.contribution.id}`,
+      extensionId: item.extensionId,
+      extensionName: item.extensionName,
+      label: item.contribution.label,
+      Component: item.contribution.Component,
+    }));
+}
+
 /** 管理页行数据（设置 → 扩展）。 */
 export interface ExtensionRow {
   id: string;
@@ -43,6 +67,7 @@ export interface ExtensionRow {
   version: string;
   apiVersion: number;
   description: string;
+  capabilities: ExtensionCapability[];
   status: "enabled" | "disabled" | "error";
   error: string | null;
 }
@@ -62,6 +87,7 @@ export function useExtensionRows(): ExtensionRow[] {
       version: ext.manifest.version,
       apiVersion: ext.manifest.apiVersion,
       description: ext.manifest.description,
+      capabilities: ext.manifest.capabilities,
       status: err ? "error" : flag ? "enabled" : "disabled",
       error: err,
     });
@@ -93,10 +119,7 @@ export class ExtensionErrorBoundary extends Component<
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     try {
-      // 动态引入避免循环依赖
-      void import("../lib/startupLog").then((m) =>
-        m.log(`[Extension:${this.props.label}] ${error.message}\n${info.componentStack ?? ""}`),
-      );
+      void log(`[Extension:${this.props.label}] ${error.message}\n${info.componentStack ?? ""}`);
     } catch {
       /* ignore */
     }

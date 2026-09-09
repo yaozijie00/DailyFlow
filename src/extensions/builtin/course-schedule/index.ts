@@ -1,4 +1,8 @@
-import { EXTENSION_API_VERSION, type CoreContext } from "../../types";
+import {
+  EXTENSION_API_VERSION,
+  type CoreContext,
+  type ExtensionManifest,
+} from "../../types";
 import {
   registerCourseCompletedProvider,
   unregisterCourseCompletedProvider,
@@ -26,8 +30,16 @@ export const manifest = {
   description: "每周固定课程安排、今日课程联动与课程任务（首个 Extension 验证对象）",
   version: "1.1.0",
   apiVersion: EXTENSION_API_VERSION,
+  capabilities: [
+    "ui.page",
+    "ui.today-slot",
+    "tasks.read",
+    "tasks.write",
+    "storage.extension",
+    "legacy.read",
+  ],
   author: "DailyFlow",
-};
+} satisfies ExtensionManifest;
 
 /** 异步初始化：打开独立库并（空库时）从 Core 旧表命中导入历史数据，回填任务映射，清扫孤儿映射。 */
 export async function init(ctx: CoreContext): Promise<void> {
@@ -59,6 +71,10 @@ export function activate(ctx: CoreContext) {
   registerDbBackupParticipant({
     snapshotTo: (absTarget) => snapshotExtensionDbTo(absTarget),
     close: () => closeExtensionDatabase(),
+  });
+  ctx.lifecycle.onDispose(() => {
+    unregisterCourseCompletedProvider(manifest.id);
+    unregisterDbBackupParticipant();
   });
   return {
     nav: { page: "ext:course-schedule", label: "课程" },

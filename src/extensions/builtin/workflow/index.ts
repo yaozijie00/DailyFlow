@@ -1,8 +1,17 @@
-import { EXTENSION_API_VERSION, type CoreContext } from "../../types";
+import {
+  EXTENSION_API_VERSION,
+  type CoreContext,
+  type ExtensionManifest,
+} from "../../types";
 import { registerWorkflowRunCompletedProvider, unregisterWorkflowRunCompletedProvider } from "../../registry";
 import WorkflowPage from "./Page";
 import { setTaskCompleter } from "./runnerHost";
 import { WorkflowRepository } from "./repository/workflowRepository";
+import WorkflowSettings from "./Settings";
+import {
+  disposeWorkflowPreferences,
+  initializeWorkflowPreferences,
+} from "./preferences";
 
 /**
  * DailyFlow 第二个 Extension：Workflow。
@@ -15,10 +24,24 @@ export const manifest = {
   id: "com.dailyflow.workflow",
   name: "Workflow",
   description: "把一件事情的完成方法固化成可复用、可执行的工作流（Workflow / Run）",
-  version: "0.1.0",
+  version: "0.2.0",
   apiVersion: EXTENSION_API_VERSION,
+  capabilities: [
+    "ui.page",
+    "ui.settings",
+    "tasks.read",
+    "tasks.write",
+    "storage.core",
+    "storage.extension",
+  ],
   author: "DailyFlow",
-};
+} satisfies ExtensionManifest;
+
+export async function init(ctx: CoreContext): Promise<void> {
+  if (!ctx.storage) throw new Error("Workflow 缺少 storage.extension 能力");
+  await initializeWorkflowPreferences(ctx.storage);
+  ctx.lifecycle.onDispose(disposeWorkflowPreferences);
+}
 
 let repoPromise: Promise<WorkflowRepository> | null = null;
 function lazyRepo(): Promise<WorkflowRepository> {
@@ -41,9 +64,14 @@ export function activate(ctx: CoreContext) {
     const repo = await lazyRepo();
     return repo.countCompletedRuns();
   });
+  ctx.lifecycle.onDispose(() => {
+    unregisterWorkflowRunCompletedProvider(manifest.id);
+    setTaskCompleter(null);
+  });
   return {
     nav: { page: "ext:workflow", label: "Workflow" },
     Page: WorkflowPage,
+    settings: [{ id: "preferences", label: "偏好", Component: WorkflowSettings }],
   };
 }
 

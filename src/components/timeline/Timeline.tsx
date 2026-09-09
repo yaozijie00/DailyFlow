@@ -1,59 +1,39 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { StickyNote } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
 import { useTaskStore } from "../../stores/taskStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { usePomodoroStore } from "../../stores/pomodoroStore";
 import { useNoteStore } from "../../stores/noteStore";
 import { useWindowDrag } from "../../hooks/useWindowDrag";
-import { useTaskToNoteDrag } from "../../hooks/useTaskToNoteDrag";
 import type { Task } from "../../db/repositories/taskRepository";
 import {
   FULL_DAY_MINUTES,
   MIN_BLOCK_HEIGHT,
   minutesToY,
-  yToMinutes,
   timeToY,
   formatMinutes,
   formatTimeRange,
-  dragRangeToMinutes,
-  dragRangeToTimes,
-  resizeStartTo,
-  resizeEndTo,
-  moveTaskBy,
   computeLanes,
   clampBlockY,
-  blockInfoLevel,
   taskBlockState,
+  type LaneLayout,
   type TimelineConfig,
-  type TimeRange,
   type TimeSpan,
 } from "../../lib/timeline";
 import { startOfToday, todayString } from "../../lib/date";
-import {
-  convertNoteToTask,
-  noteDragSession,
-  noteDropCallbacks,
-  noteDropZoneAt,
-} from "../../lib/noteConvert";
-import { undoManager } from "../../lib/undoManager";
 import { NO_CATEGORY_COLOR } from "../../lib/categoryColors";
+import TimelineToolbar from "./TimelineToolbar";
+import TimelineTaskBlock from "./TimelineTaskBlock";
+import TimelineScale from "./TimelineScale";
+import TimelineGrid from "./TimelineGrid";
+import { useTimelineCanvasInteractions } from "./useTimelineCanvasInteractions";
+import { useTimelineExternalDrops } from "./useTimelineExternalDrops";
 
 /** 横向滚动触发阈值：栏位使块宽低于该值（px）时内容加宽并横向滚动。 */
 const MIN_LANE_WIDTH = 60;
-/** 便签拖入时间轴的默认时长（分钟）。 */
-const NOTE_DEFAULT_MINUTES = 60;
 /** 缩放范围（每像素分钟数）。 */
 const MIN_PX = 1;
 const MAX_PX = 3;
-
-interface BlockPreview {
-  taskId: number;
-  startMs: number;
-  endMs: number;
-  /** 拖动中指针已移出时间轴区域（松开将移出时间轴） */
-  removing?: boolean;
-}
 
 export default function Timeline() {
   const tasks = useTaskStore((s) => s.tasks);
@@ -66,6 +46,7 @@ export default function Timeline() {
   const endTaskDrag = useTaskStore((s) => s.endTaskDrag);
   const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
   const openTaskDetail = useTaskStore((s) => s.openTaskDetail);
+  const convertToNote = useTaskStore((s) => s.convertToNote);
   const notes = useNoteStore((s) => s.notes);
   const updateNote = useNoteStore((s) => s.update);
   const settings = useSettingsStore((s) => s.settings);
@@ -73,79 +54,60 @@ export default function Timeline() {
   const [now, setNow] = useState(() => Date.now());
   const scrollRef = useRef<HTMLDivElement>(null);
   const taskAreaRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ startY: number } | null>(null);
-  /** 任务块拖拽标记：本次 mousedown 是否真的发生了拖动（抑制拖拽后的 click 选中） */
-  const blockDragRef = useRef(false);
-  /** 最近被拖动的块 id（仅抑制「同块拖拽尾随 click」，其他 click 正常选中） */
-  const lastDraggedBlockRef = useRef<number | null>(null);
-  const [preview, setPreview] = useState<TimeRange | null>(null);
-  const [blockPreview, setBlockPreview] = useState<BlockPreview | null>(null);
-  const [dropPreview, setDropPreview] = useState<BlockPreview | null>(null);
-  /** 便签拖入时间轴的落点预览（title 用于 Ghost 显示便签名） */
-  const [notePreview, setNotePreview] = useState<{
-    startMs: number;
-    endMs: number;
-    title?: string;
-  } | null>(null);
-  /** 横向换栏：被拖任务的目标栏（0-based，预览用） */
-  const [dragLane, setDragLane] = useState<{ taskId: number; lane: number } | null>(null);
-  const dragLaneRef = useRef<{ taskId: number; lane: number } | null>(null);
-  /** 用户横向换栏后的持久偏好（会话内有效，taskId → 0-based 栏） */
-  const lanePrefRef = useRef<Map<number, number>>(new Map());
-  /** 分割线拖动中的范围预览（松手后写回设置） */
-  const [rangeOverride, setRangeOverride] = useState<{
-    startMinutes: number;
-    endMinutes: number;
-  } | null>(null);
+  const laneSpansRef = useRef<Map<number, LaneLayout>>(new Map());
   const { start: startWindowDrag } = useWindowDrag();
-  const startTaskToNoteDrag = useTaskToNoteDrag();
 
-  // 时间轴配置（来自设置页；start/end 仅用于视觉强调与分割线）
-  const config: TimelineConfig = {
-    startMinutes: settings.timelineStartMinutes,
-    endMinutes: settings.timelineEndMinutes,
-    snapMinutes: settings.timelineSnapMinutes,
-  };
+  const config: TimelineConfig = useMemo(
+    () => ({
+      startMinutes: settings.timelineStartMinutes,
+      endMinutes: settings.timelineEndMinutes,
+      snapMinutes: settings.timelineSnapMinutes,
+    }),
+    [
+      settings.timelineStartMinutes,
+      settings.timelineEndMinutes,
+      settings.timelineSnapMinutes,
+    ],
+  );
   const pxPerMinute = settings.timelinePxPerMinute;
-  const tStart = settings.timelineStartMinutes;
-  const tEnd = settings.timelineEndMinutes;
   const snap = settings.timelineSnapMinutes;
   const totalHeight = FULL_DAY_MINUTES * pxPerMinute;
-
-  const effStart = rangeOverride?.startMinutes ?? config.startMinutes;
-  const effEnd = rangeOverride?.endMinutes ?? config.endMinutes;
-
-  // 全天小时刻度（00:00-24:00）
-  const hours = useMemo(() => {
-    const list: number[] = [];
-    for (let m = 0; m <= FULL_DAY_MINUTES; m += 60) list.push(m);
-    return list;
-  }, []);
-
-  // 非整点的 15 分钟刻度（辅助判断 09:15/09:30/09:45 等）
-  const quarterTicks = useMemo(() => {
-    const list: number[] = [];
-    for (let m = 15; m < FULL_DAY_MINUTES; m += 15) {
-      if (m % 60 !== 0) list.push(m);
-    }
-    return list;
-  }, []);
-
-  // 全天吸附粒度细线（跳过整点）
-  const minorTicks = useMemo(() => {
-    const list: number[] = [];
-    for (let m = 0; m < FULL_DAY_MINUTES; m += snap) {
-      if (m % 60 !== 0) list.push(m);
-    }
-    return list;
-  }, [snap]);
+  const interactions = useTimelineCanvasInteractions({
+    taskAreaRef,
+    config,
+    pxPerMinute,
+    startWindowDrag,
+    openCreate,
+    updateTask,
+    updateSettings,
+    getLaneLayout: (taskId) => laneSpansRef.current.get(taskId),
+  });
+  const {
+    preview,
+    blockPreview,
+    dragLane,
+    effectiveStart: effStart,
+    effectiveEnd: effEnd,
+  } = interactions;
+  const { dropPreview, notePreview } = useTimelineExternalDrops({
+    taskAreaRef,
+    tasks,
+    taskDrag,
+    notes,
+    selectedDate,
+    config,
+    pxPerMinute,
+    updateTask,
+    createTask,
+    updateNote,
+    endTaskDrag,
+  });
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(timer);
   }, []);
 
-  // 进入页面时自动滚动到设定范围起点（全幅显示）
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTop = minutesToY(effStart, pxPerMinute);
@@ -179,117 +141,6 @@ export default function Timeline() {
     });
   }
 
-  // 任务列表 → 时间轴拖拽：悬停显示 Ghost Preview；松开时若在区域内才保存（失败保持原状态）
-  useEffect(() => {
-    if (!taskDrag) {
-      setDropPreview(null);
-      return;
-    }
-    const area = taskAreaRef.current;
-    const task = tasks.find((t) => t.id === taskDrag.taskId);
-    if (!area || !task) return;
-    const cfg: TimelineConfig = {
-      startMinutes: tStart,
-      endMinutes: tEnd,
-      snapMinutes: snap,
-    };
-    const durationMs =
-      task.estimatedDuration != null && task.estimatedDuration > 0
-        ? task.estimatedDuration * 1000
-        : snap * 60_000;
-    const isInside = (ev: MouseEvent) => {
-      const rect = area.getBoundingClientRect();
-      return (
-        ev.clientX >= rect.left &&
-        ev.clientX <= rect.right &&
-        ev.clientY >= rect.top &&
-        ev.clientY <= rect.bottom
-      );
-    };
-    const onMove = (ev: MouseEvent) => {
-      if (!isInside(ev)) {
-        setDropPreview(null);
-        return;
-      }
-      const y = ev.clientY - area.getBoundingClientRect().top;
-      const startMs = dragRangeToTimes(y, y, cfg, pxPerMinute).startMs;
-      setDropPreview({ taskId: task.id, startMs, endMs: startMs + durationMs });
-    };
-    const onUp = (ev: MouseEvent) => {
-      // 先同步移除监听：若用户松手后同帧内立即拖时间轴块，残留监听会导致
-      // 该任务被重复 drop 或 Ghost 串到下一次拖动（任务长度/名称错乱）
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-      if (isInside(ev)) {
-        const y = ev.clientY - area.getBoundingClientRect().top;
-        const startMs = dragRangeToTimes(y, y, cfg, pxPerMinute).startMs;
-        updateTask(task.id, {
-          plannedStart: startMs,
-          plannedEnd: startMs + durationMs,
-        });
-      }
-      endTaskDrag();
-    };
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-    return () => {
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-    };
-  }, [taskDrag, tasks, updateTask, endTaskDrag, snap, tStart, tEnd, pxPerMinute]);
-
-  function yFromClientY(clientY: number): number {
-    const rect = taskAreaRef.current!.getBoundingClientRect();
-    return clientY - rect.top;
-  }
-
-  /** 便签鼠标拖拽悬停时间轴：按落点计算时间并显示 Ghost 预览（WebView2 下 HTML5 DnD 不可靠）。 */
-  useEffect(() => {
-    const onMove = (ev: MouseEvent) => {
-      if (noteDragSession.noteId == null || !taskAreaRef.current) {
-        setNotePreview(null);
-        return;
-      }
-      if (noteDropZoneAt(ev.clientX, ev.clientY) !== "timeline") {
-        setNotePreview(null);
-        return;
-      }
-      const y = ev.clientY - taskAreaRef.current.getBoundingClientRect().top;
-      const startMs = dragRangeToTimes(y, y, config, pxPerMinute).startMs;
-      const note = notes.find((n) => n.id === noteDragSession.noteId);
-      setNotePreview({
-        startMs,
-        endMs: startMs + NOTE_DEFAULT_MINUTES * 60_000,
-        title: note?.title,
-      });
-    };
-    window.addEventListener("mousemove", onMove);
-    return () => window.removeEventListener("mousemove", onMove);
-  }, [notes, config, pxPerMinute]);
-
-  /** 便签投放回调：按落点 y 创建带时间块的 Task，原便签标记「已安排」（一次 Undo 复合操作）。 */
-  useEffect(() => {
-    noteDropCallbacks.timeline = (noteId, _clientX, clientY) => {
-      setNotePreview(null);
-      if (!taskAreaRef.current) return;
-      const y = clientY - taskAreaRef.current.getBoundingClientRect().top;
-      const startMs = dragRangeToTimes(y, y, config, pxPerMinute).startMs;
-      const endMs = startMs + NOTE_DEFAULT_MINUTES * 60_000;
-      void undoManager.withBatchAsync(() =>
-        convertNoteToTask(
-          noteId,
-          notes,
-          createTask,
-          updateNote,
-          { scheduledDate: selectedDate, plannedStart: startMs, plannedEnd: endMs },
-        ),
-      );
-    };
-    return () => {
-      delete noteDropCallbacks.timeline;
-    };
-  }, [notes, createTask, updateNote, selectedDate, config, pxPerMinute]);
-
   /**
    * 双击任务块：进入该 Task 的 Focus 上下文（跳转专注页并预选该任务）。
    * v1.6：不再根据任务预计时长自动推算/覆盖本次专注时长（由用户在专注页自选）。
@@ -302,192 +153,10 @@ export default function Timeline() {
     usePomodoroStore.getState().setPendingTaskId(task.id);
   }
 
-  function handleMouseDown(e: React.MouseEvent) {
-    if (e.button !== 0) return; // 仅左键
-    e.preventDefault(); // 阻止拖拽过程中选中文字
-    const startY = yFromClientY(e.clientY);
-    dragRef.current = { startY };
-
-    startWindowDrag(
-      {
-        onMove: (ev) => {
-          const currentY = yFromClientY(ev.clientY);
-          setPreview(dragRangeToMinutes(dragRef.current!.startY, currentY, config, pxPerMinute));
-        },
-        onUp: (ev) => {
-          const currentY = yFromClientY(ev.clientY);
-          const { startMs, endMs } = dragRangeToTimes(
-            dragRef.current!.startY,
-            currentY,
-            config,
-            pxPerMinute,
-          );
-          dragRef.current = null;
-          setPreview(null);
-          openCreate({ plannedStart: startMs, plannedEnd: endMs });
-        },
-      },
-      () => {
-        dragRef.current = null;
-        setPreview(null);
-      },
-    );
-  }
-
-  function startResize(e: React.MouseEvent, task: Task, edge: "start" | "end") {
-    e.stopPropagation();
-    e.preventDefault(); // 阻止拖拽过程中选中文字
-    const taskStart = task.plannedStart!;
-    const taskEnd = task.plannedEnd!;
-
-    startWindowDrag(
-      {
-        onMove: (ev) => {
-          const y = yFromClientY(ev.clientY);
-          if (edge === "start") {
-            const newStart = resizeStartTo(y, taskEnd, config, pxPerMinute);
-            setBlockPreview({ taskId: task.id, startMs: newStart, endMs: taskEnd });
-          } else {
-            const newEnd = resizeEndTo(y, taskStart, config, pxPerMinute);
-            setBlockPreview({ taskId: task.id, startMs: taskStart, endMs: newEnd });
-          }
-        },
-        onUp: (ev) => {
-          const y = yFromClientY(ev.clientY);
-          // 调整后的完整计划范围（未调整的一侧保持原值）
-          const newStart =
-            edge === "start" ? resizeStartTo(y, taskEnd, config, pxPerMinute) : taskStart;
-          const newEnd =
-            edge === "end" ? resizeEndTo(y, taskStart, config, pxPerMinute) : taskEnd;
-          updateTask(task.id, {
-            plannedStart: newStart,
-            plannedEnd: newEnd,
-            // 同步预计时长（秒），保持任务详情「预计」与时间轴块时长一致
-            estimatedDuration: Math.round((newEnd - newStart) / 1000),
-          });
-          setBlockPreview(null);
-        },
-      },
-      () => setBlockPreview(null),
-    );
-  }
-
-  function startMove(e: React.MouseEvent, task: Task) {
-    e.stopPropagation();
-    e.preventDefault(); // 阻止拖拽过程中选中文字
-    blockDragRef.current = false;
-    const origStart = task.plannedStart!;
-    const origEnd = task.plannedEnd!;
-    const startY = yFromClientY(e.clientY);
-    const startX = e.clientX;
-    const startLayout = laneSpans.get(task.id);
-
-    // 指针是否已移出时间轴区域（松开 = 移出时间轴，仅清空计划时间，不删除任务）
-    const isOutside = (ev: MouseEvent) => {
-      const rect = taskAreaRef.current!.getBoundingClientRect();
-      return !(
-        ev.clientX >= rect.left &&
-        ev.clientX <= rect.right &&
-        ev.clientY >= rect.top &&
-        ev.clientY <= rect.bottom
-      );
-    };
-
-    startWindowDrag(
-      {
-        onMove: (ev) => {
-          // 仅当位移 >4px 才算「真实拖动」：纯点击（含 <4px 手抖）不置抑制标记，
-          // 松手后的 click 正常选中任务 → Detail Panel 可靠切换。
-          if (
-            Math.hypot(ev.clientX - startX, ev.clientY - startY) > 4
-          ) {
-            blockDragRef.current = true;
-            lastDraggedBlockRef.current = task.id;
-          }
-          const removing = isOutside(ev);
-          const deltaY = yFromClientY(ev.clientY) - startY;
-          const { startMs, endMs } = moveTaskBy(origStart, origEnd, deltaY, config, pxPerMinute);
-          // 横向换栏：按当前块宽估算目标栏（仅多栏组内有效）
-          if (startLayout && startLayout.laneCount > 1) {
-            const laneW =
-              taskAreaRef.current!.getBoundingClientRect().width / startLayout.laneCount;
-            const deltaX = ev.clientX - startX;
-            const target = Math.min(
-              startLayout.laneCount - 1,
-              Math.max(0, startLayout.lane - 1 + Math.round(deltaX / laneW)),
-            );
-            dragLaneRef.current = { taskId: task.id, lane: target };
-            setDragLane(dragLaneRef.current);
-          } else {
-            dragLaneRef.current = null;
-            setDragLane(null);
-          }
-          setBlockPreview({ taskId: task.id, startMs, endMs, removing });
-        },
-        onUp: (ev) => {
-          if (isOutside(ev)) {
-            updateTask(task.id, { plannedStart: null, plannedEnd: null });
-          } else {
-            const deltaY = yFromClientY(ev.clientY) - startY;
-            const { startMs, endMs } = moveTaskBy(origStart, origEnd, deltaY, config, pxPerMinute);
-            updateTask(task.id, { plannedStart: startMs, plannedEnd: endMs });
-            // 保存换栏偏好（会话内），时间长度不变
-            const lane = dragLaneRef.current;
-            if (lane && lane.taskId === task.id) {
-              lanePrefRef.current.set(task.id, lane.lane);
-            }
-          }
-          dragLaneRef.current = null;
-          setDragLane(null);
-          setBlockPreview(null);
-        },
-      },
-      () => {
-        dragLaneRef.current = null;
-        setDragLane(null);
-        setBlockPreview(null);
-      },
-    );
-  }
-
-  /** 拖动范围分割线（开始/结束）→ 实时预览，松手写回设置。 */
-  function startRangeDrag(e: React.MouseEvent, edge: "start" | "end") {
-    if (e.button !== 0) return;
-    e.preventDefault();
-    e.stopPropagation();
-    startWindowDrag(
-      {
-        onMove: (ev) => {
-          const y = yFromClientY(ev.clientY);
-          const m = Math.round(yToMinutes(y, pxPerMinute) / snap) * snap;
-          if (edge === "start") {
-            const ns = Math.min(Math.max(m, 0), effEnd - 60);
-            setRangeOverride({ startMinutes: ns, endMinutes: effEnd });
-          } else {
-            const ne = Math.min(Math.max(m, effStart + 60), FULL_DAY_MINUTES);
-            setRangeOverride({ startMinutes: effStart, endMinutes: ne });
-          }
-        },
-        onUp: (ev) => {
-          const y = yFromClientY(ev.clientY);
-          const m = Math.round(yToMinutes(y, pxPerMinute) / snap) * snap;
-          if (edge === "start") {
-            void updateSettings({ timelineStartMinutes: Math.min(Math.max(m, 0), effEnd - 60) });
-          } else {
-            void updateSettings({ timelineEndMinutes: Math.min(Math.max(m, effStart + 60), FULL_DAY_MINUTES) });
-          }
-          setRangeOverride(null);
-        },
-      },
-      () => setRangeOverride(null),
-    );
-  }
-
   const scheduledTasks = tasks.filter(
     (t) => t.plannedStart != null && t.plannedEnd != null,
   );
 
-  // 分栏：以「预览位置」参与计算，拖拽/缩放/拖入悬停时实时重排
   const laneSpans = useMemo(() => {
     const spans: TimeSpan[] = scheduledTasks.map((t) => {
       const isPreviewing = blockPreview?.taskId === t.id;
@@ -506,10 +175,11 @@ export default function Timeline() {
     }
     const prefer = (id: number): number | undefined => {
       if (dragLane && dragLane.taskId === id) return dragLane.lane;
-      return lanePrefRef.current.get(id);
+      return interactions.getPreferredLane(id);
     };
     return computeLanes(spans, prefer);
-  }, [scheduledTasks, blockPreview, dropPreview, dragLane]);
+  }, [scheduledTasks, blockPreview, dropPreview, dragLane, interactions]);
+  laneSpansRef.current = laneSpans;
 
   const maxLaneCount = useMemo(
     () => Array.from(laneSpans.values()).reduce((m, l) => Math.max(m, l.laneCount), 0),
@@ -529,7 +199,6 @@ export default function Timeline() {
   const todayStart = startOfToday();
   const timelineStartTs = todayStart + effStart * 60 * 1000;
   const timelineEndTs = todayStart + effEnd * 60 * 1000;
-  // 红色「当前时间线」仅今天显示；查看历史/未来日期时隐藏
   const showNowLine =
     selectedDate === todayString() && now >= timelineStartTs && now < timelineEndTs;
 
@@ -540,117 +209,34 @@ export default function Timeline() {
 
   return (
     <div ref={scrollRef} className="h-full overflow-auto">
-      {/* 缩放控制（sticky 固定顶部，滚动时保持可见） */}
-      <div className="sticky top-0 z-40 flex items-center justify-end gap-1 border-b border-border-subtle glass-surface px-2 py-1">
-        <span className="text-xs text-text-faint">缩放</span>
-        <button
-          onClick={() => zoom(-1)}
-          className="rounded border border-border-subtle bg-surface px-1.5 text-xs text-text-muted hover:bg-surface-hover"
-          aria-label="缩小时间轴"
-        >
-          −
-        </button>
-        <span className="w-8 text-center text-xs tabular-nums text-text-secondary">
-          {pxPerMinute.toFixed(1)}
-        </span>
-        <button
-          onClick={() => zoom(1)}
-          className="rounded border border-border-subtle bg-surface px-1.5 text-xs text-text-muted hover:bg-surface-hover"
-          aria-label="放大时间轴"
-        >
-          ＋
-        </button>
-      </div>
+      <TimelineToolbar
+        startMinutes={effStart}
+        endMinutes={effEnd}
+        pxPerMinute={pxPerMinute}
+        onZoom={zoom}
+      />
 
       <div
         className="flex"
         style={{ height: totalHeight, minWidth: Math.max(maxLaneCount * MIN_LANE_WIDTH, 0) }}
       >
-        {/* 左侧时间刻度（sticky 固定左侧，不随横向滚动移走） */}
-        <div className="sticky left-0 z-10 w-14 shrink-0 glass-surface">
-          {/* 非整点 15 分钟刻度线（浅色，辅助判断非整点时刻） */}
-          {quarterTicks.map((m) => (
-            <div
-              key={m}
-              className="absolute right-0 h-2 w-3 border-t border-border-strong/80"
-              style={{ top: minutesToY(m, pxPerMinute) }}
-            />
-          ))}
-          {/* 整点标签（明显层级） */}
-          {hours.map((m) => (
-            <span
-              key={m}
-              className="absolute right-2 -translate-y-1/2 text-xs font-medium tabular-nums text-text-muted"
-              style={{ top: minutesToY(m, pxPerMinute) }}
-            >
-              {formatMinutes(m)}
-            </span>
-          ))}
-        </div>
+        <TimelineScale pxPerMinute={pxPerMinute} />
 
-        {/* 任务区（可拖拽创建 / 任务块可移动、调整 / 横向换栏 / 便签拖入） */}
         <div
           ref={taskAreaRef}
-          onMouseDown={handleMouseDown}
+          onMouseDown={interactions.handleCanvasMouseDown}
           data-note-drop="timeline"
           className="relative flex-1 cursor-crosshair select-none"
         >
-            {/* 范围外灰色（早于开始 / 晚于结束） */}
-            <div
-              className="pointer-events-none absolute left-0 right-0 bg-surface-muted/70"
-              style={{ top: 0, height: minutesToY(effStart, pxPerMinute) }}
-            />
-            <div
-              className="pointer-events-none absolute left-0 right-0 bg-surface-muted/70"
-              style={{
-                top: minutesToY(effEnd, pxPerMinute),
-                height: totalHeight - minutesToY(effEnd, pxPerMinute),
-              }}
+            <TimelineGrid
+              startMinutes={effStart}
+              endMinutes={effEnd}
+              snapMinutes={snap}
+              pxPerMinute={pxPerMinute}
+              totalHeight={totalHeight}
+              onRangeDrag={interactions.startRangeDrag}
             />
 
-            {/* 吸附粒度细线 */}
-            {minorTicks.map((m) => (
-              <div
-                key={m}
-                className="absolute left-0 right-0 border-t border-border-subtle/60"
-                style={{ top: minutesToY(m, pxPerMinute) }}
-              />
-            ))}
-
-            {/* 整点线 */}
-            {hours.map((m) => (
-              <div
-                key={m}
-                className="absolute left-0 right-0 border-t border-border-subtle"
-                style={{ top: minutesToY(m, pxPerMinute) }}
-              />
-            ))}
-
-            {/* 范围开始分割线（可拖动） */}
-            <div
-              onMouseDown={(e) => startRangeDrag(e, "start")}
-              className="group absolute left-0 right-0 z-30 -translate-y-1/2 cursor-ns-resize"
-              style={{ top: minutesToY(effStart, pxPerMinute) }}
-            >
-              <div className="h-1.5 w-full bg-border-strong/60 transition-colors group-hover:bg-text-secondary/70" />
-              <span className="absolute left-1 top-0 -translate-y-full rounded bg-accent px-1 text-[10px] text-on-accent">
-                {formatMinutes(effStart)}
-              </span>
-            </div>
-
-            {/* 范围结束分割线（可拖动） */}
-            <div
-              onMouseDown={(e) => startRangeDrag(e, "end")}
-              className="group absolute left-0 right-0 z-30 -translate-y-1/2 cursor-ns-resize"
-              style={{ top: minutesToY(effEnd, pxPerMinute) }}
-            >
-              <div className="h-1.5 w-full bg-border-strong/60 transition-colors group-hover:bg-text-secondary/70" />
-              <span className="absolute left-1 top-1 rounded bg-accent px-1 text-[10px] text-on-accent">
-                {formatMinutes(effEnd)}
-              </span>
-            </div>
-
-            {/* 任务块（可整体移动 / 调整上、下边缘 / 横向换栏） */}
             {scheduledTasks.map((task) => {
               const isPreviewing = blockPreview?.taskId === task.id;
               const isRemoving = isPreviewing && !!blockPreview?.removing;
@@ -664,7 +250,6 @@ export default function Timeline() {
               );
               if (!clamped) return null;
               const { top, height } = clamped;
-              const showCategory = height >= 40 && task.categoryId != null;
               const categoryName =
                 task.categoryId != null
                   ? (categoryNameMap.get(task.categoryId) ?? "")
@@ -683,120 +268,35 @@ export default function Timeline() {
                   : NO_CATEGORY_COLOR;
               // 视觉状态（拖拽/调整中不套用状态样式，避免干扰）
               const state = isPreviewing ? "normal" : taskBlockState(task.status);
-              const info = blockInfoLevel(height);
               const selected = task.id === selectedTaskId;
               return (
-                <div
+                <TimelineTaskBlock
                   key={task.id}
-                  onMouseDown={(e) => startMove(e, task)}
-                  onClick={() => {
-                    // 仅当本块自身刚被拖动（拖拽尾随 click）时抑制选中，
-                    // 其余 click（含拖动后点击其他块）一律更新选择 → Detail Panel 同步。
-                    if (blockDragRef.current && lastDraggedBlockRef.current === task.id) {
-                      blockDragRef.current = false;
-                      lastDraggedBlockRef.current = null;
-                      return;
-                    }
-                    blockDragRef.current = false;
-                    lastDraggedBlockRef.current = null;
-                    openTaskDetail(task.id); // 单击任务块 → 右侧详情面板（含重复点击同一块）
-                  }}
-                  onDoubleClick={() => handleTaskDoubleClick(task)}
-                  className={`group absolute cursor-grab select-none overflow-hidden rounded text-xs active:cursor-grabbing ${
-                    isRemoving
-                      ? "bg-red-200 text-red-900 ring-2 ring-red-500"
-                      : state === "running"
-                        ? "text-text-primary ring-2 ring-blue-400/80"
-                        : state === "completed"
-                          ? "text-text-primary/80 opacity-75"
-                          : state === "cancelled"
-                            ? "opacity-40"
-                            : "text-text-primary hover:brightness-95"
-                  } ${
-                    selected
-                      ? "z-10 ring-2 ring-accent/50"
-                      : ""
-                  } ${laneStyle ? "" : "left-1 right-1"}`}
-                  style={{
+                  view={{
+                    id: task.id,
+                    title: task.title,
+                    notes: task.notes,
+                    categoryName,
+                    state,
                     top,
                     height,
-                    backgroundColor: isRemoving ? undefined : `${color}26`,
-                    borderLeft: isRemoving ? undefined : `3px solid ${color}`,
-                    ...laneStyle,
+                    startMs,
+                    endMs,
+                    color,
+                    selected,
+                    isPreviewing,
+                    isRemoving,
+                    laneStyle,
                   }}
-                >
-                  {/* 上边缘手柄（调整 plannedStart） */}
-                  <div
-                    onMouseDown={(e) => startResize(e, task, "start")}
-                    title="拖动调整开始时间"
-                    className="absolute left-0 right-0 top-0 z-10 h-2 cursor-ns-resize"
-                  />
-                  <div className="px-2 py-1">
-                    {showCategory && (
-                      <div className="truncate text-[10px] leading-tight opacity-70">
-                        {categoryName}
-                      </div>
-                    )}
-                    {/* 标题行：状态标记 + 标题 + 转便签手柄 */}
-                    <div className="flex items-center gap-1">
-                      {state === "running" && (
-                        <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-blue-500" />
-                      )}
-                      {state === "completed" && (
-                        <span className="shrink-0 text-[10px] font-medium text-green-600">✓</span>
-                      )}
-                      <span
-                        className={`truncate ${
-                          state === "completed" || state === "cancelled"
-                            ? "line-through decoration-text-faint"
-                            : ""
-                        }`}
-                      >
-                        {task.title}
-                      </span>
-                      <span
-                        onMouseDown={(e) => startTaskToNoteDrag(e, task.id)}
-                        className="ml-auto shrink-0 cursor-grab text-text-faint opacity-0 transition-opacity hover:text-amber-600 group-hover:opacity-100"
-                        title="拖到便签区转为便签"
-                        aria-label="转为便签"
-                      >
-                        <StickyNote size={12} />
-                      </span>
-                    </div>
-                    {/* 时间行（块够高时显示开始-结束） */}
-                    {info.showTime && (
-                      <div className="mt-0.5 truncate text-[10px] leading-tight tabular-nums text-text-secondary">
-                        {formatTimeRange(startMs, endMs)}
-                      </div>
-                    )}
-                    {/* 描述行（块足够高且有备注时显示） */}
-                    {info.showNotes && task.notes && (
-                      <div className="mt-0.5 truncate text-[10px] leading-tight text-text-muted">
-                        {task.notes}
-                      </div>
-                    )}
-                  </div>
-                  {/* 下边缘手柄（调整 plannedEnd，hover 高亮） */}
-                  <div
-                    onMouseDown={(e) => startResize(e, task, "end")}
-                    title="拖动调整结束时间"
-                    className="group absolute bottom-0 left-0 right-0 z-10 h-2.5 cursor-ns-resize"
-                  >
-                    <div className="h-full w-full transition-colors group-hover:bg-blue-200/70" />
-                  </div>
-                  {/* 实时时间（移动/resize 时显示） */}
-                  {isPreviewing && !isRemoving && (
-                    <span className="absolute left-0 top-1/2 z-20 -translate-y-1/2 whitespace-nowrap rounded-sm bg-blue-500 px-1 text-[10px] text-white">
-                      {formatTimeRange(startMs, endMs)}
-                    </span>
-                  )}
-                  {/* 拖出提示（松开将移出时间轴，任务保留） */}
-                  {isRemoving && (
-                    <span className="pointer-events-none absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded bg-red-500 px-1 text-[10px] font-medium text-white">
-                      松开移出时间轴
-                    </span>
-                  )}
-                </div>
+                  onMoveStart={(event) => interactions.startMove(event, task)}
+                  onOpen={() => {
+                    if (interactions.shouldOpenTask(task.id)) openTaskDetail(task.id);
+                  }}
+                  onFocus={() => handleTaskDoubleClick(task)}
+                  onResizeStart={(event) => interactions.startResize(event, task, "start")}
+                  onResizeEnd={(event) => interactions.startResize(event, task, "end")}
+                  onMoveToInbox={() => void convertToNote(task.id)}
+                />
               );
             })}
 

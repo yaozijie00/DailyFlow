@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { log } from "../lib/startupLog";
 
 interface Props {
   children: ReactNode;
@@ -21,10 +22,7 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     try {
-      // 动态引入避免循环依赖
-      void import("../lib/startupLog").then((m) =>
-        m.log(`React ErrorBoundary: ${error.message}\n${info.componentStack ?? ""}`),
-      );
+      void log(`React ErrorBoundary: ${error.message}\n${info.componentStack ?? ""}`);
     } catch {
       /* ignore */
     }

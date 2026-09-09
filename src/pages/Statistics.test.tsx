@@ -23,6 +23,7 @@ function makeOverview(overrides: Partial<OverviewStatistics> = {}): OverviewStat
     dailyFocus: [],
     dailyCompletedTasks: [],
     estimateRowCount: 0,
+    untrackedEstimateCount: 0,
     estimatedTotalSeconds: 0,
     actualTotalSeconds: 0,
     estimateRows: [],
@@ -140,8 +141,8 @@ describe("Statistics 页面（统计 + 成就 Tab）", () => {
     render(<Statistics />);
     expect(screen.getByText("总投入")).toBeTruthy();
     expect(screen.getByText("专注次数")).toBeTruthy();
-    expect(screen.getByText("完成任务")).toBeTruthy();
-    expect(screen.getByText("完成率")).toBeTruthy();
+    expect(screen.getByText("期间完成任务")).toBeTruthy();
+    expect(screen.getByText("新建任务完成率")).toBeTruthy();
     expect(screen.getByText("60%")).toBeTruthy(); // 完成率 0.6
     expect(screen.getByText("开发")).toBeTruthy(); // 最常类别
   });

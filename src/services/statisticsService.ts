@@ -100,6 +100,8 @@ export interface OverviewStatistics {
   dailyCompletedTasks: { date: string; count: number }[];
   /** 区间内完成任务数（预计>0 或实际>0，预计 vs 实际 对比样本） */
   estimateRowCount: number;
+  /** 有预计时长但没有任何实际投入记录的完成任务数，不进入准确率计算。 */
+  untrackedEstimateCount: number;
   /** 区间内完成任务预计时长合计（秒，estimatedDuration） */
   estimatedTotalSeconds: number;
   /** 区间内完成任务实际专注合计（秒，task.actualDuration 累计） */
@@ -300,14 +302,17 @@ export class StatisticsService {
     // 实际取任务累计 actualDuration（真实 Focus Session 落库值，不推算）。
     let estimatedTotalSeconds = 0;
     let actualTotalSeconds = 0;
+    let untrackedEstimateCount = 0;
     const estimateRows: OverviewStatistics["estimateRows"] = [];
     for (const t of completedTasks) {
       const est = t.estimatedDuration ?? 0;
       const act = t.actualDuration ?? 0;
-      estimatedTotalSeconds += est;
-      actualTotalSeconds += act;
-      if (est > 0 || act > 0) {
+      if (act > 0) {
+        estimatedTotalSeconds += est;
+        actualTotalSeconds += act;
         estimateRows.push({ title: t.title, estimatedSeconds: est, actualSeconds: act });
+      } else if (est > 0) {
+        untrackedEstimateCount += 1;
       }
     }
     estimateRows.sort(
@@ -332,6 +337,7 @@ export class StatisticsService {
       dailyFocus,
       dailyCompletedTasks,
       estimateRowCount: estimateRows.length,
+      untrackedEstimateCount,
       estimatedTotalSeconds,
       actualTotalSeconds,
       estimateRows,

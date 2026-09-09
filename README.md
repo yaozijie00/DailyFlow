@@ -16,6 +16,7 @@
 - **撤销/重做**：任务/便签/目标/项目创建、编辑、删除、拖动、转换等全操作可撤销；删除后 Toast 一键撤销
 - **窗口行为**：系统托盘常驻（含打开 今日/长期/统计）；关闭行为可配置（退出 / 隐藏到托盘）
 - **设置**：通用/外观/分类/快捷键/通知/专注/数据/关于；备份与恢复、快捷键录制与冲突检测
+- **扩展平台**：内置课程表与 Workflow；能力声明、错误隔离、独立设置入口、按扩展隔离的 JSON 存储与版本迁移
 
 ## 技术栈
 
@@ -47,6 +48,8 @@ npm run tauri build  # 生成安装包（NSIS，Windows）
 
 ```bash
 npm test             # 运行全部单元/组件测试（Vitest）
+npm run tauri:e2e    # 启动测试专用桌面配置
+npm run qa:tauri:e2e # 连接真实 WebView2 执行关键流程回归
 ```
 
 ## 项目结构
@@ -66,7 +69,7 @@ src-tauri/           # Rust 后端（Tauri 命令 + SQLite 插件）
 
 ## 数据存储
 
-数据默认保存在安装目录下的 `data/`（`dailyflow.db`），备份在 `data/backups/`，图片缓存在 `data/cache/`。可在「设置 → 存储」中自定义路径。
+Windows 下数据默认保存在 `%LOCALAPPDATA%\DailyFlow\`（主库为 `dailyflow.db`），备份位于其 `backups/`，图片缓存位于 `cache/`。可在“设置 → 存储”中自定义路径。
 
 ## License
 

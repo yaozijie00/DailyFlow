@@ -1,12 +1,16 @@
 import type { ComponentType } from "react";
+import { getDb } from "../db/db";
+import { createExtensionStorage } from "./storage";
 import {
-  EXTENSION_API_VERSION,
+  getExtensionCompatibilityError,
   validateManifest,
   type ActivatedExtension,
   type CoreContext,
   type ExtensionContributions,
+  type ExtensionCapability,
   type ExtensionManifest,
   type ExtensionModule,
+  type ExtensionSettingsContribution,
   type ExtensionSlotId,
 } from "./types";
 
@@ -33,19 +37,208 @@ interface LoadedEntry {
   deactivate?: (ctx: CoreContext) => void | Promise<void>;
 }
 
+export interface ExtensionDiagnostic {
+  extensionId: string;
+  phase: "load" | "activate" | "deactivate";
+  message: string;
+}
+
+type ExtensionCleanup = () => void | Promise<void>;
+
 const loaded: LoadedEntry[] = [];
 const activated = new Map<string, ActivatedExtension>();
+const cleanups = new Map<string, Set<ExtensionCleanup>>();
+const lifecycleChains = new Map<string, Promise<void>>();
+const diagnostics: ExtensionDiagnostic[] = [];
 let hostCtx: CoreContext | null = null;
+
+function recordDiagnostic(diagnostic: ExtensionDiagnostic): void {
+  diagnostics.push(diagnostic);
+  if (diagnostics.length > 100) diagnostics.shift();
+}
+
+function requireCapability(
+  capabilities: ReadonlySet<ExtensionCapability>,
+  capability: ExtensionCapability,
+): void {
+  if (!capabilities.has(capability)) {
+    throw new Error(`扩展缺少 ${capability} 权限`);
+  }
+}
+
+/** 按 Manifest 能力收窄宿主 API；用于运行时强制任务读写与旧数据访问边界。 */
+export function scopeContextCapabilities(
+  ctx: CoreContext,
+  declared: readonly ExtensionCapability[],
+): CoreContext {
+  const capabilities = new Set(declared);
+  return {
+    ...ctx,
+    tasks: {
+      create: async (input) => {
+        requireCapability(capabilities, "tasks.write");
+        return ctx.tasks.create(input);
+      },
+      createWithId: async (input) => {
+        requireCapability(capabilities, "tasks.write");
+        return ctx.tasks.createWithId(input);
+      },
+      complete: async (taskId) => {
+        requireCapability(capabilities, "tasks.write");
+        return ctx.tasks.complete(taskId);
+      },
+      listByIds: async (ids) => {
+        requireCapability(capabilities, "tasks.read");
+        return ctx.tasks.listByIds(ids);
+      },
+      listByDate: async (date) => {
+        requireCapability(capabilities, "tasks.read");
+        return ctx.tasks.listByDate(date);
+      },
+    },
+    storage: capabilities.has("storage.extension") ? ctx.storage : undefined,
+    legacy: capabilities.has("legacy.read") ? ctx.legacy : undefined,
+  };
+}
+
+function createScopedContext(entry: LoadedEntry): CoreContext {
+  const ctx = hostCtx;
+  if (!ctx) throw new Error("Extension Host Context 尚未初始化");
+  const capableCtx = scopeContextCapabilities(ctx, entry.manifest.capabilities);
+  const owned = new Set<ExtensionCleanup>();
+  cleanups.set(entry.id, owned);
+  return {
+    ...capableCtx,
+    storage: entry.manifest.capabilities.includes("storage.extension")
+      ? createExtensionStorage(getDb(), entry.id)
+      : undefined,
+    events: {
+      ...capableCtx.events,
+      subscribe: (domain, listener) => {
+        const unsubscribe = capableCtx.events.subscribe(domain, listener);
+        owned.add(unsubscribe);
+        return () => {
+          owned.delete(unsubscribe);
+          unsubscribe();
+        };
+      },
+    },
+    lifecycle: {
+      onDispose: (cleanup) => {
+        owned.add(cleanup);
+        return () => owned.delete(cleanup);
+      },
+    },
+  };
+}
+
+async function callDeactivate(entry: LoadedEntry, ctx: CoreContext): Promise<void> {
+  if (!entry.deactivate) return;
+  try {
+    await entry.deactivate(ctx);
+  } catch (error) {
+    recordDiagnostic({
+      extensionId: entry.id,
+      phase: "deactivate",
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+async function disposeScoped(id: string): Promise<void> {
+  const owned = cleanups.get(id);
+  cleanups.delete(id);
+  if (!owned) return;
+  for (const cleanup of [...owned].reverse()) {
+    try {
+      await cleanup();
+    } catch (error) {
+      recordDiagnostic({
+        extensionId: id,
+        phase: "deactivate",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+}
+
+function runSerialized(id: string, operation: () => Promise<void>): Promise<void> {
+  const previous = lifecycleChains.get(id) ?? Promise.resolve();
+  const current = previous.catch(() => undefined).then(operation);
+  lifecycleChains.set(id, current);
+  const release = () => {
+    if (lifecycleChains.get(id) === current) lifecycleChains.delete(id);
+  };
+  void current.then(release, release);
+  return current;
+}
+
+/** 校验 UI 贡献边界，防止扩展覆盖 Core 路由或占用其它扩展的页面地址。 */
+export function validateContributions(
+  extensionId: string,
+  contributions: ExtensionContributions,
+  existingRoutes: ReadonlyMap<string, string>,
+): string | null {
+  const nav = contributions.nav;
+  if (!nav && contributions.Page) return "提供 Page 时必须同时声明 nav";
+  if (nav && !contributions.Page) return "声明 nav 时必须同时提供 Page";
+  if (nav) {
+    if (!nav.page.startsWith("ext:")) return "扩展页面路由必须以 ext: 开头";
+    const owner = existingRoutes.get(nav.page);
+    if (owner && owner !== extensionId) return `路由 ${nav.page} 已被扩展 ${owner} 占用`;
+  }
+  const settingIds = new Set<string>();
+  for (const setting of contributions.settings ?? []) {
+    const id = setting.id.trim();
+    if (!id || !setting.label.trim()) return "扩展设置分组 ID 与名称不能为空";
+    if (settingIds.has(id)) return `扩展设置分组 ID 重复：${id}`;
+    settingIds.add(id);
+  }
+  return null;
+}
+
+/** UI 扩展点也必须由 manifest 显式申请，避免静默获得新入口。 */
+export function validateContributionCapabilities(
+  declared: readonly ExtensionCapability[],
+  contributions: ExtensionContributions,
+): string | null {
+  const capabilities = new Set(declared);
+  if ((contributions.nav || contributions.Page) && !capabilities.has("ui.page")) {
+    return "扩展页面贡献需要声明 ui.page 能力";
+  }
+  if (contributions.slots?.today && !capabilities.has("ui.today-slot")) {
+    return "今日页面槽位贡献需要声明 ui.today-slot 能力";
+  }
+  if ((contributions.settings?.length ?? 0) > 0 && !capabilities.has("ui.settings")) {
+    return "扩展设置贡献需要声明 ui.settings 能力";
+  }
+  return null;
+}
 
 /** 逐个激活（异常隔离）；init（可选异步初始化）先于 activate 执行，失败仅标记该扩展 error。 */
 async function activateEntry(entry: LoadedEntry): Promise<void> {
-  const ctx = hostCtx;
-  if (!ctx) return; // Context 尚未注入（Core 启动流程保证先 init 再激活）
+  if (!hostCtx) return; // Context 尚未注入（Core 启动流程保证先 init 再激活）
+  if (activated.has(entry.id)) await callDeactivate(entry, hostCtx);
+  await disposeScoped(entry.id);
+  const ctx = createScopedContext(entry);
   try {
     if (entry.init) {
       await entry.init(ctx);
     }
     const contributions: ExtensionContributions = entry.activate(ctx) ?? {};
+    const routes = new Map<string, string>();
+    for (const active of activated.values()) {
+      if (active.id !== entry.id && active.contributions.nav) {
+        routes.set(active.contributions.nav.page, active.id);
+      }
+    }
+    const contributionError = validateContributions(entry.id, contributions, routes);
+    if (contributionError) throw new Error(contributionError);
+    const capabilityError = validateContributionCapabilities(
+      entry.manifest.capabilities,
+      contributions,
+    );
+    if (capabilityError) throw new Error(capabilityError);
     activated.set(entry.id, {
       id: entry.id,
       manifest: entry.manifest,
@@ -53,11 +246,15 @@ async function activateEntry(entry: LoadedEntry): Promise<void> {
       error: null,
     });
   } catch (e) {
+    await callDeactivate(entry, ctx);
+    await disposeScoped(entry.id);
+    const message = e instanceof Error ? e.message : String(e);
+    recordDiagnostic({ extensionId: entry.id, phase: "activate", message });
     activated.set(entry.id, {
       id: entry.id,
       manifest: entry.manifest,
       contributions: {},
-      error: e instanceof Error ? e.message : String(e),
+      error: message,
     });
   }
 }
@@ -69,23 +266,20 @@ async function activateEntry(entry: LoadedEntry): Promise<void> {
  * 未加载/未激活的 id 为安全 no-op。
  */
 export async function deactivate(id: string): Promise<void> {
-  const ctx = hostCtx;
-  const entry = loaded.find((e) => e.id === id);
-  if (entry?.deactivate && ctx) {
-    try {
-      await entry.deactivate(ctx);
-    } catch {
-      // 停用钩子异常不阻塞停用（数据保留优先）
-    }
-  }
-  activated.delete(id);
+  await runSerialized(id, async () => {
+    const ctx = hostCtx;
+    const entry = loaded.find((e) => e.id === id);
+    if (entry && ctx) await callDeactivate(entry, ctx);
+    await disposeScoped(id);
+    activated.delete(id);
+  });
 }
 
 /** 重新激活单个（启用时或设置页「重试」用；需已注入 Context）。 */
 export async function reactivate(id: string): Promise<void> {
   const entry = loaded.find((e) => e.id === id);
   if (!entry) return;
-  await activateEntry(entry);
+  await runSerialized(id, () => activateEntry(entry));
 }
 
 /**
@@ -101,8 +295,24 @@ export async function loadAll(ctx?: CoreContext): Promise<void> {
     try {
       const mod = ((await builtinLoaders[path]()) ?? {}) as Partial<ExtensionModule>;
       const manifest = validateManifest(mod.manifest);
-      if (!manifest || manifest.apiVersion !== EXTENSION_API_VERSION) continue;
+      if (!manifest) {
+        recordDiagnostic({ extensionId: path, phase: "load", message: "扩展清单格式无效" });
+        continue;
+      }
+      const compatibilityError = getExtensionCompatibilityError(manifest);
+      if (compatibilityError) {
+        recordDiagnostic({ extensionId: manifest.id, phase: "load", message: compatibilityError });
+        continue;
+      }
       if (typeof mod.activate !== "function") continue;
+      if (loaded.some((entry) => entry.id === manifest.id)) {
+        recordDiagnostic({
+          extensionId: manifest.id,
+          phase: "load",
+          message: `扩展 ID 重复：${manifest.id}`,
+        });
+        continue;
+      }
       loaded.push({
         id: manifest.id,
         manifest,
@@ -110,7 +320,12 @@ export async function loadAll(ctx?: CoreContext): Promise<void> {
         ...(typeof mod.init === "function" ? { init: mod.init } : {}),
         ...(typeof mod.deactivate === "function" ? { deactivate: mod.deactivate } : {}),
       });
-    } catch {
+    } catch (error) {
+      recordDiagnostic({
+        extensionId: path,
+        phase: "load",
+        message: error instanceof Error ? error.message : String(error),
+      });
       // 单个模块加载失败：跳过（后续可重试），不影响启动
     }
   }
@@ -119,6 +334,10 @@ export async function loadAll(ctx?: CoreContext): Promise<void> {
 /** 当前宿主 Context（Extension UI 组件取用 Core API；未注入时为 null）。 */
 export function getHostContext(): CoreContext | null {
   return hostCtx;
+}
+
+export function getExtensionDiagnostics(): ExtensionDiagnostic[] {
+  return [...diagnostics];
 }
 
 /* ---- 课程成就数据 Provider：Core 成就引擎经 Host 查询（不直接依赖课程扩展） ---- */
@@ -233,6 +452,30 @@ export function getSlotComponents(slot: ExtensionSlotId): Array<{
     if (act.error) continue;
     const Component = act.contributions.slots?.[slot];
     if (Component) out.push({ id: act.id, Component });
+  }
+  return out;
+}
+
+/** 所有激活扩展贡献的设置分组；宿主使用 extensionId + id 生成全局稳定键。 */
+export function getSettingsContributions(): Array<{
+  extensionId: string;
+  extensionName: string;
+  contribution: ExtensionSettingsContribution;
+}> {
+  const out: Array<{
+    extensionId: string;
+    extensionName: string;
+    contribution: ExtensionSettingsContribution;
+  }> = [];
+  for (const act of activated.values()) {
+    if (act.error) continue;
+    for (const contribution of act.contributions.settings ?? []) {
+      out.push({
+        extensionId: act.id,
+        extensionName: act.manifest.name,
+        contribution,
+      });
+    }
   }
   return out;
 }

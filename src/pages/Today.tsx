@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Bell, Plus, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { Bell, Plus, PanelRightClose, PanelRightOpen, Inbox } from "lucide-react";
 import { useAppStore } from "../stores/appStore";
 import { useSettingsStore } from "../stores/settingsStore";
 import { useTaskStore } from "../stores/taskStore";
@@ -19,6 +19,8 @@ import { useEnabledSlotComponents, ExtensionErrorBoundary } from "../extensions/
 import { computeReminderSummary, hasAnyReminder } from "../lib/dayWarnings";
 import NoteList from "../components/notes/NoteList";
 import CalendarPopover from "../components/today/CalendarPopover";
+import { useNoteStore } from "../stores/noteStore";
+import { shouldOverlayTodayDetail } from "../lib/layoutBreakpoints";
 
 // 布局固定尺寸（与 className 保持一致）
 const TASK_LIST_WIDTH = 288; // w-72（含右侧 pr-4 间距，取整避免时间轴过挤）
@@ -42,6 +44,8 @@ function readSavedWidth(): number {
 export default function Today() {
   const dbStatus = useAppStore((s) => s.dbStatus);
   const settings = useSettingsStore((s) => s.settings);
+  const notes = useNoteStore((s) => s.notes);
+  const loadNotes = useNoteStore((s) => s.load);
   const tasks = useTaskStore((s) => s.tasks);
   const overdue = useTaskStore((s) => s.overdue);
   const load = useTaskStore((s) => s.load);
@@ -51,7 +55,9 @@ export default function Today() {
   const detailOpenSeq = useTaskStore((s) => s.detailOpenSeq);
   const selectedDate = useTaskStore((s) => s.selectedDate);
   const setSelectedDate = useTaskStore((s) => s.setSelectedDate);
-  const [showDetail, setShowDetail] = useState(true);
+  // 详情按需展开，把首屏宽度优先留给任务与时间轴。
+  const [showDetail, setShowDetail] = useState(false);
+  const [showInbox, setShowInbox] = useState(settings.todayShowNotes);
   const loadedDateRef = useRef(todayString());
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -101,7 +107,7 @@ export default function Today() {
     const el = containerRef.current;
     if (!el) return;
     const measure = () => {
-      const overlay = el.clientWidth < 1180;
+      const overlay = shouldOverlayTodayDetail(el.clientWidth);
       setDetailOverlay(overlay);
       // 浮层模式：提醒不横排占列（走页头铃铛入口浮层）；
       // 横排模式：仅当详情未开且空间不足（挤到时间轴下限）时收提醒
@@ -165,9 +171,14 @@ export default function Today() {
   useEffect(() => {
     if (dbStatus === "ready") {
       load();
+      void loadNotes();
       loadedDateRef.current = todayString();
     }
-  }, [load, dbStatus]);
+  }, [load, loadNotes, dbStatus]);
+
+  useEffect(() => {
+    setShowInbox(settings.todayShowNotes);
+  }, [settings.todayShowNotes]);
 
   // 查看「今天」时加载昨日未完成（逾期结转横幅）；切到历史日期则清空
   useEffect(() => {
@@ -238,6 +249,22 @@ export default function Today() {
         }
         actions={
           <>
+            <button
+              onClick={() => setShowInbox((value) => !value)}
+              aria-expanded={showInbox}
+              aria-controls="today-inbox"
+              className={`flex h-9 items-center gap-1.5 rounded-md border px-2.5 text-xs transition-colors ${
+                showInbox
+                  ? "border-accent/30 bg-accent-soft text-accent"
+                  : "border-border-subtle bg-surface text-text-secondary hover:bg-surface-hover"
+              }`}
+            >
+              <Inbox size={15} />
+              收集箱
+              <span className="rounded-full bg-surface-muted px-1.5 tabular-nums text-text-muted">
+                {notes.filter((note) => note.status === "active").length}
+              </span>
+            </button>
             {showRail && railNarrow && (
               <button
                 onClick={() => setRailOpen((v) => !v)}
@@ -284,7 +311,7 @@ export default function Today() {
       )}
 
       {/* 今日信息行：左侧 节日 + 统计（左对齐，与时间轴窗口左缘一致） */}
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-3">
         <TodayFestival date={selectedDate} />
         <TodaySummary />
       </div>
@@ -324,8 +351,9 @@ export default function Today() {
             )}
           </div>
           {/* 便签区：固定高度、独立滚动（可在设置中隐藏；次级面板窄窗自动收缩高度） */}
-          {settings.todayShowNotes && (
+          {showInbox && (
             <div
+              id="today-inbox"
               className={`shrink-0 overflow-y-auto pt-1 transition-[max-height] duration-200 ${
                 detailOverlay ? "max-h-32" : "max-h-44"
               }`}

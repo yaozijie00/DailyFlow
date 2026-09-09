@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import NoteList from "./NoteList";
 import type { Note } from "../../db/repositories/noteRepository";
+import { todayString } from "../../lib/date";
 
 afterEach(cleanup);
 
@@ -17,12 +18,20 @@ const mockState = vi.hoisted(() => ({
   remove: vi.fn(),
 }));
 
+const taskMock = vi.hoisted(() => ({
+  createScheduledTask: vi.fn(),
+  convertToNote: vi.fn(),
+}));
+
 vi.mock("../../stores/noteStore", () => ({
   useNoteStore: (selector: (s: unknown) => unknown) => selector(mockState),
 }));
 vi.mock("../../stores/appStore", () => ({
   useAppStore: (selector: (s: unknown) => unknown) =>
     selector({ dbStatus: "ready", pushToast: vi.fn() }),
+}));
+vi.mock("../../stores/taskStore", () => ({
+  useTaskStore: (selector: (s: unknown) => unknown) => selector(taskMock),
 }));
 
 function makeNote(overrides: Partial<Note> = {}): Note {
@@ -47,6 +56,9 @@ describe("NoteList（便签区）", () => {
     mockState.complete.mockClear();
     mockState.remove.mockClear();
     mockState.load.mockClear();
+    taskMock.createScheduledTask.mockReset();
+    taskMock.createScheduledTask.mockResolvedValue(true);
+    taskMock.convertToNote.mockReset();
   });
 
   it("空状态提示", () => {
@@ -78,6 +90,22 @@ describe("NoteList（便签区）", () => {
     render(<NoteList />);
     fireEvent.click(screen.getByLabelText("完成便签"));
     expect(mockState.complete).toHaveBeenCalledWith(1);
+  });
+
+  it("可直接安排到今日，无需依赖拖拽", async () => {
+    mockState.notes = [makeNote()];
+    render(<NoteList />);
+    fireEvent.click(screen.getByLabelText("安排到今日"));
+    await vi.waitFor(() => {
+      expect(taskMock.createScheduledTask).toHaveBeenCalledWith({
+        title: "设计背包 UI",
+        categoryId: null,
+        scheduledDate: todayString(),
+        plannedStart: null,
+        plannedEnd: null,
+      });
+      expect(mockState.update).toHaveBeenCalledWith(1, { status: "arranged" });
+    });
   });
 
   it("hover 操作：删除便签", async () => {

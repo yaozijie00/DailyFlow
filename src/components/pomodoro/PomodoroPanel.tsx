@@ -161,7 +161,11 @@ export default function PomodoroPanel() {
 
       {/* 开始前的本次参数（仅 IDLE 专注阶段显示；只作用于本次，不写回 Settings 默认值） */}
       {snapshot.state === "IDLE" && !isBreak && (
-        <div className="mb-4 space-y-2 rounded-md bg-surface-muted p-3">
+        <details className="mb-4 rounded-md bg-surface-muted">
+          <summary className="cursor-pointer select-none px-3 py-2 text-sm text-text-secondary">
+            本次设置 · {sliderValue} 分钟 · {focusCountGoal} 个番茄
+          </summary>
+          <div className="space-y-2 border-t border-border-subtle px-3 pb-3 pt-2">
           <div className="flex items-center gap-3 text-sm">
             <span className="w-14 shrink-0 text-text-muted">专注时长</span>
             <input
@@ -261,9 +265,10 @@ export default function PomodoroPanel() {
             </button>
           </div>
           <p className="text-[11px] text-text-faint">
-            以上只作用于本次专注；默认值在「设置 → 默认」中调整。
+            以上只作用于本次专注；默认值在「设置 → 专注默认值」中调整。
           </p>
-        </div>
+          </div>
+        </details>
       )}
 
       {/* 结果视图 */}

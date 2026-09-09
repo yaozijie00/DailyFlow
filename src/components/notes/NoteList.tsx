@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { StickyNote, Check, X, Plus, RotateCcw } from "lucide-react";
+import { StickyNote, Check, X, Plus, RotateCcw, CalendarPlus } from "lucide-react";
 import { useNoteStore } from "../../stores/noteStore";
 import { useTaskStore } from "../../stores/taskStore";
 import { useAppStore } from "../../stores/appStore";
@@ -10,11 +10,14 @@ import {
   noteDropZoneAt,
   taskToNoteDrag,
   taskToNoteDropCallbacks,
+  convertNoteToTask,
 } from "../../lib/noteConvert";
+import { undoManager } from "../../lib/undoManager";
+import { todayString } from "../../lib/date";
 import type { Note } from "../../db/repositories/noteRepository";
 
 /** 便签项：hover 显示操作；双击文字进入编辑；按住拖动到任务列表/时间轴。 */
-function NoteItem({ note }: { note: Note }) {
+function NoteItem({ note, onArrange }: { note: Note; onArrange: (id: number) => void }) {
   const update = useNoteStore((s) => s.update);
   const complete = useNoteStore((s) => s.complete);
   const remove = useNoteStore((s) => s.remove);
@@ -106,6 +109,20 @@ function NoteItem({ note }: { note: Note }) {
           {note.title}
         </button>
       )}
+      {!arranged && (
+        <button
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onArrange(note.id);
+          }}
+          aria-label="安排到今日"
+          title="安排到今日"
+          className="shrink-0 rounded p-0.5 text-accent/75 hover:bg-accent-soft hover:text-accent"
+        >
+          <CalendarPlus size={14} />
+        </button>
+      )}
       <span className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
         {arranged && (
           <button
@@ -151,6 +168,8 @@ export default function NoteList() {
   const create = useNoteStore((s) => s.create);
   const load = useNoteStore((s) => s.load);
   const clearArranged = useNoteStore((s) => s.clearArranged);
+  const update = useNoteStore((s) => s.update);
+  const createScheduledTask = useTaskStore((s) => s.createScheduledTask);
   const convertToNote = useTaskStore((s) => s.convertToNote);
   const [draft, setDraft] = useState("");
   const [showArranged, setShowArranged] = useState(false);
@@ -194,6 +213,25 @@ export default function NoteList() {
     setDraft("");
   };
 
+  const arrangeToday = (noteId: number) => {
+    void undoManager.withBatchAsync(() =>
+      convertNoteToTask(
+        noteId,
+        notes,
+        ({ title, categoryId, plannedStart, plannedEnd }) =>
+          createScheduledTask({
+            title,
+            categoryId,
+            scheduledDate: todayString(),
+            plannedStart,
+            plannedEnd,
+          }),
+        update,
+        { scheduledDate: todayString() },
+      ),
+    );
+  };
+
   return (
     <div
       data-note-drop="notelist"
@@ -203,7 +241,7 @@ export default function NoteList() {
     >
       <div className="mb-1.5 flex items-center gap-1 text-xs text-text-muted">
         <StickyNote size={12} className="text-amber-500" />
-        <span className="font-medium">便签</span>
+        <span className="font-medium">收集箱</span>
         <span className="truncate text-text-faint">暂时没安排时间，但不能忘记</span>
       </div>
 
@@ -236,7 +274,7 @@ export default function NoteList() {
           {activeNotes.length > 0 && (
             <ul className="space-y-1">
               {activeNotes.map((n) => (
-                <NoteItem key={n.id} note={n} />
+                <NoteItem key={n.id} note={n} onArrange={arrangeToday} />
               ))}
             </ul>
           )}
@@ -269,7 +307,7 @@ export default function NoteList() {
               {showArranged && (
                 <ul className="mt-1 space-y-1">
                   {arrangedNotes.map((n) => (
-                    <NoteItem key={n.id} note={n} />
+                    <NoteItem key={n.id} note={n} onArrange={arrangeToday} />
                   ))}
                 </ul>
               )}

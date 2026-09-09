@@ -1,11 +1,11 @@
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use serde::{Deserialize, Serialize};
 use tauri::Emitter;
 use tauri::Manager;
 use windows_core::PCWSTR;
@@ -109,18 +109,19 @@ async fn open_mini_window(app: tauri::AppHandle) -> Result<(), String> {
     // 表现为「创建新窗口」日志后无下文 + Mini 白屏/主窗消失。
     let url = "index.html";
     append_startup_log(&format!("open_mini_window: 创建新窗口 url={url}"));
-    let win = WebviewWindowBuilder::new(&app, MINI_WINDOW_LABEL, tauri::WebviewUrl::App(url.into()))
-        .title("DailyFlow Mini")
-        .inner_size(360.0, 560.0)
-        .resizable(false)
-        .always_on_top(true)
-        .skip_taskbar(true)
-        .decorations(false)
-        .build()
-        .map_err(|e| {
-            append_startup_log(&format!("open_mini_window: 创建失败 {e}"));
-            e.to_string()
-        })?;
+    let win =
+        WebviewWindowBuilder::new(&app, MINI_WINDOW_LABEL, tauri::WebviewUrl::App(url.into()))
+            .title("DailyFlow Mini")
+            .inner_size(360.0, 560.0)
+            .resizable(false)
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .decorations(false)
+            .build()
+            .map_err(|e| {
+                append_startup_log(&format!("open_mini_window: 创建失败 {e}"));
+                e.to_string()
+            })?;
     append_startup_log("open_mini_window: 创建成功，show()");
     win.show().map_err(|e| {
         append_startup_log(&format!("open_mini_window: show 失败 {e}"));
@@ -200,7 +201,8 @@ fn setup_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
     let open_goals = MenuItem::with_id(app, "open_goals", "打开长期", true, None::<&str>)?;
     let open_stats = MenuItem::with_id(app, "open_statistics", "打开统计", true, None::<&str>)?;
     let open_mini = MenuItem::with_id(app, "open_mini", "切换迷你窗", true, None::<&str>)?;
-    let toggle_item = MenuItem::with_id(app, "toggle_focus", "开始 / 暂停专注", true, None::<&str>)?;
+    let toggle_item =
+        MenuItem::with_id(app, "toggle_focus", "开始 / 暂停专注", true, None::<&str>)?;
     let quit_item = MenuItem::with_id(app, "quit", "退出 DailyFlow", true, None::<&str>)?;
     let menu = Menu::with_items(
         app,
@@ -326,6 +328,7 @@ fn dailyflow_data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     if !cfg.data_dir.trim().is_empty() {
         let dir = PathBuf::from(cfg.data_dir.trim());
         fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        recover_interrupted_restore(&dir)?;
         return Ok(dir);
     }
     let target = default_data_dir()?; // %LOCALAPPDATA%\DailyFlow（已创建）
@@ -344,19 +347,20 @@ fn dailyflow_data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
                             legacy.display()
                         ));
                         fs::create_dir_all(&legacy).map_err(|e| e.to_string())?;
+                        recover_interrupted_restore(&legacy)?;
                         return Ok(legacy);
                     }
                 }
             }
         }
     }
+    recover_interrupted_restore(&target)?;
     Ok(target)
 }
 
 /// 启动自诊断使用的数据目录（不依赖 AppHandle，始终 %LOCALAPPDATA%\DailyFlow）。
 fn default_data_dir() -> Result<PathBuf, String> {
-    let local = std::env::var("LOCALAPPDATA")
-        .map_err(|e| format!("无法获取 LOCALAPPDATA：{e}"))?;
+    let local = std::env::var("LOCALAPPDATA").map_err(|e| format!("无法获取 LOCALAPPDATA：{e}"))?;
     let dir = Path::new(&local).join("DailyFlow");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir)
@@ -446,7 +450,9 @@ fn probe_webview2_env_async() {
     use webview2_com::Microsoft::Web::WebView2::Win32::{
         CreateCoreWebView2EnvironmentWithOptions, ICoreWebView2EnvironmentOptions,
     };
-    use webview2_com::{CoreWebView2EnvironmentOptions, CreateCoreWebView2EnvironmentCompletedHandler};
+    use webview2_com::{
+        CoreWebView2EnvironmentOptions, CreateCoreWebView2EnvironmentCompletedHandler,
+    };
 
     std::thread::spawn(move || {
         unsafe {
@@ -507,8 +513,7 @@ fn probe_webview2_env_async() {
             };
             if has != 0 {
                 unsafe {
-                    let _ =
-                        windows_sys::Win32::UI::WindowsAndMessaging::TranslateMessage(&msg);
+                    let _ = windows_sys::Win32::UI::WindowsAndMessaging::TranslateMessage(&msg);
                     windows_sys::Win32::UI::WindowsAndMessaging::DispatchMessageW(&msg);
                 }
             } else {
@@ -612,6 +617,22 @@ fn is_safe_backup_name(name: &str) -> bool {
         && !name.contains('\\')
 }
 
+fn is_safe_snapshot_name(name: &str) -> bool {
+    (name.starts_with("DailyFlow_Backup_")
+        || name.starts_with("DailyFlow_BeforeRestore_")
+        || name.starts_with("DailyFlow_PreMigration_"))
+        && name.ends_with(".db")
+        && !name.contains('/')
+        && !name.contains('\\')
+}
+
+fn is_safe_pending_name(name: &str) -> bool {
+    name.ends_with(".db.pending")
+        && !name.contains('/')
+        && !name.contains('\\')
+        && is_safe_snapshot_name(name.trim_end_matches(".pending"))
+}
+
 /// 返回备份目录绝对路径。
 #[tauri::command]
 fn backups_dir(app: tauri::AppHandle) -> Result<String, String> {
@@ -653,12 +674,98 @@ fn delete_backup(app: tauri::AppHandle, backup_name: String) -> Result<(), Strin
     remove_if_exists(&format!("{backup_name}.course"))
 }
 
-/// 两阶段原子替换（B3/恢复一致性加固）：
-/// 1. 把主库备份与（可选的）伴生课程库备份都复制到同目录 tmp（不替换目标）；
-///    任一复制失败 → 清理已生成的 tmp，主库/课程库保持原状（无半恢复状态）。
-/// 2. 全部复制成功后，依次 rename 覆盖目标（同卷 rename 原子）。
-///    rename 失败时清理残留 tmp 并报错（rename 失败概率远低于 copy，且不产生半文件）。
-/// @param main_db 主库目标与备份源；(course_db, course_backup) 存在时同时替换伴生课程库。
+/// 删除未发布的备份快照。主库和伴生库都按同一暂存名管理。
+#[tauri::command]
+fn delete_staged_backup(app: tauri::AppHandle, pending_name: String) -> Result<(), String> {
+    if !is_safe_pending_name(&pending_name) {
+        return Err("非法的暂存备份文件名".into());
+    }
+    let dir = resolve_backups_dir(&app)?;
+    for name in [&pending_name, &format!("{pending_name}.course")] {
+        match fs::remove_file(dir.join(name)) {
+            Ok(_) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(e.to_string()),
+        }
+    }
+    Ok(())
+}
+
+/// 将完整暂存快照发布为可见备份。伴生库发布失败时撤回主库发布。
+#[tauri::command]
+fn publish_backup(
+    app: tauri::AppHandle,
+    pending_name: String,
+    backup_name: String,
+) -> Result<(), String> {
+    if !is_safe_pending_name(&pending_name) || !is_safe_snapshot_name(&backup_name) {
+        return Err("非法的备份文件名".into());
+    }
+    let dir = resolve_backups_dir(&app)?;
+    let pending = dir.join(&pending_name);
+    let published = dir.join(&backup_name);
+    let pending_course = dir.join(format!("{pending_name}.course"));
+    let published_course = dir.join(format!("{backup_name}.course"));
+    if !pending.is_file() {
+        return Err("暂存备份不存在".into());
+    }
+    if published.exists() || published_course.exists() {
+        return Err("备份文件已存在".into());
+    }
+
+    fs::rename(&pending, &published).map_err(|e| e.to_string())?;
+    if pending_course.is_file() {
+        if let Err(e) = fs::rename(&pending_course, &published_course) {
+            let rollback = fs::rename(&published, &pending);
+            return Err(match rollback {
+                Ok(_) => e.to_string(),
+                Err(re) => format!("发布伴生备份失败：{e}；撤回主备份也失败：{re}"),
+            });
+        }
+    }
+    Ok(())
+}
+
+fn recover_interrupted_restore(data_dir: &Path) -> Result<(), String> {
+    let journal = data_dir.join("dailyflow.restore-journal");
+    if !journal.is_file() {
+        return Ok(());
+    }
+    let state = fs::read_to_string(&journal).map_err(|e| e.to_string())?;
+    let main_existed = state.contains("main_existed=1");
+    let course_existed = state.contains("course_existed=1");
+    let db_path = data_dir.join("dailyflow.db");
+    let course_path = data_dir.join("course-schedule.db");
+    let db_old = data_dir.join("dailyflow.db.restore-old");
+    let course_old = data_dir.join("course-schedule.db.restore-old");
+
+    if main_existed {
+        fs::copy(&db_old, &db_path).map_err(|e| format!("恢复主库回滚副本失败：{e}"))?;
+    } else {
+        let _ = fs::remove_file(&db_path);
+    }
+    if course_existed {
+        fs::copy(&course_old, &course_path).map_err(|e| format!("恢复课程库回滚副本失败：{e}"))?;
+    } else {
+        let _ = fs::remove_file(&course_path);
+    }
+
+    for path in [
+        data_dir.join("dailyflow.db.restore-tmp"),
+        data_dir.join("course-schedule.db.restore-tmp"),
+        db_old,
+        course_old,
+        data_dir.join("dailyflow.db-wal"),
+        data_dir.join("dailyflow.db-shm"),
+        data_dir.join("course-schedule.db-wal"),
+        data_dir.join("course-schedule.db-shm"),
+    ] {
+        let _ = fs::remove_file(path);
+    }
+    fs::remove_file(journal).map_err(|e| e.to_string())
+}
+
+/// 带回滚日志的双文件替换。任一步失败会恢复旧版本；进程中断则在下次初始化时恢复。
 fn stage_and_swap_restore_files(
     main_db: (&std::path::Path, &std::path::Path),
     course: Option<(&std::path::Path, &std::path::Path)>,
@@ -667,8 +774,15 @@ fn stage_and_swap_restore_files(
     let data_dir = db_path.parent().ok_or("主库路径缺少父目录")?;
     let db_tmp = data_dir.join("dailyflow.db.restore-tmp");
     let course_tmp = data_dir.join("course-schedule.db.restore-tmp");
+    let db_old = data_dir.join("dailyflow.db.restore-old");
+    let course_old = data_dir.join("course-schedule.db.restore-old");
+    let journal = data_dir.join("dailyflow.restore-journal");
 
-    // 阶段 1：全部复制到 tmp（任何失败 → 清理并整体中止，目标未动）
+    recover_interrupted_restore(data_dir)?;
+    let main_existed = db_path.is_file();
+    let course_existed = course.map(|(p, _)| p.is_file()).unwrap_or(false);
+
+    // 阶段 1：准备完整新文件和旧版本回滚副本，尚未修改目标。
     if let Some((_cp, cb)) = course {
         fs::copy(cb, &course_tmp).map_err(|e| e.to_string())?;
     }
@@ -676,18 +790,50 @@ fn stage_and_swap_restore_files(
         let _ = fs::remove_file(&course_tmp);
         return Err(e.to_string());
     }
+    if main_existed {
+        fs::copy(db_path, &db_old).map_err(|e| e.to_string())?;
+    }
+    if let Some((cp, _)) = course {
+        if course_existed {
+            if let Err(e) = fs::copy(cp, &course_old) {
+                let _ = fs::remove_file(&db_tmp);
+                let _ = fs::remove_file(&course_tmp);
+                let _ = fs::remove_file(&db_old);
+                return Err(e.to_string());
+            }
+        }
+    }
+    fs::write(
+        &journal,
+        format!(
+            "main_existed={}\ncourse_existed={}\n",
+            u8::from(main_existed),
+            u8::from(course_existed)
+        ),
+    )
+    .map_err(|e| e.to_string())?;
 
-    // 阶段 2：全部就绪后统一 rename（主库先、伴生后；wal/shm 清理由调用方完成）
+    // 阶段 2：依次发布；任意失败都按日志恢复两个旧文件。
     if let Err(e) = fs::rename(&db_tmp, db_path) {
-        let _ = fs::remove_file(&db_tmp);
-        let _ = fs::remove_file(&course_tmp);
-        return Err(e.to_string());
+        let recovery = recover_interrupted_restore(data_dir);
+        return Err(match recovery {
+            Ok(_) => e.to_string(),
+            Err(re) => format!("主库替换失败：{e}；自动回滚失败：{re}"),
+        });
     }
     if let Some((cp, _cb)) = course {
         if let Err(e) = fs::rename(&course_tmp, cp) {
-            let _ = fs::remove_file(&course_tmp);
-            return Err(e.to_string());
+            let recovery = recover_interrupted_restore(data_dir);
+            return Err(match recovery {
+                Ok(_) => e.to_string(),
+                Err(re) => format!("课程库替换失败：{e}；自动回滚失败：{re}"),
+            });
         }
+    }
+    // 先删除日志表示提交完成，再清理回滚副本。反向顺序会在崩溃时留下无副本的日志。
+    fs::remove_file(&journal).map_err(|e| e.to_string())?;
+    for path in [&db_old, &course_old, &db_tmp, &course_tmp] {
+        let _ = fs::remove_file(path);
     }
     Ok(())
 }
@@ -713,7 +859,10 @@ fn restore_backup(app: tauri::AppHandle, backup_name: String) -> Result<(), Stri
         .is_file()
         .then(|| (data.join("course-schedule.db"), course_backup.clone()));
 
-    stage_and_swap_restore_files((&db_path, &src), course.as_ref().map(|(p, b)| (p.as_path(), b.as_path())))?;
+    stage_and_swap_restore_files(
+        (&db_path, &src),
+        course.as_ref().map(|(p, b)| (p.as_path(), b.as_path())),
+    )?;
 
     // 替换成功后清理 WAL/SHM 残留（主库与伴生课程库）
     let _ = fs::remove_file(data.join("dailyflow.db-wal"));
@@ -789,8 +938,11 @@ fn set_storage_paths(
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
-    std::fs::write(&path, serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?)
-        .map_err(|e| e.to_string())?;
+    std::fs::write(
+        &path,
+        serde_json::to_string_pretty(&cfg).map_err(|e| e.to_string())?,
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -863,7 +1015,9 @@ fn open_with_default(path: &str) -> Result<(), String> {
     if code > 32 {
         Ok(())
     } else if code == 31 {
-        Err(format!("没有程序可以打开该文件/文件夹（无默认关联）：{path}"))
+        Err(format!(
+            "没有程序可以打开该文件/文件夹（无默认关联）：{path}"
+        ))
     } else {
         Err(format!("打开失败（系统错误码 {code}）：{path}"))
     }
@@ -880,9 +1034,7 @@ fn workflow_launch_process(
     if !exe.is_file() {
         return Err(format!("程序不存在：{executable}"));
     }
-    let args: Vec<String> = arguments
-        .map(|a| split_args(&a))
-        .unwrap_or_default();
+    let args: Vec<String> = arguments.map(|a| split_args(&a)).unwrap_or_default();
     let mut cmd = std::process::Command::new(&exe);
     cmd.args(&args);
     if let Some(wd) = working_directory {
@@ -924,10 +1076,7 @@ fn show_startup_error(message: &str) {
         .encode_utf16()
         .chain(std::iter::once(0))
         .collect();
-    let msg: Vec<u16> = message
-        .encode_utf16()
-        .chain(std::iter::once(0))
-        .collect();
+    let msg: Vec<u16> = message.encode_utf16().chain(std::iter::once(0)).collect();
     unsafe {
         windows_sys::Win32::UI::WindowsAndMessaging::MessageBoxW(
             std::ptr::null_mut(),
@@ -966,9 +1115,14 @@ pub fn run() {
         if rt_ok {
             // 设置环境变量，使探测结果与实际运行一致（Tauri 随后也会设置）
             std::env::set_var("WEBVIEW2_BROWSER_EXECUTABLE_FOLDER", &rt);
-            append_startup_log(&format!("WEBVIEW2_BROWSER_EXECUTABLE_FOLDER={}", rt.display()));
+            append_startup_log(&format!(
+                "WEBVIEW2_BROWSER_EXECUTABLE_FOLDER={}",
+                rt.display()
+            ));
         } else {
-            append_startup_log("WEBVIEW2_BROWSER_EXECUTABLE_FOLDER 未设置（固定运行时缺失，将回退系统运行时）");
+            append_startup_log(
+                "WEBVIEW2_BROWSER_EXECUTABLE_FOLDER 未设置（固定运行时缺失，将回退系统运行时）",
+            );
         }
     } else {
         append_startup_log("无法解析 exe 目录");
@@ -1045,6 +1199,8 @@ pub fn run() {
             backups_dir,
             list_backups,
             delete_backup,
+            delete_staged_backup,
+            publish_backup,
             restore_backup,
             append_log,
             get_storage_paths,
@@ -1113,15 +1269,9 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let f = dir.join("probe.tmp");
         std::fs::write(&f, b"x").unwrap();
-        assert_eq!(
-            super::workflow_path_exists(f.to_string_lossy().to_string()).unwrap(),
-            true
-        );
+        assert!(super::workflow_path_exists(f.to_string_lossy().to_string()).unwrap());
         let missing = dir.join("nope.tmp");
-        assert_eq!(
-            super::workflow_path_exists(missing.to_string_lossy().to_string()).unwrap(),
-            false
-        );
+        assert!(!super::workflow_path_exists(missing.to_string_lossy().to_string()).unwrap());
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -1153,7 +1303,10 @@ mod tests {
     #[test]
     fn split_args_keeps_quoted_spaces_together() {
         // 无引号：按空白切
-        assert_eq!(super::split_args("--background --no-splash"), vec!["--background", "--no-splash"]);
+        assert_eq!(
+            super::split_args("--background --no-splash"),
+            vec!["--background", "--no-splash"]
+        );
         // 引号包裹的空格参数作为一个整体
         assert_eq!(
             super::split_args("--out \"C:\\My Folder\\a b.png\" -v"),
@@ -1216,8 +1369,14 @@ mod tests {
         std::fs::write(dst.join("dailyflow.db"), b"existing-newer").unwrap();
 
         super::copy_dir_skip_existing(&src, &dst).unwrap();
-        assert_eq!(std::fs::read(dst.join("dailyflow.db")).unwrap(), b"existing-newer");
-        assert_eq!(std::fs::read(dst.join("sub").join("nested.txt")).unwrap(), b"nested");
+        assert_eq!(
+            std::fs::read(dst.join("dailyflow.db")).unwrap(),
+            b"existing-newer"
+        );
+        assert_eq!(
+            std::fs::read(dst.join("sub").join("nested.txt")).unwrap(),
+            b"nested"
+        );
         let _ = std::fs::remove_dir_all(&base);
     }
 
@@ -1234,7 +1393,10 @@ mod tests {
 
         super::copy_dir_skip_existing(&legacy, &target).unwrap();
         // 目标文件保持（不覆盖已有）
-        assert_eq!(std::fs::read(target.join("dailyflow.db")).unwrap(), b"target");
+        assert_eq!(
+            std::fs::read(target.join("dailyflow.db")).unwrap(),
+            b"target"
+        );
         let _ = std::fs::remove_dir_all(&base);
     }
 
@@ -1248,8 +1410,14 @@ mod tests {
         std::fs::write(legacy.join("backups").join("x.db"), b"x").unwrap();
 
         super::copy_dir_skip_existing(&legacy, &target).unwrap();
-        assert_eq!(std::fs::read(target.join("dailyflow.db")).unwrap(), b"legacy");
-        assert_eq!(std::fs::read(target.join("backups").join("x.db")).unwrap(), b"x");
+        assert_eq!(
+            std::fs::read(target.join("dailyflow.db")).unwrap(),
+            b"legacy"
+        );
+        assert_eq!(
+            std::fs::read(target.join("backups").join("x.db")).unwrap(),
+            b"x"
+        );
         let _ = std::fs::remove_dir_all(&base);
     }
 
@@ -1329,6 +1497,70 @@ mod tests {
         // 无 tmp 残留
         assert!(!data.join("dailyflow.db.restore-tmp").exists());
         assert!(!data.join("course-schedule.db.restore-tmp").exists());
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn stage_swap_course_publish_failure_rolls_main_back() {
+        use std::os::windows::fs::OpenOptionsExt;
+
+        let base = std::env::temp_dir().join(format!("wf_restore_locked_{}", std::process::id()));
+        let data = base.join("data");
+        let back = base.join("backups");
+        std::fs::create_dir_all(&data).unwrap();
+        std::fs::create_dir_all(&back).unwrap();
+        let db_path = data.join("dailyflow.db");
+        let course_path = data.join("course-schedule.db");
+        let main_backup = back.join("DailyFlow_Backup_x.db");
+        let course_backup = back.join("DailyFlow_Backup_x.db.course");
+        std::fs::write(&db_path, b"old-main").unwrap();
+        std::fs::write(&course_path, b"old-course").unwrap();
+        std::fs::write(&main_backup, b"new-main").unwrap();
+        std::fs::write(&course_backup, b"new-course").unwrap();
+
+        let lock = std::fs::OpenOptions::new()
+            .read(true)
+            .share_mode(0)
+            .open(&course_path)
+            .unwrap();
+        let result = super::stage_and_swap_restore_files(
+            (&db_path, &main_backup),
+            Some((&course_path, &course_backup)),
+        );
+        assert!(result.is_err());
+        assert_eq!(std::fs::read(&db_path).unwrap(), b"old-main");
+        drop(lock);
+        assert_eq!(std::fs::read(&course_path).unwrap(), b"old-course");
+        super::recover_interrupted_restore(&data).unwrap();
+        assert!(!data.join("dailyflow.restore-journal").exists());
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn interrupted_restore_is_recovered_from_journal() {
+        let base = std::env::temp_dir().join(format!("wf_restore_recover_{}", std::process::id()));
+        std::fs::create_dir_all(&base).unwrap();
+        std::fs::write(base.join("dailyflow.db"), b"new-main").unwrap();
+        std::fs::write(base.join("course-schedule.db"), b"new-course").unwrap();
+        std::fs::write(base.join("dailyflow.db.restore-old"), b"old-main").unwrap();
+        std::fs::write(base.join("course-schedule.db.restore-old"), b"old-course").unwrap();
+        std::fs::write(
+            base.join("dailyflow.restore-journal"),
+            b"main_existed=1\ncourse_existed=1\n",
+        )
+        .unwrap();
+
+        super::recover_interrupted_restore(&base).unwrap();
+        assert_eq!(
+            std::fs::read(base.join("dailyflow.db")).unwrap(),
+            b"old-main"
+        );
+        assert_eq!(
+            std::fs::read(base.join("course-schedule.db")).unwrap(),
+            b"old-course"
+        );
+        assert!(!base.join("dailyflow.restore-journal").exists());
         let _ = std::fs::remove_dir_all(&base);
     }
 }

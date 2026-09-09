@@ -85,7 +85,7 @@ export default function Statistics() {
       : Math.round(overview.completionRate * 100);
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-5">
+    <div className="df-page-wide flex flex-col gap-5">
       <PageHeader
         title="统计"
         description="基于完成的番茄钟实时聚合你的时间投入，并解锁成就。"
@@ -163,35 +163,51 @@ export default function Statistics() {
           ) : (
             <>
               {/* 核心指标 */}
-              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <div className="grid gap-4 sm:grid-cols-3">
                 <StatCard
                   label="总投入"
                   value={formatDurationCompact(overview!.totalSeconds)}
                   sub={`${overview!.completedFocusCount} 个完成番茄`}
                 />
-                <StatCard label="专注次数" value={String(overview!.sessionCount)} sub="含提前结束" />
                 <StatCard
-                  label="完成任务"
+                  label="期间完成任务"
                   value={String(overview!.taskCompleted)}
-                  sub={`未完成 ${overview!.taskIncomplete}`}
+                  sub="按完成时间统计"
                 />
-                <StatCard label="完成率" value={`${completionPct}%`} />
+                <StatCard
+                  label="新建任务完成率"
+                  value={`${completionPct}%`}
+                  sub="按区间内创建任务统计"
+                />
               </div>
 
               {/* 次要指标 */}
-              <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                <StatCard
-                  label="平均每次专注"
-                  value={formatDurationCompact(overview!.avgSessionSeconds)}
-                />
-                <StatCard label="平均每日投入" value={formatDurationCompact(overview!.avgDailySeconds)} />
-                <StatCard label="最常类别" value={overview!.topCategory ?? "—"} />
-                <StatCard
-                  label="创建任务"
-                  value={String(overview!.taskCreated)}
-                  sub={`未完成 ${overview!.taskIncomplete}`}
-                />
-              </div>
+              <details className="rounded-md border border-border-subtle glass-surface">
+                <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-text-secondary hover:text-text-primary">
+                  更多指标
+                </summary>
+                <div className="grid gap-4 border-t border-border-subtle p-4 sm:grid-cols-2 lg:grid-cols-5">
+                  <StatCard
+                    label="专注次数"
+                    value={String(overview!.sessionCount)}
+                    sub="含提前结束"
+                  />
+                  <StatCard
+                    label="平均每次专注"
+                    value={formatDurationCompact(overview!.avgSessionSeconds)}
+                  />
+                  <StatCard
+                    label="平均每日投入"
+                    value={formatDurationCompact(overview!.avgDailySeconds)}
+                  />
+                  <StatCard label="最常类别" value={overview!.topCategory ?? "—"} />
+                  <StatCard
+                    label="创建任务"
+                    value={String(overview!.taskCreated)}
+                    sub={`未完成 ${overview!.taskIncomplete}`}
+                  />
+                </div>
+              </details>
 
               {/* A6：Workflow 执行指标（区间内存在已完成/失败 run 时显示） */}
               {workflowExecution != null &&
@@ -225,15 +241,20 @@ export default function Statistics() {
               </section>
 
               {/* 预计 vs 实际（真实复盘：预计时长 vs 专注实际投入） */}
-              {overview!.estimateRowCount > 0 && (
+              {(overview!.estimateRowCount > 0 || overview!.untrackedEstimateCount > 0) && (
                 <section className="glass-surface rounded-md border border-border-subtle p-5">
                   <h2 className="mb-4 text-sm font-medium text-text-secondary">
                     预计 vs 实际
                     <span className="ml-2 text-xs font-normal text-text-faint">
-                      范围内完成任务 {overview!.estimateRowCount} 项 · 实际仅统计真实 Focus Session
+                      有效样本 {overview!.estimateRowCount} 项 · 实际仅统计真实 Focus Session
                     </span>
                   </h2>
-                  <div className="mb-4 grid grid-cols-3 gap-3">
+                  {overview!.untrackedEstimateCount > 0 && (
+                    <p className="mb-4 rounded-md bg-warning-soft px-3 py-2 text-xs text-warning">
+                      {overview!.untrackedEstimateCount} 项任务没有实际投入记录，未纳入高估或低估判断。
+                    </p>
+                  )}
+                  {overview!.estimateRowCount > 0 && <><div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <StatCard
                       label="预计合计"
                       value={formatDurationCompact(overview!.estimatedTotalSeconds)}
@@ -284,6 +305,7 @@ export default function Statistics() {
                       );
                     })}
                   </ul>
+                  </>}
                 </section>
               )}
 

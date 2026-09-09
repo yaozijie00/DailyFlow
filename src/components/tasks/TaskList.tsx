@@ -16,7 +16,6 @@ import {
 import { undoManager } from "../../lib/undoManager";
 import { formatDuration } from "../../lib/format";
 import { useLayoutModeStore } from "../../lib/layoutMode";
-import { TASK_STATUS_LABEL } from "../../lib/taskLabels";
 import { NO_CATEGORY_COLOR } from "../../lib/categoryColors";
 import { TASK_PRIORITIES, taskPriorityMeta } from "../../lib/taskPriority";
 
@@ -252,7 +251,7 @@ export default function TaskList() {
                         }
                         openTaskDetail(task.id);
                       }}
-                      className={`flex cursor-pointer select-none items-center gap-3 rounded-md border px-3 py-2 ${
+                      className={`group flex cursor-pointer select-none items-center gap-2 rounded-md border px-3 py-2 ${
                         selected
                           ? "border-accent bg-accent-soft"
                           : "border-transparent hover:bg-surface-hover"
@@ -293,17 +292,16 @@ export default function TaskList() {
                           )}
                         </AnimatePresence>
                       </button>
-                      {/* 优先级标签（Compact 隐藏：让任务名完整可读） */}
-                      {!compact && (
-                        <span
-                          className="shrink-0 rounded px-1 py-px text-[10px] font-medium leading-tight"
-                          style={{ color: pMeta.text, backgroundColor: pMeta.bg }}
-                          title={`优先级：${pMeta.label}`}
-                        >
-                          {pMeta.label}
-                        </span>
-                      )}
-                      <span className="min-w-0 flex-1">
+                      <button
+                        type="button"
+                        aria-label={`打开任务 ${task.title}`}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openTaskDetail(task.id);
+                        }}
+                        className="min-w-0 flex-1 text-left focus-visible:rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30"
+                      >
                         <span className="flex items-center gap-1.5">
                           <span
                             className="h-2 w-2 shrink-0 rounded-full"
@@ -326,7 +324,15 @@ export default function TaskList() {
                         </span>
                         {/* 副行：类别/时长/子任务（Compact 隐藏，单行任务名） */}
                         {!compact && (
-                          <span className="block truncate text-xs text-text-muted">
+                          <span className="flex min-w-0 items-center gap-1 text-xs text-text-muted">
+                            <span
+                              className="shrink-0 rounded px-1 py-px text-[10px] font-medium leading-tight"
+                              style={{ color: pMeta.text, backgroundColor: pMeta.bg }}
+                              title={`优先级：${pMeta.label}`}
+                            >
+                              {pMeta.label}
+                            </span>
+                            <span className="truncate">
                             {task.categoryId != null
                               ? (categoryMap.get(task.categoryId) ?? "")
                               : ""}
@@ -336,45 +342,42 @@ export default function TaskList() {
                             {childTasks.length > 0
                               ? `${task.categoryId != null || task.estimatedDuration != null ? " · " : ""}子任务 ${childDone}/${childTasks.length}`
                               : ""}
+                            </span>
                           </span>
                         )}
-                      </span>
-                      {/* 右侧状态文本（Compact 隐藏） */}
-                      {!compact && (
-                        <span className="shrink-0 text-xs text-text-faint">
-                          {TASK_STATUS_LABEL[task.status] ?? task.status}
+                      </button>
+                      <span className="flex shrink-0 items-center opacity-30 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                        {/* 转为便签手柄（拖到便签区） */}
+                        <span
+                          onMouseDown={(e) => startTaskToNoteDrag(e, task.id)}
+                          className="cursor-grab p-0.5 text-text-faint transition-colors hover:text-amber-500"
+                          title="拖到便签区转为便签"
+                          aria-label="转为便签"
+                        >
+                          <StickyNote size={14} />
                         </span>
-                      )}
-                      {/* 转为便签手柄（拖到便签区） */}
-                      <span
-                        onMouseDown={(e) => startTaskToNoteDrag(e, task.id)}
-                        className="shrink-0 cursor-grab text-text-faint transition-colors hover:text-amber-500"
-                        title="拖到便签区转为便签"
-                        aria-label="转为便签"
-                      >
-                        <StickyNote size={14} />
-                      </span>
-                      {/* 拖动排序手柄（与「拖入时间轴」互不干扰） */}
-                      <span
-                        draggable
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData("text/plain", String(task.id));
-                          e.stopPropagation();
-                        }}
-                        onDragOver={(e) => e.preventDefault()}
-                        onDrop={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          const fromId = Number(e.dataTransfer.getData("text/plain"));
-                          if (Number.isFinite(fromId) && fromId !== task.id) {
-                            moveTask(fromId, task.id);
-                          }
-                        }}
-                        className="shrink-0 cursor-grab text-text-faint transition-colors hover:text-text-secondary"
-                        title="拖动手柄调整顺序（拖动整行是拖入时间轴）"
-                      >
-                        <GripVertical size={14} />
+                        {/* 拖动排序手柄（与「拖入时间轴」互不干扰） */}
+                        <span
+                          draggable
+                          onMouseDown={(e) => e.stopPropagation()}
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData("text/plain", String(task.id));
+                            e.stopPropagation();
+                          }}
+                          onDragOver={(e) => e.preventDefault()}
+                          onDrop={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const fromId = Number(e.dataTransfer.getData("text/plain"));
+                            if (Number.isFinite(fromId) && fromId !== task.id) {
+                              moveTask(fromId, task.id);
+                            }
+                          }}
+                          className="cursor-grab p-0.5 text-text-faint transition-colors hover:text-text-secondary"
+                          title="拖动手柄调整顺序（拖动整行是拖入时间轴）"
+                        >
+                          <GripVertical size={14} />
+                        </span>
                       </span>
                     </div>
 

@@ -80,8 +80,8 @@ interface TaskState {
   createSubtask: (parent: Task, title: string) => Promise<void>;
   setSelectedDate: (date: string) => void;
   goToToday: () => void;
-  createTask: (input: TaskCreateInput) => Promise<void>;
-  updateTask: (id: number, input: UpdateTaskInput) => Promise<void>;
+  createTask: (input: TaskCreateInput) => Promise<boolean>;
+  updateTask: (id: number, input: UpdateTaskInput) => Promise<boolean>;
   deleteTask: (id: number) => Promise<void>;
   /** 任务 → 便签（反向拖拽）：转成 active 便签并删除任务行（保留专注历史） */
   convertToNote: (id: number) => Promise<void>;
@@ -257,8 +257,10 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       await taskService.createTask({ ...input, scheduledDate: get().selectedDate });
       set({ isCreateOpen: false });
       await get().load();
+      return true;
     } catch {
       fail("创建任务失败");
+      return false;
     }
   },
 
@@ -267,8 +269,10 @@ export const useTaskStore = create<TaskState>((set, get) => ({
       await taskService.updateTask(id, input);
       set({ editingTaskId: null });
       await get().load();
+      return true;
     } catch {
       fail("保存任务失败");
+      return false;
     }
   },
 

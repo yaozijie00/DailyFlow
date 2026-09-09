@@ -226,6 +226,9 @@ export const TASK_UNDOABLE_FIELDS = [
   "goalId",
   "scheduledDate",
   "repeatRule",
+  "projectId",
+  "parentId",
+  "courseId",
   "priority",
 ] as const;
 

@@ -7,6 +7,7 @@ import type {
 } from "../../../../db/repositories/courseRepository";
 import { extCourses, extWeeklySlots, extTaskLinks } from "./schema";
 import type { ExtDb } from "./bridge";
+import { openExtensionDb } from "./dbLoader";
 
 /**
  * 课程表 Extension 的存储仓库：所有课程数据读写都落在「扩展独立库」（ExtDb）。
@@ -15,8 +16,7 @@ import type { ExtDb } from "./bridge";
  */
 export class ExtensionCourseRepository {
   constructor(
-    private readonly getDb: () => Promise<ExtDb> = () =>
-      import("./dbLoader").then((m) => m.openExtensionDb()),
+    private readonly getDb: () => Promise<ExtDb> = () => openExtensionDb(),
   ) {}
 
   private async db(): Promise<ExtDb> {

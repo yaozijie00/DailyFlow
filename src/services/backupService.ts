@@ -12,7 +12,7 @@ const REQUIRED_TABLES = ["tasks", "categories", "focus_sessions", "settings"];
  * 数据备份 / 恢复（本地文件；A1-P0Fix-③ 起覆盖扩展独立库）。
  *
  * 备份 = 对主库执行 `VACUUM INTO`（完整单文件快照）；若课程扩展（独立库扩展）已启用，
- * 另生成伴生快照 `<name>.course`（Rust 恢复时一并替换课程库）。
+ * 另生成伴生快照 `<name>.course`。两份快照都成功后才由 Rust 发布为可见备份。
  * 恢复流程（严格顺序）：校验 → 自动备份当前 → 关闭主库与扩展库连接 → 覆盖文件 → 重载应用。
  */
 
@@ -43,51 +43,51 @@ async function snapshotMainWithCourse(absPath: string): Promise<void> {
   await snapshotTo(absPath);
   const participant = getDbBackupParticipant();
   if (participant) {
-    try {
-      const snapshotted = await participant.snapshotTo(`${absPath}.course`);
-      if (!snapshotted) {
-        // 扩展库从未打开（无数据）：无需伴生
-      }
-    } catch {
-      // 伴生快照失败不阻断主库备份（避免备份整体失败）
-    }
+    await participant.snapshotTo(`${absPath}.course`);
   }
 }
 
-/** 导出备份：生成 DailyFlow_Backup_YYYY-MM-DD.db（+课程伴生），返回主库保存的绝对路径。 */
-export async function exportBackup(): Promise<string> {
+let backupSequence = 0;
+
+function backupStamp(now = new Date()): string {
+  const pad = (n: number, width = 2) => String(n).padStart(width, "0");
+  backupSequence = (backupSequence + 1) % 1000;
+  return `${todayString()}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}_${pad(now.getMilliseconds(), 3)}_${pad(backupSequence, 3)}`;
+}
+
+async function createPublishedSnapshot(prefix: string): Promise<string> {
   const dir = await getBackupsDir();
-  const filename = `DailyFlow_Backup_${todayString()}.db`;
-  const absPath = `${dir}\\${filename}`;
-  // 同名已存在则先删除（VACUUM INTO 目标必须不存在；Rust 侧连带删 .course 伴生）
-  await invoke("delete_backup", { backupName: filename });
-  await snapshotMainWithCourse(absPath);
-  return absPath;
+  const filename = `${prefix}_${backupStamp()}.db`;
+  const pendingName = `${filename}.pending`;
+  const pendingPath = `${dir}\\${pendingName}`;
+  try {
+    await snapshotMainWithCourse(pendingPath);
+    await invoke("publish_backup", { pendingName, backupName: filename });
+    return `${dir}\\${filename}`;
+  } catch (error) {
+    try {
+      await invoke("delete_staged_backup", { pendingName });
+    } catch {
+      // 暂存清理失败不会覆盖原始错误；下次启动/发布会清理同名暂存文件。
+    }
+    throw error;
+  }
+}
+
+/** 导出备份：生成带毫秒与序号的独立文件（+课程伴生），返回主库保存的绝对路径。 */
+export async function exportBackup(): Promise<string> {
+  return createPublishedSnapshot("DailyFlow_Backup");
 }
 
 /** 恢复前自动备份当前数据（绝不无备份覆盖）。 */
 export async function backupBeforeRestore(): Promise<string> {
-  const dir = await getBackupsDir();
-  const now = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  const stamp = `${todayString()}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-  const filename = `DailyFlow_BeforeRestore_${stamp}.db`;
-  const absPath = `${dir}\\${filename}`;
-  await snapshotMainWithCourse(absPath);
-  return absPath;
+  return createPublishedSnapshot("DailyFlow_BeforeRestore");
 }
 
 /** 迁移前自动备份（最佳努力：失败不阻断迁移，迁移本身逐语句幂等可收敛）。 */
 export async function backupBeforeMigration(): Promise<string | null> {
   try {
-    const dir = await getBackupsDir();
-    const now = new Date();
-    const pad = (n: number) => String(n).padStart(2, "0");
-    const stamp = `${todayString()}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-    const filename = `DailyFlow_PreMigration_${stamp}.db`;
-    const absPath = `${dir}\\${filename}`;
-    await snapshotMainWithCourse(absPath);
-    return absPath;
+    return await createPublishedSnapshot("DailyFlow_PreMigration");
   } catch {
     return null;
   }

@@ -1,7 +1,7 @@
 [package]
 name = "dailyflow"
-version = "3.1.0"
-description = "DailyFlow - 涓汉鏈湴鏃堕棿绠＄悊宸ュ叿"
+version = "3.2.0"
+description = "DailyFlow - 个人本地时间管理工具"
 authors = ["you"]
 edition = "2021"
 

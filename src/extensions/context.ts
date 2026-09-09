@@ -6,6 +6,8 @@ import { CourseRepository } from "../db/repositories/courseRepository";
 import { TaskRepository } from "../db/repositories/taskRepository";
 import { FocusSessionRepository } from "../db/repositories/focusSessionRepository";
 import { TaskService } from "../services/taskService";
+import { getDataVersion, subscribeDataVersion } from "../lib/dataVersion";
+import { evaluateAndNotify } from "../services/achievementRuntime";
 
 /**
  * 构造 Core Context（Extension Host 属于 Core）。
@@ -20,6 +22,14 @@ export function createCoreContext(): CoreContext {
   const taskRepo = new TaskRepository(getDb());
   return {
     apiVersion: EXTENSION_API_VERSION,
+    events: {
+      getVersion: getDataVersion,
+      subscribe: subscribeDataVersion,
+    },
+    // Registry 会为每个扩展注入独立实现；该默认值便于 Context 单元测试和宿主外只读使用。
+    lifecycle: {
+      onDispose: () => () => undefined,
+    },
     tasks: {
       create: async (input) => {
         try {
@@ -76,7 +86,6 @@ export function createCoreContext(): CoreContext {
           if (st.selectedDate === updated.scheduledDate) {
             await st.load(); // 今日视图即时刷新
           }
-          const { evaluateAndNotify } = await import("../services/achievementRuntime");
           void evaluateAndNotify(); // 任务类成就即时评估
           return true;
         } catch {

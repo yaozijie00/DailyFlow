@@ -8,10 +8,12 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+.worktrees/
 dist
 dist-ssr
 *.local
 coverage
+/artifacts/
 .vite
 *.tsbuildinfo
 

@@ -4,7 +4,9 @@ import { tasks, focusSessions } from "../schema";
 import type { TaskPriority } from "../../lib/taskPriority";
 import { DEFAULT_TASK_PRIORITY } from "../../lib/taskPriority";
 
-export type Task = typeof tasks.$inferSelect;
+type StoredTask = typeof tasks.$inferSelect;
+/** Optional keeps source-compatible fixtures/extensions while old databases migrate. */
+export type Task = Omit<StoredTask, "repeatSourceId"> & { repeatSourceId?: number | null };
 
 export interface CreateTaskInput {
   title: string;
@@ -27,6 +29,8 @@ export interface CreateTaskInput {
   courseId?: number | null;
   /** 重复规则（'' 不重复 / daily / weekdays / weekly / monthly） */
   repeatRule?: string;
+  /** Stable root id for a repeated-task series. */
+  repeatSourceId?: number | null;
   /** 优先级（v2.3.x；缺省 = medium） */
   priority?: TaskPriority;
 }
@@ -58,6 +62,7 @@ export class TaskRepository {
         parentId: input.parentId ?? null,
         courseId: input.courseId ?? null,
         repeatRule: input.repeatRule ?? "",
+        repeatSourceId: input.repeatSourceId ?? null,
         priority: input.priority ?? DEFAULT_TASK_PRIORITY,
       })
       .returning()
@@ -88,6 +93,31 @@ export class TaskRepository {
       .where(eq(tasks.scheduledDate, scheduledDate))
       .orderBy(tasks.sortOrder, tasks.id)
       .all();
+  }
+
+  /** Find the one occurrence generated for a series and date. */
+  async findRepeatOccurrence(repeatSourceId: number, scheduledDate: string): Promise<Task | null> {
+    const row = await this.db
+      .select()
+      .from(tasks)
+      .where(and(eq(tasks.repeatSourceId, repeatSourceId), eq(tasks.scheduledDate, scheduledDate)))
+      .get();
+    return row ?? null;
+  }
+
+  /** Adopt a pre-series occurrence created by an older DailyFlow version. */
+  async findLegacyRepeatOccurrence(source: Task, scheduledDate: string): Promise<Task | null> {
+    const rows = await this.findByDate(scheduledDate);
+    const matches = rows.filter((row) =>
+      row.repeatSourceId == null &&
+      row.title === source.title &&
+      row.repeatRule === source.repeatRule &&
+      row.categoryId === source.categoryId &&
+      row.goalId === source.goalId &&
+      row.projectId === source.projectId
+    );
+    // 多条旧记录无法可靠判断属于哪个系列，宁可保留原记录也不错误合并两个系列。
+    return matches.length === 1 ? matches[0] : null;
   }
 
   /** 按 scheduledDate 范围 [fromDate, toDate) 查询任务（统计「每日任务」用）。 */
@@ -154,7 +184,7 @@ export class TaskRepository {
 
   /** 以原 id 重建任务行（撤销「删除任务」用；AUTOINCREMENT 接受显式 id）。 */
   async insertRestored(task: Task): Promise<void> {
-    await this.db.insert(tasks).values(task).run();
+    await this.db.insert(tasks).values({ ...task, repeatSourceId: task.repeatSourceId ?? null }).run();
   }
 
   /** 统计某日任务总数与完成数（含已取消，与任务列表口径一致），单条 SQL 实时聚合。 */

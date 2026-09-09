@@ -8,6 +8,7 @@ import WorkflowEditorView from "./components/WorkflowEditorView";
 import { workflowRunnerHost } from "./runnerHost";
 import { getHostContext } from "../../registry";
 import { todayString } from "../../../lib/date";
+import { getWorkflowPreferences } from "./preferences";
 
 type ModalMode = { kind: "create" } | { kind: "edit"; id: string } | null;
 
@@ -183,7 +184,7 @@ export default function WorkflowPage() {
     if (modal?.kind === "create") {
       const id = await create({ name: t, description: desc.trim() || undefined, tags });
       setModal(null);
-      if (id) openEditor(id);
+      if (id && getWorkflowPreferences().openEditorAfterCreate) openEditor(id);
       return;
     }
     if (modal?.kind === "edit") {

@@ -1,4 +1,5 @@
 import type { ComponentType } from "react";
+import type { DataDomain } from "../lib/dataVersion";
 
 /**
  * DailyFlow Extension Platform（v0.2 落地 · TS 原生）
@@ -7,12 +8,31 @@ import type { ComponentType } from "react";
  * - Manifest（id/name/version/apiVersion）与唯一 ID
  * - 生命周期：enabled / disabled / error（错误隔离，不阻塞 Core）
  * - Context API（版本化）：Extension 不直接访问 Core 内部，统一走注入的 CoreContext
- * - UI Extension Point：导航页贡献（独立页面）+ 页面槽位（如 Today 的「今日课程」）
+ * - UI Extension Point：导航页、页面槽位与独立设置分组
  * - 独立启用/禁用（持久化），禁用不删数据
  */
 
 /** Extension API 版本：Extension 声明兼容的版本（V1）。 */
 export const EXTENSION_API_VERSION = 1;
+
+/** Extension 可申请的宿主能力。未知能力会在加载阶段被拒绝。 */
+export const EXTENSION_CAPABILITIES = [
+  "ui.page",
+  "ui.today-slot",
+  "ui.settings",
+  "tasks.read",
+  "tasks.write",
+  "storage.core",
+  "storage.extension",
+  "legacy.read",
+] as const;
+
+export type ExtensionCapability = (typeof EXTENSION_CAPABILITIES)[number];
+
+const EXTENSION_ID_PATTERN =
+  /^[a-z0-9]+(?:-[a-z0-9]+)*(?:\.[a-z0-9]+(?:-[a-z0-9]+)*)+$/;
+const SEMVER_PATTERN =
+  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 
 export interface ExtensionManifest {
   /** 唯一 ID（不得随 UI 名称变化），如 "com.dailyflow.course-schedule" */
@@ -23,6 +43,8 @@ export interface ExtensionManifest {
   version: string;
   /** 声明的 API 兼容版本，须 === EXTENSION_API_VERSION 才会被加载 */
   apiVersion: number;
+  /** 扩展需要的宿主能力；省略时按空数组处理，兼容旧 manifest。 */
+  capabilities: ExtensionCapability[];
   author?: string;
 }
 
@@ -37,11 +59,20 @@ export interface ExtensionNavContribution {
 /** 页面槽位贡献：注册到 Core 的某个标准扩展点（第一阶段：today）。 */
 export type ExtensionSlotId = "today";
 
+/** 设置分组贡献：启用后作为独立分组显示在设置页。id 只需在本扩展内唯一。 */
+export interface ExtensionSettingsContribution {
+  id: string;
+  label: string;
+  Component: ComponentType;
+}
+
 /** Extension 激活结果：声明它向 Core UI 提供的贡献。 */
 export interface ExtensionContributions {
   nav?: ExtensionNavContribution;
   /** slot → React 组件（阶段一：today 槽位，如「今日课程」） */
   slots?: Partial<Record<ExtensionSlotId, ComponentType>>;
+  /** 可选设置分组；宿主会自动隔离渲染错误并添加扩展命名空间。 */
+  settings?: ExtensionSettingsContribution[];
   /** nav 指向的页面组件 */
   Page?: ComponentType;
 }
@@ -78,18 +109,44 @@ export interface ActivatedExtension {
 export function validateManifest(raw: unknown): ExtensionManifest | null {
   if (typeof raw !== "object" || raw === null) return null;
   const m = raw as Record<string, unknown>;
-  if (typeof m.id !== "string" || m.id.trim() === "") return null;
+  if (typeof m.id !== "string" || !EXTENSION_ID_PATTERN.test(m.id)) return null;
   if (typeof m.name !== "string" || m.name.trim() === "") return null;
-  if (typeof m.version !== "string" || m.version.trim() === "") return null;
-  if (typeof m.apiVersion !== "number") return null;
+  if (typeof m.version !== "string" || !SEMVER_PATTERN.test(m.version)) return null;
+  if (
+    typeof m.apiVersion !== "number" ||
+    !Number.isSafeInteger(m.apiVersion) ||
+    m.apiVersion < 1
+  ) return null;
+  const capabilities = m.capabilities ?? [];
+  if (!Array.isArray(capabilities)) return null;
+  const knownCapabilities = new Set<string>(EXTENSION_CAPABILITIES);
+  if (
+    capabilities.some(
+      (capability) => typeof capability !== "string" || !knownCapabilities.has(capability),
+    )
+  ) {
+    return null;
+  }
   return {
     id: m.id,
     name: m.name,
     description: typeof m.description === "string" ? m.description : "",
     version: m.version,
     apiVersion: m.apiVersion,
+    capabilities: [...new Set(capabilities)] as ExtensionCapability[],
     author: typeof m.author === "string" ? m.author : undefined,
   };
+}
+
+/** 清单格式通过后的宿主兼容性判断；返回 null 表示可以加载。 */
+export function getExtensionCompatibilityError(
+  manifest: ExtensionManifest,
+  hostApiVersion = EXTENSION_API_VERSION,
+): string | null {
+  if (manifest.apiVersion !== hostApiVersion) {
+    return `扩展需要 API ${manifest.apiVersion}，当前宿主提供 API ${hostApiVersion}`;
+  }
+  return null;
 }
 
 /* ==================== Core Context（Extension 唯一访问入口，版本化） ==================== */
@@ -105,10 +162,39 @@ export interface CoreTaskCreateInput {
   courseId?: number | null;
 }
 
+export type JsonPrimitive = string | number | boolean | null;
+export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
+
+export interface ExtensionStorageMigration {
+  version: number;
+  migrate: (storage: ExtensionStorage) => Promise<void>;
+}
+
+/** 由宿主绑定扩展 ID 的持久化入口；扩展无法指定或读取其它命名空间。 */
+export interface ExtensionStorage {
+  get: <T extends JsonValue = JsonValue>(key: string) => Promise<T | null>;
+  set: (key: string, value: JsonValue) => Promise<void>;
+  delete: (key: string) => Promise<boolean>;
+  keys: () => Promise<string[]>;
+  version: () => Promise<number>;
+  migrate: (targetVersion: number, migrations: ExtensionStorageMigration[]) => Promise<void>;
+}
+
 /** Extension 可用的 Core 能力（V1 最小集；后续按 API 版本扩展）。 */
 export interface CoreContext {
   /** 当前宿主 API 版本 */
   apiVersion: number;
+  /** 数据域失效事件。扩展可订阅 Core 变化，并在停用时由宿主自动清理。 */
+  events: {
+    getVersion: (domain: DataDomain) => number;
+    subscribe: (domain: DataDomain, listener: () => void) => () => void;
+  };
+  /** 当前激活周期的资源清理器；宿主在停用、重试和异常时统一执行。 */
+  lifecycle: {
+    onDispose: (cleanup: () => void | Promise<void>) => () => void;
+  };
+  /** 仅向声明 storage.extension 的扩展注入，并自动绑定 manifest.id。 */
+  storage?: ExtensionStorage;
   tasks: {
     /** 在指定日期创建任务；成功返回 true。与 Core 今日页创建同一语义。 */
     create: (input: CoreTaskCreateInput) => Promise<boolean>;

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useAppStore } from "../../stores/appStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { usePomodoroStore } from "../../stores/pomodoroStore";
-import { hideToTray, exitApp } from "../../services/windowBehaviorService";
+import { hideToMini, hideToTray, exitApp } from "../../services/windowBehaviorService";
 import type { CloseBehavior } from "../../services/settingsService";
 
 /**
@@ -35,9 +35,7 @@ export default function CloseBehaviorDialog() {
     if (behavior === "tray") {
       hideToTray(); // 隐藏到托盘，Focus 继续运行
     } else if (behavior === "mini") {
-      void import("../../services/windowBehaviorService").then((m) =>
-        m.hideToMini(),
-      );
+      hideToMini();
     } else if (focusRunning) {
       useAppStore.getState().openCloseDialog("exit-focus"); // 退出且 Focus 运行中 → 再确认
     } else {

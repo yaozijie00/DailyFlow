@@ -1,11 +1,11 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { X } from "lucide-react";
 import { useTaskStore } from "../../stores/taskStore";
 import { useGoalStore } from "../../stores/goalStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { formatTimeRange } from "../../lib/timeline";
 import { REPEAT_RULES } from "../../lib/repeat";
 import { TASK_PRIORITIES, taskPriorityMeta, type TaskPriority } from "../../lib/taskPriority";
+import { Dialog } from "../ui/Dialog";
 
 export default function TaskFormModal() {
   const isCreateOpen = useTaskStore((s) => s.isCreateOpen);
@@ -122,16 +122,7 @@ export default function TaskFormModal() {
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4">
-      <div className="mx-auto mt-[6vh] w-full max-w-md rounded-lg bg-bg-elevated p-6 shadow-popover">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-text-primary">
-            {editingTask ? "编辑任务" : "创建任务"}
-          </h2>
-          <button onClick={close} className="text-text-faint hover:text-text-secondary">
-            <X size={18} />
-          </button>
-        </div>
+    <Dialog open={open} onClose={close} title={editingTask ? "编辑任务" : "创建任务"}>
         <form onSubmit={handleSubmit} className="space-y-4">
           {hasDraft && (
             <div>
@@ -294,7 +285,6 @@ export default function TaskFormModal() {
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </Dialog>
   );
 }

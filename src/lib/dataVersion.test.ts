@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { renderHook, act, cleanup } from "@testing-library/react";
 import {
   bumpDataVersion,
   getDataVersion,
   useDataVersion,
+  subscribeDataVersion,
   type DataDomain,
 } from "./dataVersion";
 
@@ -53,5 +54,15 @@ describe("dataVersion 失效总线（A1-P0Fix-④）", () => {
       bumpDataVersion("task");
       bumpDataVersion("task");
     }).not.toThrow();
+  });
+
+  it("后台订阅可以主动取消", () => {
+    const listener = vi.fn();
+    const unsubscribe = subscribeDataVersion("project", listener);
+    bumpDataVersion("project");
+    expect(listener).toHaveBeenCalledTimes(1);
+    unsubscribe();
+    bumpDataVersion("project");
+    expect(listener).toHaveBeenCalledTimes(1);
   });
 });

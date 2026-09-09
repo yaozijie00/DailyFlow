@@ -2,6 +2,17 @@ import { useExtensionStore } from "../../stores/extensionStore";
 import { useExtensionRows, type ExtensionRow } from "../../extensions/host";
 import { EXTENSION_API_VERSION } from "../../extensions/types";
 
+const CAPABILITY_LABELS = {
+  "ui.page": "独立页面",
+  "ui.today-slot": "今日视图",
+  "ui.settings": "设置分组",
+  "tasks.read": "读取任务",
+  "tasks.write": "修改任务",
+  "storage.core": "主库存储",
+  "storage.extension": "扩展存储",
+  "legacy.read": "读取旧数据",
+} as const;
+
 /**
  * 设置 → 扩展（Extension Manager）：
  * 统一入口：已安装 / 状态 / 启用禁用 / API 版本 / 错误详情。
@@ -24,6 +35,21 @@ function Row({ row }: { row: ExtensionRow }) {
           </div>
           <p className="mt-0.5 truncate text-xs text-text-muted">{row.description}</p>
           <p className="mt-0.5 font-mono text-[10px] text-text-faint">{row.id}</p>
+          <div className="mt-2 flex flex-wrap gap-1" aria-label="扩展能力">
+            {row.capabilities.length > 0 ? (
+              row.capabilities.map((capability) => (
+                <span
+                  key={capability}
+                  className="rounded-full border border-border-subtle bg-surface-muted px-2 py-0.5 text-[10px] text-text-muted"
+                  title={capability}
+                >
+                  {CAPABILITY_LABELS[capability]}
+                </span>
+              ))
+            ) : (
+              <span className="text-[10px] text-text-faint">未申请宿主能力</span>
+            )}
+          </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {row.status === "error" && (

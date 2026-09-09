@@ -60,21 +60,23 @@ export async function convertNoteToTask(
     scheduledDate?: string;
     plannedStart?: number | null;
     plannedEnd?: number | null;
-  }) => Promise<void>,
-  updateNote: (id: number, input: { status: "arranged" }) => Promise<void>,
+  }) => Promise<boolean | void>,
+  updateNote: (id: number, input: { status: "arranged" }) => Promise<boolean | void>,
   options: NoteConvertOptions = {},
 ): Promise<boolean> {
   const note = notes.find((n) => n.id === noteId);
   if (!note || note.status !== "active") return false;
   try {
-    await createTask({
+    const created = await createTask({
       title: note.title,
       categoryId: note.categoryId ?? null,
       scheduledDate: options.scheduledDate,
       plannedStart: options.plannedStart ?? null,
       plannedEnd: options.plannedEnd ?? null,
     });
-    await updateNote(note.id, { status: "arranged" });
+    if (created === false) return false;
+    const updated = await updateNote(note.id, { status: "arranged" });
+    if (updated === false) return false;
     return true;
   } catch {
     return false;

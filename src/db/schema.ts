@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 /**
  * 数据模型（7 张表）+ 外键关系
@@ -43,6 +43,8 @@ export const tasks = sqliteTable("tasks", {
   goalId: integer("goal_id").references(() => goals.id, { onDelete: "set null" }),
   /** 重复规则（v1.6.2）：'' 不重复 / daily / weekdays / weekly / monthly；完成自动生成下一实例 */
   repeatRule: text("repeat_rule").notNull().default(""),
+  /** Stable identity of a repeated-task series. The first occurrence uses its own id lazily. */
+  repeatSourceId: integer("repeat_source_id"),
   /** 所属项目（v1.8 Goal→Project→Task；删除项目时置空） */
   projectId: integer("project_id").references(() => projects.id, { onDelete: "set null" }),
   /**
@@ -218,4 +220,26 @@ export const workflowRuns = sqliteTable("workflow_runs", {
   completedAt: integer("completed_at"),
   errorJson: text("error_json"),
   createdAt: integer("created_at").notNull(),
+});
+
+/** 宿主管理的扩展 JSON 键值；extension_id + key 构成隔离边界。 */
+export const extensionStorage = sqliteTable(
+  "extension_storage",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    extensionId: text("extension_id").notNull(),
+    key: text("key").notNull(),
+    valueJson: text("value_json").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("idx_extension_storage_namespace").on(table.extensionId, table.key),
+  ],
+);
+
+/** 每个扩展最近完成的数据迁移版本。 */
+export const extensionStorageMeta = sqliteTable("extension_storage_meta", {
+  extensionId: text("extension_id").primaryKey(),
+  version: integer("version").notNull().default(0),
+  updatedAt: integer("updated_at").notNull(),
 });

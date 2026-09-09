@@ -216,20 +216,7 @@ export class TaskService {
       });
       if (updated) {
         const nextDate = nextOccurrenceDate(before.scheduledDate, before.repeatRule);
-        if (nextDate) {
-          const child = await this.tasks.create({
-            title: before.title,
-            scheduledDate: nextDate,
-            categoryId: before.categoryId,
-            status: "TODO",
-            estimatedDuration: before.estimatedDuration,
-            notes: before.notes,
-            goalId: before.goalId,
-            repeatRule: before.repeatRule,
-            priority: taskPriorityMeta(before.priority).value,
-          });
-          await this.tasks.reorderByTime(child.scheduledDate);
-        }
+        if (nextDate) await this.ensureNextOccurrence(before, nextDate);
       }
       return updated;
     }
@@ -242,18 +229,8 @@ export class TaskService {
       if (updated) {
         const nextDate = nextOccurrenceDate(before.scheduledDate, before.repeatRule);
         if (nextDate) {
-          const child = await this.tasks.create({
-            title: before.title,
-            scheduledDate: nextDate,
-            categoryId: before.categoryId,
-            status: "TODO",
-            estimatedDuration: before.estimatedDuration,
-            notes: before.notes,
-            goalId: before.goalId,
-            repeatRule: before.repeatRule,
-            priority: taskPriorityMeta(before.priority).value,
-          });
-          await this.tasks.reorderByTime(child.scheduledDate);
+          const { task: child, created } = await this.ensureNextOccurrence(before, nextDate);
+          if (!created) return updated;
           const snapshot = { ...child };
           // 随外层 batch 合并：撤销完成 = 还原状态 + 删除下一实例
           undoManager.push({
@@ -270,6 +247,52 @@ export class TaskService {
       }
       return updated;
     });
+  }
+
+  /**
+   * Return the one occurrence for this series/date. The database unique index is the
+   * final concurrency guard; the legacy lookup adopts occurrences made before series ids existed.
+   */
+  private async ensureNextOccurrence(
+    before: Task,
+    nextDate: string,
+  ): Promise<{ task: Task; created: boolean }> {
+    const sourceId = before.repeatSourceId ?? before.id;
+    const existing = await this.tasks.findRepeatOccurrence(sourceId, nextDate);
+    if (existing) return { task: existing, created: false };
+
+    const legacy = await this.tasks.findLegacyRepeatOccurrence(before, nextDate);
+    if (legacy) {
+      const adopted = await this.tasks.update(legacy.id, { repeatSourceId: sourceId });
+      return { task: adopted ?? legacy, created: false };
+    }
+
+    try {
+      const child = await this.tasks.create({
+        title: before.title,
+        scheduledDate: nextDate,
+        categoryId: before.categoryId,
+        status: "TODO",
+        estimatedDuration: before.estimatedDuration,
+        plannedStart: before.plannedStart,
+        plannedEnd: before.plannedEnd,
+        notes: before.notes,
+        goalId: before.goalId,
+        projectId: before.projectId,
+        parentId: before.parentId,
+        courseId: before.courseId,
+        repeatRule: before.repeatRule,
+        repeatSourceId: sourceId,
+        priority: taskPriorityMeta(before.priority).value,
+      });
+      await this.tasks.reorderByTime(child.scheduledDate);
+      return { task: child, created: true };
+    } catch (error) {
+      // Another completion may have inserted the occurrence between our read and insert.
+      const raced = await this.tasks.findRepeatOccurrence(sourceId, nextDate);
+      if (raced) return { task: raced, created: false };
+      throw error;
+    }
   }
 
   async cancelTask(id: number): Promise<Task | null> {

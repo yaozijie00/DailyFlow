@@ -146,3 +146,18 @@ describe("TaskDetail（右侧详情面板）", () => {
     expect(screen.getByText(/完成时间/)).toBeTruthy();
   });
 });
+
+it('audit: switching tasks must not save the previous task draft into the next task', async () => {
+  mockState.updateTask.mockClear();
+  focusStatsMock.getTaskFocusStats.mockResolvedValue({totalSeconds:0,count:0,completedCount:0});
+  mockState.tasks=[makeTask({id:101,title:'Audit A',notes:'A original'}),makeTask({id:102,title:'Audit B',notes:'B original'})];
+  mockState.selectedTaskId=101;
+  const view=render(<TaskDetail/>);
+  fireEvent.click(screen.getAllByRole('button',{name:'编辑'})[0]);
+  fireEvent.change(screen.getByPlaceholderText('记录补充信息…'),{target:{value:'A draft'}});
+  mockState.selectedTaskId=102;
+  view.rerender(<TaskDetail/>);
+  const save=screen.queryByRole('button',{name:'保存'});
+  if(save) fireEvent.click(save);
+  expect(mockState.updateTask).not.toHaveBeenCalledWith(102,{notes:'A draft'});
+});

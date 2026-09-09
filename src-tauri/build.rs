@@ -16,7 +16,10 @@ fn main() {
         let dst = target_dir.join("debug").join("webview2");
         if src.join("msedgewebview2.exe").exists() && !dst.join("msedgewebview2.exe").exists() {
             match copy_tree(&src, &dst) {
-                Ok(()) => println!("cargo:warning=dev: fixed WebView2 runtime copied to {}", dst.display()),
+                Ok(()) => println!(
+                    "cargo:warning=dev: fixed WebView2 runtime copied to {}",
+                    dst.display()
+                ),
                 Err(e) => println!("cargo:warning=dev: failed to copy fixed WebView2 runtime: {e}"),
             }
         }

@@ -120,7 +120,7 @@ export default function Goals() {
   ];
 
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-4">
+    <div className="df-page-wide flex flex-col gap-4">
       <PageHeader
         title="长期"
         description="以月历规划时间跨度，以看板管理目标进度；任务关联目标后进度自动统计。"

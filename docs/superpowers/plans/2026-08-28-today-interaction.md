@@ -1,5 +1,7 @@
 # Today 交互优化（重叠分栏 / 分类颜色 / 快速创建与删除撤销）Implementation Plan
 
+> **状态：历史计划。** 对应时间轴分栏、分类颜色与今日交互已经在后续版本完成并由当前回归套件覆盖；以下未勾选框保留原始执行记录，不代表当前待办。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 让今日页时间轴上的重叠任务块自动横向分栏排列、任务分类可自定义颜色，并提供快速创建与「删除可撤销」，提升创建/消除任务与多任务排布的效率。

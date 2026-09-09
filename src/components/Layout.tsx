@@ -20,6 +20,7 @@ import UndoButtons from "./undo/UndoButtons";
 import CommandPalette from "./commands/CommandPalette";
 import QuickCapture from "./commands/QuickCapture";
 import { LayoutModeSwitcher } from "./LayoutModeSwitcher";
+import { APP_BREAKPOINTS } from "../lib/layoutBreakpoints";
 
 type NavIcon = typeof CalendarDays;
 
@@ -142,7 +143,7 @@ export default function Layout({ children }: { children: ReactNode }) {
     }
     const mq =
       typeof window.matchMedia === "function"
-        ? window.matchMedia("(max-width: 959px)")
+        ? window.matchMedia(`(max-width: ${APP_BREAKPOINTS.sidebarCollapse - 1}px)`)
         : null;
     if (mq?.matches) setCollapsed(true);
     setAutoApplied(true);
@@ -153,7 +154,8 @@ export default function Layout({ children }: { children: ReactNode }) {
       <TitleBar />
       <div className="flex min-h-0 flex-1">
         <aside
-          className={`glass-surface flex shrink-0 flex-col rounded-r-xl transition-[width] duration-200 ${
+          data-collapsed={collapsed}
+          className={`df-sidebar glass-surface flex shrink-0 flex-col rounded-r-xl transition-[width] duration-200 ${
             collapsed ? "w-14" : "w-56"
           }`}
         >
@@ -220,13 +222,13 @@ export default function Layout({ children }: { children: ReactNode }) {
                 {dbStatus === "ready" && (
                   <span className="flex items-center gap-1">
                     <Database size={12} />
-                    SQLite 已连接
+                    已保存到本机
                   </span>
                 )}
                 {dbStatus === "error" && (
                   <span className="text-danger">数据库错误：{dbError}</span>
                 )}
-                {dbStatus === "idle" && "数据库初始化中…"}
+                {dbStatus === "idle" && "正在准备本机数据…"}
               </div>
               <div className="df-layout-undo flex items-center justify-between border-t border-border-subtle px-3 py-2">
                 <span className="text-xs text-text-faint">撤销/重做</span>

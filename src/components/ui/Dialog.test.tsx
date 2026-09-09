@@ -67,4 +67,23 @@ describe("Dialog", () => {
     const dialog = screen.getByRole("dialog");
     expect(dialog.contains(document.activeElement)).toBe(true);
   });
+
+  it("Tab 焦点被约束在对话框内，关闭后回到触发按钮", () => {
+    const trigger = document.createElement("button");
+    document.body.appendChild(trigger);
+    trigger.focus();
+    const { rerender } = render(
+      <Dialog open onClose={vi.fn()} title="标题">
+        <button>第一个</button><button>最后一个</button>
+      </Dialog>,
+    );
+    const close = screen.getByLabelText("关闭");
+    const last = screen.getByRole("button", { name: "最后一个" });
+    last.focus();
+    fireEvent.keyDown(window, { key: "Tab" });
+    expect(document.activeElement).toBe(close);
+    rerender(<Dialog open={false} onClose={vi.fn()} title="标题">内容</Dialog>);
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
+  });
 });

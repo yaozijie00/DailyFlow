@@ -1,5 +1,7 @@
 # DailyFlow UI 视觉升级 + Mini 窗完善 实现计划（V2.4）
 
+> **状态：历史计划。** 三主题、自绘标题栏与 Mini 窗已经随 2.4/3.0 发布并由当前回归套件覆盖；以下未勾选框保留原始执行记录，不代表当前待办。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 全应用三主题（浅色/深色/毛玻璃）视觉升级 + 自绘标题栏 + Mini 窗重设计（明显入口 + 内容增强）。

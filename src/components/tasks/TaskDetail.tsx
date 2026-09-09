@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Check, Pencil, Trash2, CornerDownRight } from "lucide-react";
 import { useTaskStore } from "../../stores/taskStore";
 import { useGoalStore } from "../../stores/goalStore";
@@ -33,6 +33,13 @@ export default function TaskDetail() {
   const task = tasks.find((t) => t.id === selectedTaskId);
   const focusStats = useTaskFocusStats(task?.id ?? null);
 
+  // Editor drafts belong to one task; never carry A's draft into B after selection changes.
+  useEffect(() => {
+    setNotesEditing(false);
+    setNotesDraft("");
+    setChildDraft("");
+  }, [selectedTaskId]);
+
   if (!task) {
     return (
       <div className="rounded-md border border-dashed border-border-strong bg-surface/60 p-6 text-center text-sm text-text-faint">
@@ -43,8 +50,8 @@ export default function TaskDetail() {
 
   const saveNotes = async () => {
     const v = notesDraft.trim();
-    await updateTask(task.id, { notes: v === "" ? null : v });
-    setNotesEditing(false);
+    const ok = await updateTask(task.id, { notes: v === "" ? null : v });
+    if (ok !== false) setNotesEditing(false);
   };
 
   const categoryName =
@@ -72,60 +79,56 @@ export default function TaskDetail() {
 
   return (
     <div className="rounded-md border border-border-subtle glass-surface p-4">
-      <h2 className="mb-3 text-lg font-semibold text-text-primary">{task.title}</h2>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="break-words text-lg font-semibold leading-snug text-text-primary">
+            {task.title}
+          </h2>
+          <span className="mt-1.5 inline-flex rounded-full bg-surface-muted px-2 py-0.5 text-[11px] text-text-muted">
+            {TASK_STATUS_LABEL[task.status] ?? task.status}
+          </span>
+        </div>
+        {!completed && !cancelled && (
+          <button
+            onClick={() => completeTask(task.id)}
+            className="flex shrink-0 items-center gap-1 rounded-md bg-green-600 px-3 py-1.5 text-sm text-white hover:bg-green-500"
+          >
+            <Check size={14} /> 完成任务
+          </button>
+        )}
+      </div>
 
-      <dl className="mb-4 space-y-2 text-sm">
-        <div className="flex justify-between">
-          <dt className="text-text-muted">类别</dt>
-          <dd className="text-text-primary">{categoryName}</dd>
-        </div>
-        <div className="flex justify-between">
-          <dt className="text-text-muted">关联目标</dt>
-          <dd className="text-text-primary">{goalName}</dd>
-        </div>
-        <div className="flex justify-between">
-          <dt className="text-text-muted">项目</dt>
-          <dd className="text-text-primary">{projectName}</dd>
-        </div>
-        <div className="flex justify-between">
-          <dt className="text-text-muted">计划时间</dt>
-          <dd className="text-text-primary">
-            {task.plannedStart != null && task.plannedEnd != null
-              ? formatTimeRange(task.plannedStart, task.plannedEnd)
-              : "未设置"}
-          </dd>
-        </div>
-        <div className="flex justify-between">
-          <dt className="text-text-muted">预计</dt>
-          <dd className="tabular-nums text-text-primary">{formatDuration(task.estimatedDuration) || "未设置"}</dd>
-        </div>
-        <div className="flex justify-between">
-          <dt className="text-text-muted">实际</dt>
-          <dd className="tabular-nums text-text-primary">{formatDuration(task.actualDuration) || "0分钟"}</dd>
-        </div>
-        <div className="flex justify-between">
-          <dt className="text-text-muted">状态</dt>
-          <dd className="text-text-primary">{TASK_STATUS_LABEL[task.status] ?? task.status}</dd>
-        </div>
-        <div className="flex justify-between">
-          <dt className="text-text-muted">创建时间</dt>
-          <dd className="tabular-nums text-text-primary">{formatDateTime(task.createdAt)}</dd>
-        </div>
-        <div className="flex justify-between">
-          <dt className="text-text-muted">完成时间</dt>
-          <dd className="tabular-nums text-text-primary">{formatDateTime(task.completedAt)}</dd>
-        </div>
-        <div className="flex justify-between">
-          <dt className="text-text-muted">Focus 投入</dt>
-          <dd className="tabular-nums text-text-primary">{formatDuration(focusStats.totalSeconds) || "0分钟"}</dd>
-        </div>
-        <div className="flex justify-between">
-          <dt className="text-text-muted">专注次数</dt>
-          <dd className="text-text-primary">
-            {focusStats.count} 次（完成 {focusStats.completedCount} 个番茄）
-          </dd>
-        </div>
-      </dl>
+      <section className="mb-4 rounded-md border border-border-subtle bg-surface/70 p-3">
+        <h3 className="mb-2 text-xs font-medium text-text-secondary">计划</h3>
+        <dl className="space-y-2 text-sm">
+          <div className="flex justify-between gap-3">
+            <dt className="text-text-muted">计划时间</dt>
+            <dd className="text-right text-text-primary">
+              {task.plannedStart != null && task.plannedEnd != null
+                ? formatTimeRange(task.plannedStart, task.plannedEnd)
+                : "未设置"}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-text-muted">预计</dt>
+            <dd className="tabular-nums text-text-primary">
+              {formatDuration(task.estimatedDuration) || "未设置"}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-text-muted">项目</dt>
+            <dd className="truncate text-right text-text-primary">{projectName}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-text-muted">关联目标</dt>
+            <dd className="truncate text-right text-text-primary">{goalName}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-text-muted">类别</dt>
+            <dd className="truncate text-right text-text-primary">{categoryName}</dd>
+          </div>
+        </dl>
+      </section>
 
       {/* 备注（可内联编辑） */}
       <div className="mb-4">
@@ -265,6 +268,40 @@ export default function TaskDetail() {
         </div>
       )}
 
+      <details className="mb-4 border-t border-border-subtle pt-3">
+        <summary className="cursor-pointer select-none text-sm text-text-muted hover:text-text-secondary">
+          记录与历史
+        </summary>
+        <dl className="mt-3 space-y-2 text-sm">
+          <div className="flex justify-between gap-3">
+            <dt className="text-text-muted">实际</dt>
+            <dd className="tabular-nums text-text-primary">
+              {formatDuration(task.actualDuration) || "0分钟"}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-text-muted">Focus 投入</dt>
+            <dd className="tabular-nums text-text-primary">
+              {formatDuration(focusStats.totalSeconds) || "0分钟"}
+            </dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-text-muted">专注次数</dt>
+            <dd className="text-right text-text-primary">
+              {focusStats.count} 次（完成 {focusStats.completedCount} 个番茄）
+            </dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-text-muted">创建时间</dt>
+            <dd className="tabular-nums text-text-primary">{formatDateTime(task.createdAt)}</dd>
+          </div>
+          <div className="flex justify-between gap-3">
+            <dt className="text-text-muted">完成时间</dt>
+            <dd className="tabular-nums text-text-primary">{formatDateTime(task.completedAt)}</dd>
+          </div>
+        </dl>
+      </details>
+
       {/* 延期（Postpone）：改 scheduledDate，可撤销 */}
       {!completed && !cancelled && (
         <div className="mb-4 border-t border-border-subtle pt-3">
@@ -313,14 +350,6 @@ export default function TaskDetail() {
       )}
 
       <div className="flex flex-wrap gap-2">
-        {!completed && !cancelled && (
-          <button
-            onClick={() => completeTask(task.id)}
-            className="rounded-md bg-green-600 px-3 py-1.5 text-sm text-white hover:bg-green-500"
-          >
-            完成任务
-          </button>
-        )}
         {!completed && !cancelled && (
           <button
             onClick={() => cancelTask(task.id)}

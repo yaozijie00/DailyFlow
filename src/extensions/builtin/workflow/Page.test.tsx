@@ -25,6 +25,13 @@ vi.mock("./store/workflowStore", () => ({
   useWorkflowStore: (selector: (s: unknown) => unknown) => selector(workflowMock),
 }));
 
+const preferenceMock = vi.hoisted(() => ({ openEditorAfterCreate: true }));
+vi.mock("./preferences", () => ({
+  getWorkflowPreferences: () => ({
+    openEditorAfterCreate: preferenceMock.openEditorAfterCreate,
+  }),
+}));
+
 const appMock = vi.hoisted(() => ({ pushToast: vi.fn() }));
 vi.mock("../../../stores/appStore", () => ({
   useAppStore: (selector: (s: unknown) => unknown) => selector(appMock),
@@ -104,5 +111,21 @@ describe("WorkflowPage", () => {
     render(<WorkflowPage />);
     fireEvent.click(screen.getByRole("button", { name: "按任务运行 石材材质流程" }));
     await waitFor(() => expect(appMock.pushToast).toHaveBeenCalledWith("error", expect.stringContaining("任务联动不可用")));
+  });
+
+  it("关闭自动打开偏好后，创建成功停留在列表", async () => {
+    preferenceMock.openEditorAfterCreate = false;
+    workflowMock.load.mockClear();
+    workflowMock.create.mockClear();
+    render(<WorkflowPage />);
+    fireEvent.click(screen.getByRole("button", { name: "新建" }));
+    fireEvent.change(screen.getByPlaceholderText("流程名称"), {
+      target: { value: "连续创建测试" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "创建" }));
+    await waitFor(() => expect(workflowMock.create).toHaveBeenCalled());
+    expect(workflowMock.load).not.toHaveBeenCalled();
+    expect(screen.getByText("石材材质流程")).toBeTruthy();
+    preferenceMock.openEditorAfterCreate = true;
   });
 });

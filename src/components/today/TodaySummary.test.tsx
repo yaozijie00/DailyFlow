@@ -16,13 +16,15 @@ vi.mock("../../hooks/useTodayStats", () => ({
 }));
 
 describe("TodaySummary", () => {
-  it("展示五项今日统计（任务/完成/完成率/专注时长/专注次数）", () => {
+  it("展示三项今日决策指标（待完成/计划进度/已专注）", () => {
     render(<TodaySummary />);
-    expect(screen.getByText("今日任务")).toBeTruthy();
-    expect(screen.getByText("3")).toBeTruthy();
+    expect(screen.getByText("待完成")).toBeTruthy();
+    expect(screen.getByText("2")).toBeTruthy();
+    expect(screen.getByText("计划进度")).toBeTruthy();
     expect(screen.getByText("1/3")).toBeTruthy();
     expect(screen.getByText("33%")).toBeTruthy();
+    expect(screen.getByText("已专注")).toBeTruthy();
     expect(screen.getByText("40分钟")).toBeTruthy(); // 2400 秒
-    expect(screen.getByText("2")).toBeTruthy();
+    expect(screen.getByText("2 次专注")).toBeTruthy();
   });
 });

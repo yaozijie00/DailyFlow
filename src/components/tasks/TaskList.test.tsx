@@ -87,6 +87,7 @@ describe("TaskList", () => {
   beforeEach(() => {
     mockState.tasks = [];
     mockState.toggleComplete.mockClear();
+    mockState.openTaskDetail.mockClear();
     mockState.reorderTasks.mockClear();
     mockState.createTask.mockClear();
     mockState.projectFilter = null;
@@ -128,6 +129,15 @@ describe("TaskList", () => {
     render(<TaskList />);
     fireEvent.click(screen.getByText("写代码"));
     expect(mockState.openTaskDetail).toHaveBeenCalledWith(7);
+  });
+
+  it("任务标题使用有名称的原生按钮打开详情", () => {
+    mockState.tasks = [makeTask({ id: 8, title: "键盘任务" })];
+    render(<TaskList />);
+    const row = screen.getByRole("button", { name: "打开任务 键盘任务" });
+    expect(row.tagName).toBe("BUTTON");
+    fireEvent.click(row);
+    expect(mockState.openTaskDetail).toHaveBeenCalledWith(8);
   });
 
   it("按状态筛选：点「已完成」只显示已完成任务", () => {

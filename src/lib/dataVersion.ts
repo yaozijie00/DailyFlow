@@ -44,15 +44,18 @@ export function getDataVersion(domain: DataDomain): number {
   return versions[domain];
 }
 
+/** 非 React 订阅入口，供 Extension Context 与后台服务使用。 */
+export function subscribeDataVersion(domain: DataDomain, listener: () => void): () => void {
+  listenersOf(domain).add(listener);
+  return () => {
+    listenersOf(domain).delete(listener);
+  };
+}
+
 /** React Hook：订阅某域版本；版本变化触发重渲染（组件 effect 里据此 reload）。 */
 export function useDataVersion(domain: DataDomain): number {
   return useSyncExternalStore(
-    (cb) => {
-      listenersOf(domain).add(cb);
-      return () => {
-        listenersOf(domain).delete(cb);
-      };
-    },
+    (cb) => subscribeDataVersion(domain, cb),
     () => versions[domain],
   );
 }
