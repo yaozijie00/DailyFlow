@@ -1,6 +1,12 @@
 import type { Db } from "../../../../db/db";
 import { WorkflowRepository } from "../repository/workflowRepository";
 import type { Workflow, WorkflowEdge, WorkflowNode, WorkflowRun } from "../models";
+import type { ExtensionStorage } from "../../../types";
+import {
+  createExtensionTemplateMetadataStore,
+  WorkflowTemplateService,
+  type WorkflowTemplateQuery,
+} from "../templates/templateService";
 
 /**
  * Workflow Service（UI ↔ Repository 桥）。
@@ -8,6 +14,8 @@ import type { Workflow, WorkflowEdge, WorkflowNode, WorkflowRun } from "../model
  */
 
 let repoPromise: Promise<WorkflowRepository> | null = null;
+let templateStorage: ExtensionStorage | null = null;
+let templateServicePromise: Promise<WorkflowTemplateService> | null = null;
 
 function repo(): Promise<WorkflowRepository> {
   if (!repoPromise) {
@@ -19,6 +27,24 @@ function repo(): Promise<WorkflowRepository> {
   return repoPromise;
 }
 
+function templates(): Promise<WorkflowTemplateService> {
+  if (!templateServicePromise) {
+    templateServicePromise = repo().then(
+      (repository) =>
+        new WorkflowTemplateService(
+          repository,
+          templateStorage ? createExtensionTemplateMetadataStore(templateStorage) : undefined,
+        ),
+    );
+  }
+  return templateServicePromise;
+}
+
+export function setWorkflowTemplateStorage(storage: ExtensionStorage | null): void {
+  templateStorage = storage;
+  templateServicePromise = null;
+}
+
 export interface WorkflowMetaInput {
   name: string;
   description?: string;
@@ -26,6 +52,18 @@ export interface WorkflowMetaInput {
 }
 
 export const workflowService = {
+  listTemplates: (query?: WorkflowTemplateQuery) => templates().then((service) => service.list(query)),
+
+  getTemplate: (id: string) => templates().then((service) => service.get(id)),
+
+  duplicateTemplateForEdit: (id: string) =>
+    templates().then((service) => service.duplicateForEdit(id)),
+
+  setTemplateFavorite: (id: string, favorite: boolean) =>
+    templates().then((service) => service.setFavorite(id, favorite)),
+
+  markTemplateUsed: (id: string) => templates().then((service) => service.markUsed(id)),
+
   list: () => repo().then((r) => r.list()),
 
   get: (id: string) => repo().then((r) => r.get(id)),

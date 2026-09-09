@@ -12,6 +12,7 @@ import {
   disposeWorkflowPreferences,
   initializeWorkflowPreferences,
 } from "./preferences";
+import { setWorkflowTemplateStorage } from "./services/workflowService";
 
 /**
  * DailyFlow 第二个 Extension：Workflow。
@@ -45,7 +46,9 @@ export const manifest = {
 export async function init(ctx: CoreContext): Promise<void> {
   if (!ctx.storage) throw new Error("Workflow 缺少 storage.extension 能力");
   await initializeWorkflowPreferences(ctx.storage);
+  setWorkflowTemplateStorage(ctx.storage);
   ctx.lifecycle.onDispose(disposeWorkflowPreferences);
+  ctx.lifecycle.onDispose(() => setWorkflowTemplateStorage(null));
 }
 
 let repoPromise: Promise<WorkflowRepository> | null = null;
