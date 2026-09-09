@@ -1,28 +1,12 @@
 // @vitest-environment jsdom
-/**
- * WorkflowPage 测试：
- * 1. hooks 顺序回归（列表 → 编辑器早退不报 fewer hooks）；
- * 2. Phase 6「按任务运行」：经 ctx.tasks.listByDate 列出今日任务 → 选中 → runnerHost.start(wfId, taskId)。
- */
-import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
-import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import WorkflowPage from "./Page";
 import { useWorkflowUiStore, workflowUiStorageKey } from "./store/workflowUiStore";
 
-beforeEach(() => {
-  localStorage.clear();
-  useWorkflowUiStore.getState().reset();
-  workflowMock.current = null;
-});
-
-afterEach(() => {
-  cleanup();
-  useWorkflowUiStore.getState().reset();
-});
-
 const workflowMock = vi.hoisted(() => ({
-  list: [{ id: "w1", name: "石材材质流程", description: "", tags: [] }],
-  current: null,
+  list: [{ id: "w1", name: "石材材质流程", description: "", version: 1, tags: [], updatedAt: 1 }],
+  current: null as null | { id: string },
   loadList: vi.fn(async () => undefined),
   load: vi.fn(async () => undefined),
   create: vi.fn(async () => "w1"),
@@ -35,66 +19,72 @@ const workflowMock = vi.hoisted(() => ({
 }));
 
 vi.mock("./store/workflowStore", () => ({
-  useWorkflowStore: (selector: (s: unknown) => unknown) => selector(workflowMock),
+  useWorkflowStore: (selector: (state: typeof workflowMock) => unknown) => selector(workflowMock),
 }));
+
+const template = vi.hoisted(() => ({
+  id: "builtin.general-project",
+  schemaVersion: 2 as const,
+  name: "创建通用项目目录",
+  description: "建立常用目录",
+  version: 1,
+  variables: [],
+  nodes: [],
+  edges: [],
+  tags: ["项目"],
+  createdAt: 1,
+  updatedAt: 1,
+  source: "builtin" as const,
+  readOnly: true,
+  favorite: false,
+}));
+
+const serviceMock = vi.hoisted(() => ({
+  listTemplates: vi.fn(async () => [template]),
+  duplicateTemplateForEdit: vi.fn(async () => ({ ...template, id: "w1", source: "personal" as const, readOnly: false })),
+  setTemplateFavorite: vi.fn(async () => undefined),
+  markTemplateUsed: vi.fn(async () => undefined),
+  listActiveRuns: vi.fn(async () => []),
+  saveGraph: vi.fn(async () => undefined),
+}));
+
+vi.mock("./services/workflowService", () => ({ workflowService: serviceMock }));
 
 const preferenceMock = vi.hoisted(() => ({ openEditorAfterCreate: true }));
 vi.mock("./preferences", () => ({
-  getWorkflowPreferences: () => ({
-    openEditorAfterCreate: preferenceMock.openEditorAfterCreate,
-  }),
+  getWorkflowPreferences: () => ({ openEditorAfterCreate: preferenceMock.openEditorAfterCreate }),
 }));
 
 const appMock = vi.hoisted(() => ({ pushToast: vi.fn() }));
 vi.mock("../../../stores/appStore", () => ({
-  useAppStore: (selector: (s: unknown) => unknown) => selector(appMock),
+  useAppStore: (selector: (state: typeof appMock) => unknown) => selector(appMock),
 }));
 
-// Phase 6：mock 宿主 Context 的 listByDate（今日任务只读查询）
-const hostCtxMock = vi.hoisted(() => ({
-  getHostContext: vi.fn(() => ({
-    apiVersion: 1,
-    tasks: {
-      listByDate: vi.fn(async () => [
-        { id: 101, title: "制作石材材质", status: "TODO" },
-        { id: 102, title: "已完成的事", status: "COMPLETED" },
-      ]),
-      complete: vi.fn(async () => true),
-    },
-  })),
-}));
-vi.mock("../../registry", () => hostCtxMock);
+beforeEach(() => {
+  localStorage.clear();
+  useWorkflowUiStore.getState().reset();
+  workflowMock.current = null;
+  preferenceMock.openEditorAfterCreate = true;
+  vi.clearAllMocks();
+});
 
-vi.mock("../../../lib/date", () => ({
-  todayString: () => "2026-01-01",
-}));
-
-// mock runnerHost：断言 start 收到 taskId
-const runnerHostMock = vi.hoisted(() => ({
-  start: vi.fn(async (_wfId: string, taskId?: number | null) => ({
-    run: { id: "r1", state: "paused", error: null },
-    events: [],
-    taskId: taskId ?? null,
-  })),
-  resume: vi.fn(async () => ({ run: { id: "r1", state: "completed" }, events: [] })),
-  confirmFinish: vi.fn(async () => ({ run: { id: "r1", state: "completed" }, events: [] })),
-  cancel: vi.fn(async () => ({ id: "r1", state: "cancelled" })),
-}));
-vi.mock("./runnerHost", () => ({
-  workflowRunnerHost: runnerHostMock,
-}));
+afterEach(() => {
+  cleanup();
+  useWorkflowUiStore.getState().reset();
+});
 
 describe("WorkflowPage", () => {
-  it("默认进入模板库，并在三种顶层视图间导航", () => {
+  it("defaults to the template library and navigates across all top-level views", async () => {
     render(<WorkflowPage />);
     expect(screen.getByRole("tab", { name: "模板库" }).getAttribute("aria-selected")).toBe("true");
+    expect(await screen.findByText("创建通用项目目录")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("tab", { name: "运行中心" }));
     expect(screen.getByRole("heading", { name: "运行中心" })).toBeTruthy();
-    expect(screen.getByRole("tab", { name: "运行中心" }).getAttribute("aria-selected")).toBe("true");
+    expect(workflowMock.loadActiveRuns).toHaveBeenCalled();
   });
 
-  it("持久化顶层视图和当前模板，页面重新挂载后可恢复", () => {
+  it("persists the top-level view and selected template for a remount", () => {
     useWorkflowUiStore.getState().openEditor("w1");
     expect(JSON.parse(localStorage.getItem(workflowUiStorageKey) ?? "{}")).toEqual({
       view: "editor",
@@ -104,60 +94,26 @@ describe("WorkflowPage", () => {
     expect(screen.getByRole("tab", { name: "编辑器" }).getAttribute("aria-selected")).toBe("true");
   });
 
-  it("hooks 顺序回归：列表 → 编辑器（current 未加载早退）不触发 hooks 数量错误", () => {
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    try {
-      render(<WorkflowPage />);
-      expect(screen.getByText("石材材质流程")).toBeTruthy();
-      fireEvent.click(screen.getByRole("button", { name: "编辑 石材材质流程" }));
-      expect(screen.getByText("加载中…")).toBeTruthy();
-      expect(screen.getByRole("button", { name: "返回列表" })).toBeTruthy();
-      const hookError = errorSpy.mock.calls.some((c) =>
-        c.some((a) => typeof a === "string" && a.includes("fewer hooks")),
-      );
-      expect(hookError).toBe(false);
-    } finally {
-      errorSpy.mockRestore();
-    }
-  });
-
-  it("Phase 6：按任务运行 → 只列今日待办 → 选中后 start 携带 taskId", async () => {
+  it("edits a built-in template through a new personal copy", async () => {
     render(<WorkflowPage />);
-    fireEvent.click(screen.getByRole("button", { name: "按任务运行 石材材质流程" }));
+    await screen.findByText("创建通用项目目录");
+    fireEvent.click(screen.getByLabelText("更多操作 创建通用项目目录"));
+    fireEvent.click(screen.getByRole("button", { name: "编辑" }));
 
-    // 列表只含 TODO（已完成的不出现）
-    await waitFor(() => expect(screen.getByText("制作石材材质")).toBeTruthy());
-    expect(screen.queryByText("已完成的事")).toBeNull();
-
-    // 选中任务 → start(wfId, taskId)
-    fireEvent.click(screen.getByText("制作石材材质"));
-    await waitFor(() => expect(runnerHostMock.start).toHaveBeenCalledTimes(1));
-    expect(runnerHostMock.start).toHaveBeenCalledWith("w1", 101);
+    await waitFor(() => expect(serviceMock.duplicateTemplateForEdit).toHaveBeenCalledWith(template.id));
+    expect(workflowMock.load).toHaveBeenCalledWith("w1");
+    expect(screen.getByRole("tab", { name: "编辑器" }).getAttribute("aria-selected")).toBe("true");
   });
 
-  it("Phase 6：宿主无 listByDate 时给出可读提示且不崩溃", async () => {
-    hostCtxMock.getHostContext.mockReturnValueOnce({
-      apiVersion: 1,
-      tasks: {},
-    } as unknown as ReturnType<typeof hostCtxMock.getHostContext>);
-    render(<WorkflowPage />);
-    fireEvent.click(screen.getByRole("button", { name: "按任务运行 石材材质流程" }));
-    await waitFor(() => expect(appMock.pushToast).toHaveBeenCalledWith("error", expect.stringContaining("任务联动不可用")));
-  });
-
-  it("关闭自动打开偏好后，创建成功停留在列表", async () => {
+  it("respects the preference to remain in the library after creating", async () => {
     preferenceMock.openEditorAfterCreate = false;
-    workflowMock.load.mockClear();
-    workflowMock.create.mockClear();
     render(<WorkflowPage />);
     fireEvent.click(screen.getByRole("button", { name: "新建自动化" }));
-    fireEvent.change(screen.getByPlaceholderText("流程名称"), {
-      target: { value: "连续创建测试" },
-    });
+    fireEvent.change(screen.getByPlaceholderText("流程名称"), { target: { value: "连续创建测试" } });
     fireEvent.click(screen.getByRole("button", { name: "创建" }));
+
     await waitFor(() => expect(workflowMock.create).toHaveBeenCalled());
     expect(workflowMock.load).not.toHaveBeenCalled();
-    expect(screen.getByText("石材材质流程")).toBeTruthy();
-    preferenceMock.openEditorAfterCreate = true;
+    expect(screen.getByRole("tab", { name: "模板库" }).getAttribute("aria-selected")).toBe("true");
   });
 });
