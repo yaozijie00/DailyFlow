@@ -102,6 +102,16 @@ export interface PlannedEffect {
   metadata?: Record<string, unknown>;
 }
 
+export interface WorkflowPlan {
+  workflowId: string;
+  workflowVersion: number;
+  variables: WorkflowVariableValues;
+  requiredCapabilities: WorkflowCapability[];
+  effects: PlannedEffect[];
+  issues: ValidationIssue[];
+  executable: boolean;
+}
+
 export interface WorkflowNodeResult {
   status: "completed" | "paused" | "failed";
   message?: string;
