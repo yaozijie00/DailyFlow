@@ -119,6 +119,37 @@ export interface WorkflowExecutionContext {
   signal?: AbortSignal;
 }
 
+export type WorkflowRunStepState = "pending" | "running" | "completed" | "failed" | "skipped";
+
+export interface WorkflowRunStep {
+  id: string;
+  runId: string;
+  nodeId: string;
+  nodeType: string;
+  sequence: number;
+  state: WorkflowRunStepState;
+  startedAt: number | null;
+  completedAt: number | null;
+  output: Record<string, unknown> | null;
+  error: { message: string; retryable?: boolean } | null;
+  createdAt: number;
+}
+
+export interface WorkflowRunV2 {
+  id: string;
+  workflowId: string;
+  taskId: number | null;
+  state: "pending" | "running" | "paused" | "awaiting-confirm" | "completed" | "failed" | "cancelled";
+  currentNodeId: string | null;
+  startedAt: number | null;
+  completedAt: number | null;
+  error: { nodeId?: string; message: string } | null;
+  workflowVersion: number;
+  workflowSnapshot: WorkflowV2;
+  variablesSnapshot: WorkflowVariableValues;
+  createdAt: number;
+}
+
 export interface WorkflowPreviewContext {
   workflow: WorkflowV2;
   node: WorkflowNodeV2;

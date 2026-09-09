@@ -89,6 +89,9 @@ export function newEdgeId(): string {
 export function newRunId(): string {
   return newId("wfrun");
 }
+export function newRunStepId(): string {
+  return newId("wfstep");
+}
 
 export type {
   PlannedEffect,
@@ -97,6 +100,9 @@ export type {
   WorkflowEdgeV2,
   WorkflowNodeResult,
   WorkflowNodeV2,
+  WorkflowRunStep,
+  WorkflowRunStepState,
+  WorkflowRunV2,
   WorkflowV2,
   WorkflowVariableDefinition,
   WorkflowVariableType,

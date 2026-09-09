@@ -1,22 +1,32 @@
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import type { Db } from "../../../../db/db";
 import {
   workflows,
   workflowNodes,
   workflowEdges,
   workflowRuns,
+  workflowRunSteps,
 } from "../../../../db/schema";
 import {
   newWorkflowId,
   newNodeId,
   newEdgeId,
   newRunId,
+  newRunStepId,
   type Workflow,
   type WorkflowNode,
   type WorkflowEdge,
   type WorkflowRun,
   type WorkflowRunState,
 } from "../models";
+import type {
+  WorkflowNodeV2,
+  WorkflowRunStep,
+  WorkflowRunStepState,
+  WorkflowRunV2,
+  WorkflowV2,
+  WorkflowVariableValues,
+} from "../domain/types";
 
 /**
  * Workflow Repository（数据基础设施属 Core，业务归属本 Extension）：
@@ -78,6 +88,22 @@ function mapRunRow(r: typeof workflowRuns.$inferSelect): WorkflowRun {
   };
 }
 
+function mapRunStepRow(r: typeof workflowRunSteps.$inferSelect): WorkflowRunStep {
+  return {
+    id: r.id,
+    runId: r.runId,
+    nodeId: r.nodeId,
+    nodeType: r.nodeType,
+    sequence: r.sequence,
+    state: r.state as WorkflowRunStepState,
+    startedAt: r.startedAt,
+    completedAt: r.completedAt,
+    output: safeParseJson<Record<string, unknown> | null>(r.outputJson, null),
+    error: safeParseJson<WorkflowRunStep["error"]>(r.errorJson, null),
+    createdAt: r.createdAt,
+  };
+}
+
 export class WorkflowRepository {
   constructor(private readonly db: Db) {}
 
@@ -111,6 +137,143 @@ export class WorkflowRepository {
       tags: input.tags ?? [],
       createdAt: now,
       updatedAt: now,
+    };
+  }
+
+  private assertV2GraphIntegrity(workflow: WorkflowV2): void {
+    const ids = new Set<string>();
+    for (const node of workflow.nodes) {
+      if (ids.has(node.id)) throw new Error(`图包含重复节点 id：${node.id}`);
+      ids.add(node.id);
+    }
+    for (const edge of workflow.edges) {
+      if (!ids.has(edge.source) || !ids.has(edge.target)) {
+        throw new Error(`图包含悬空连线：${edge.source} → ${edge.target}（Workflow ${workflow.id}）`);
+      }
+      if (edge.source === edge.target) {
+        throw new Error(`图包含自连接：${edge.source} → ${edge.source}`);
+      }
+    }
+  }
+
+  private async insertV2NodesAndEdges(workflow: WorkflowV2): Promise<void> {
+    for (const node of workflow.nodes) {
+      await this.db
+        .insert(workflowNodes)
+        .values({
+          id: node.id,
+          workflowId: workflow.id,
+          type: node.type,
+          typeVersion: node.typeVersion,
+          title: node.title,
+          description: node.description ?? null,
+          positionX: Math.round(node.position.x),
+          positionY: Math.round(node.position.y),
+          configJson: JSON.stringify(node.config),
+          createdAt: workflow.updatedAt,
+        })
+        .run();
+    }
+    for (const edge of workflow.edges) {
+      await this.db
+        .insert(workflowEdges)
+        .values({
+          id: edge.id,
+          workflowId: workflow.id,
+          source: edge.source,
+          target: edge.target,
+          sourcePort: edge.sourcePort ?? null,
+          targetPort: edge.targetPort ?? null,
+          createdAt: workflow.updatedAt,
+        })
+        .run();
+    }
+  }
+
+  /** 写入已经过纯迁移与完整校验的 V2 Workflow。 */
+  async saveMigratedWorkflow(workflow: WorkflowV2): Promise<WorkflowV2> {
+    this.assertV2GraphIntegrity(workflow);
+    const existing = await this.db
+      .select({ id: workflows.id })
+      .from(workflows)
+      .where(eq(workflows.id, workflow.id))
+      .get();
+
+    if (existing) {
+      await this.db.delete(workflowEdges).where(eq(workflowEdges.workflowId, workflow.id)).run();
+      await this.db.delete(workflowNodes).where(eq(workflowNodes.workflowId, workflow.id)).run();
+      await this.db
+        .update(workflows)
+        .set({
+          name: workflow.name,
+          description: workflow.description ?? null,
+          version: workflow.version,
+          schemaVersion: workflow.schemaVersion,
+          variablesJson: JSON.stringify(workflow.variables),
+          tagsJson: JSON.stringify(workflow.tags),
+          updatedAt: workflow.updatedAt,
+        })
+        .where(eq(workflows.id, workflow.id))
+        .run();
+    } else {
+      await this.db
+        .insert(workflows)
+        .values({
+          id: workflow.id,
+          name: workflow.name,
+          description: workflow.description ?? null,
+          version: workflow.version,
+          schemaVersion: workflow.schemaVersion,
+          variablesJson: JSON.stringify(workflow.variables),
+          tagsJson: JSON.stringify(workflow.tags),
+          createdAt: workflow.createdAt,
+          updatedAt: workflow.updatedAt,
+        })
+        .run();
+    }
+    await this.insertV2NodesAndEdges(workflow);
+    return structuredClone(workflow);
+  }
+
+  async getV2(id: string): Promise<WorkflowV2 | null> {
+    const row = await this.db.select().from(workflows).where(eq(workflows.id, id)).get();
+    if (!row || row.schemaVersion !== 2) return null;
+    const nodeRows = await this.db
+      .select()
+      .from(workflowNodes)
+      .where(eq(workflowNodes.workflowId, id))
+      .all();
+    const edgeRows = await this.db
+      .select()
+      .from(workflowEdges)
+      .where(eq(workflowEdges.workflowId, id))
+      .all();
+    return {
+      id: row.id,
+      schemaVersion: 2,
+      name: row.name,
+      description: row.description ?? undefined,
+      version: row.version,
+      variables: safeParseJson(row.variablesJson, []),
+      nodes: nodeRows.map((node) => ({
+        id: node.id,
+        type: node.type,
+        typeVersion: node.typeVersion,
+        title: node.title,
+        description: node.description ?? undefined,
+        position: { x: node.positionX, y: node.positionY },
+        config: safeParseJson(node.configJson, {}),
+      })),
+      edges: edgeRows.map((edge) => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        ...(edge.sourcePort ? { sourcePort: edge.sourcePort } : {}),
+        ...(edge.targetPort ? { targetPort: edge.targetPort } : {}),
+      })),
+      tags: safeParseJson(row.tagsJson, []),
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
     };
   }
 
@@ -356,6 +519,114 @@ export class WorkflowRepository {
       error: null,
       createdAt: now,
     };
+  }
+
+  async createRunWithSnapshot(
+    workflow: WorkflowV2,
+    variables: WorkflowVariableValues,
+    taskId: number | null = null,
+  ): Promise<WorkflowRunV2> {
+    const now = Date.now();
+    const id = newRunId();
+    await this.db
+      .insert(workflowRuns)
+      .values({
+        id,
+        workflowId: workflow.id,
+        taskId,
+        state: "pending",
+        workflowVersion: workflow.version,
+        workflowSnapshotJson: JSON.stringify(workflow),
+        variablesSnapshotJson: JSON.stringify(variables),
+        createdAt: now,
+      })
+      .run();
+    return {
+      id,
+      workflowId: workflow.id,
+      taskId,
+      state: "pending",
+      currentNodeId: null,
+      startedAt: null,
+      completedAt: null,
+      error: null,
+      workflowVersion: workflow.version,
+      workflowSnapshot: structuredClone(workflow),
+      variablesSnapshot: structuredClone(variables),
+      createdAt: now,
+    };
+  }
+
+  async appendRunStep(
+    runId: string,
+    node: WorkflowNodeV2,
+    sequence: number,
+  ): Promise<WorkflowRunStep> {
+    const step: WorkflowRunStep = {
+      id: newRunStepId(),
+      runId,
+      nodeId: node.id,
+      nodeType: node.type,
+      sequence,
+      state: "pending",
+      startedAt: null,
+      completedAt: null,
+      output: null,
+      error: null,
+      createdAt: Date.now(),
+    };
+    await this.db
+      .insert(workflowRunSteps)
+      .values({
+        id: step.id,
+        runId,
+        nodeId: node.id,
+        nodeType: node.type,
+        sequence,
+        state: step.state,
+        createdAt: step.createdAt,
+      })
+      .run();
+    return step;
+  }
+
+  async updateRunStep(
+    id: string,
+    patch: {
+      state?: WorkflowRunStepState;
+      startedAt?: number | null;
+      completedAt?: number | null;
+      output?: Record<string, unknown> | null;
+      error?: WorkflowRunStep["error"];
+    },
+  ): Promise<WorkflowRunStep | null> {
+    const rows = await this.db
+      .update(workflowRunSteps)
+      .set({
+        ...(patch.state !== undefined ? { state: patch.state } : {}),
+        ...(patch.startedAt !== undefined ? { startedAt: patch.startedAt } : {}),
+        ...(patch.completedAt !== undefined ? { completedAt: patch.completedAt } : {}),
+        ...(patch.output !== undefined
+          ? { outputJson: patch.output === null ? null : JSON.stringify(patch.output) }
+          : {}),
+        ...(patch.error !== undefined
+          ? { errorJson: patch.error === null ? null : JSON.stringify(patch.error) }
+          : {}),
+      })
+      .where(eq(workflowRunSteps.id, id))
+      .returning()
+      .all();
+    return rows[0] ? mapRunStepRow(rows[0]) : null;
+  }
+
+  async listRunSteps(runId: string): Promise<WorkflowRunStep[]> {
+    const rows = await this.db
+      .select()
+      .from(workflowRunSteps)
+      .where(eq(workflowRunSteps.runId, runId))
+      .orderBy(asc(workflowRunSteps.sequence))
+      .all();
+    return rows.map(mapRunStepRow);
   }
 
   async getRun(id: string): Promise<WorkflowRun | null> {

@@ -184,6 +184,8 @@ export const workflows = sqliteTable("workflows", {
   name: text("name").notNull(),
   description: text("description"),
   version: integer("version").notNull().default(1),
+  schemaVersion: integer("schema_version").notNull().default(1),
+  variablesJson: text("variables_json").notNull().default("[]"),
   tagsJson: text("tags_json").notNull().default("[]"),
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
@@ -193,6 +195,7 @@ export const workflowNodes = sqliteTable("workflow_nodes", {
   id: text("id").primaryKey(),
   workflowId: text("workflow_id").notNull().references(() => workflows.id, { onDelete: "cascade" }),
   type: text("type").notNull(),
+  typeVersion: integer("type_version").notNull().default(1),
   title: text("title").notNull(),
   description: text("description"),
   positionX: integer("position_x").notNull().default(0),
@@ -206,6 +209,8 @@ export const workflowEdges = sqliteTable("workflow_edges", {
   workflowId: text("workflow_id").notNull().references(() => workflows.id, { onDelete: "cascade" }),
   source: text("source").notNull(),
   target: text("target").notNull(),
+  sourcePort: text("source_port"),
+  targetPort: text("target_port"),
   createdAt: integer("created_at").notNull(),
 });
 
@@ -219,8 +224,31 @@ export const workflowRuns = sqliteTable("workflow_runs", {
   startedAt: integer("started_at"),
   completedAt: integer("completed_at"),
   errorJson: text("error_json"),
+  workflowVersion: integer("workflow_version"),
+  workflowSnapshotJson: text("workflow_snapshot_json"),
+  variablesSnapshotJson: text("variables_snapshot_json"),
   createdAt: integer("created_at").notNull(),
 });
+
+export const workflowRunSteps = sqliteTable(
+  "workflow_run_steps",
+  {
+    id: text("id").primaryKey(),
+    runId: text("run_id")
+      .notNull()
+      .references(() => workflowRuns.id, { onDelete: "cascade" }),
+    nodeId: text("node_id").notNull(),
+    nodeType: text("node_type").notNull(),
+    sequence: integer("sequence").notNull(),
+    state: text("state").notNull().default("pending"),
+    startedAt: integer("started_at"),
+    completedAt: integer("completed_at"),
+    outputJson: text("output_json"),
+    errorJson: text("error_json"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [uniqueIndex("idx_workflow_run_steps_sequence").on(table.runId, table.sequence)],
+);
 
 /** 宿主管理的扩展 JSON 键值；extension_id + key 构成隔离边界。 */
 export const extensionStorage = sqliteTable(
