@@ -4,11 +4,21 @@
  * 1. hooks 顺序回归（列表 → 编辑器早退不报 fewer hooks）；
  * 2. Phase 6「按任务运行」：经 ctx.tasks.listByDate 列出今日任务 → 选中 → runnerHost.start(wfId, taskId)。
  */
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import WorkflowPage from "./Page";
+import { useWorkflowUiStore, workflowUiStorageKey } from "./store/workflowUiStore";
 
-afterEach(cleanup);
+beforeEach(() => {
+  localStorage.clear();
+  useWorkflowUiStore.getState().reset();
+  workflowMock.current = null;
+});
+
+afterEach(() => {
+  cleanup();
+  useWorkflowUiStore.getState().reset();
+});
 
 const workflowMock = vi.hoisted(() => ({
   list: [{ id: "w1", name: "石材材质流程", description: "", tags: [] }],
@@ -19,6 +29,9 @@ const workflowMock = vi.hoisted(() => ({
   remove: vi.fn(async () => undefined),
   duplicate: vi.fn(async () => undefined),
   updateMeta: vi.fn(async () => undefined),
+  activeRuns: [],
+  loadingRuns: false,
+  loadActiveRuns: vi.fn(async () => undefined),
 }));
 
 vi.mock("./store/workflowStore", () => ({
@@ -72,6 +85,25 @@ vi.mock("./runnerHost", () => ({
 }));
 
 describe("WorkflowPage", () => {
+  it("默认进入模板库，并在三种顶层视图间导航", () => {
+    render(<WorkflowPage />);
+    expect(screen.getByRole("tab", { name: "模板库" }).getAttribute("aria-selected")).toBe("true");
+
+    fireEvent.click(screen.getByRole("tab", { name: "运行中心" }));
+    expect(screen.getByRole("heading", { name: "运行中心" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "运行中心" }).getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("持久化顶层视图和当前模板，页面重新挂载后可恢复", () => {
+    useWorkflowUiStore.getState().openEditor("w1");
+    expect(JSON.parse(localStorage.getItem(workflowUiStorageKey) ?? "{}")).toEqual({
+      view: "editor",
+      selectedTemplateId: "w1",
+    });
+    render(<WorkflowPage />);
+    expect(screen.getByRole("tab", { name: "编辑器" }).getAttribute("aria-selected")).toBe("true");
+  });
+
   it("hooks 顺序回归：列表 → 编辑器（current 未加载早退）不触发 hooks 数量错误", () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     try {
@@ -118,7 +150,7 @@ describe("WorkflowPage", () => {
     workflowMock.load.mockClear();
     workflowMock.create.mockClear();
     render(<WorkflowPage />);
-    fireEvent.click(screen.getByRole("button", { name: "新建" }));
+    fireEvent.click(screen.getByRole("button", { name: "新建自动化" }));
     fireEvent.change(screen.getByPlaceholderText("流程名称"), {
       target: { value: "连续创建测试" },
     });

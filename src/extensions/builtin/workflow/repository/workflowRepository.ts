@@ -769,6 +769,15 @@ export class WorkflowRepository {
     return rows.map(mapRunRow);
   }
 
+  async listActiveRuns(): Promise<WorkflowRun[]> {
+    const active: WorkflowRunState[] = ["pending", "running", "paused", "awaiting-confirm"];
+    const rows = await this.db.select().from(workflowRuns).orderBy(workflowRuns.createdAt).all();
+    return rows
+      .filter((row) => active.includes(row.state as WorkflowRunState))
+      .map(mapRunRow)
+      .reverse();
+  }
+
   /** 全部已完成的 WorkflowRun 数（A5 成就数据源；跨全部 Workflow）。 */
   async countCompletedRuns(): Promise<number> {
     const rows = await this.db

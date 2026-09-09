@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { workflowService } from "../services/workflowService";
 import { useAppStore } from "../../../../stores/appStore";
-import type { Workflow } from "../models";
+import type { Workflow, WorkflowRun } from "../models";
 
 export type WorkflowSummary = {
   id: string;
@@ -17,6 +17,8 @@ interface WorkflowState {
   /** 当前打开（编辑）的 Workflow 全文 */
   current: Workflow | null;
   loading: boolean;
+  activeRuns: WorkflowRun[];
+  loadingRuns: boolean;
   loadList: () => Promise<void>;
   load: (id: string) => Promise<void>;
   clearCurrent: () => void;
@@ -27,6 +29,7 @@ interface WorkflowState {
   ) => Promise<void>;
   remove: (id: string) => Promise<void>;
   duplicate: (id: string) => Promise<void>;
+  loadActiveRuns: () => Promise<void>;
 }
 
 function fail(text: string): void {
@@ -37,6 +40,8 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   list: [],
   current: null,
   loading: false,
+  activeRuns: [],
+  loadingRuns: false,
 
   loadList: async () => {
     set({ loading: true });
@@ -105,6 +110,17 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       useAppStore.getState().pushToast("success", "已复制为「副本」");
     } catch {
       fail("复制 Workflow 失败");
+    }
+  },
+
+  loadActiveRuns: async () => {
+    set({ loadingRuns: true });
+    try {
+      set({ activeRuns: await workflowService.listActiveRuns() });
+    } catch {
+      fail("加载运行记录失败");
+    } finally {
+      set({ loadingRuns: false });
     }
   },
 }));

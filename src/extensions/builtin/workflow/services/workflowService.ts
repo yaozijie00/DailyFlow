@@ -89,4 +89,6 @@ export const workflowService = {
     repo().then((r) => r.createRun(workflowId, taskId ?? null)),
 
   getRun: (runId: string): Promise<WorkflowRun | null> => repo().then((r) => r.getRun(runId)),
+
+  listActiveRuns: () => repo().then((r) => r.listActiveRuns()),
 };

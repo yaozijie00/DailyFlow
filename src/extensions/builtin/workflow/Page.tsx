@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Search, Copy, Pencil, Trash2, Play, ListChecks, Settings2, Link2 } from "lucide-react";
-import { PageHeader } from "../../../components/ui/PageHeader";
+import { Search, Copy, Pencil, Trash2, Play, ListChecks, Settings2, Link2 } from "lucide-react";
 import { EmptyState } from "../../../components/ui/EmptyState";
 import { useAppStore } from "../../../stores/appStore";
 import { useWorkflowStore } from "./store/workflowStore";
@@ -9,6 +8,8 @@ import { workflowRunnerHost } from "./runnerHost";
 import { getHostContext } from "../../registry";
 import { todayString } from "../../../lib/date";
 import { getWorkflowPreferences } from "./preferences";
+import { WorkflowShell } from "./components/WorkflowShell";
+import { useWorkflowUiStore } from "./store/workflowUiStore";
 
 type ModalMode = { kind: "create" } | { kind: "edit"; id: string } | null;
 
@@ -44,14 +45,20 @@ export default function WorkflowPage() {
   const updateMeta = useWorkflowStore((s) => s.updateMeta);
   const remove = useWorkflowStore((s) => s.remove);
   const duplicate = useWorkflowStore((s) => s.duplicate);
+  const activeRuns = useWorkflowStore((s) => s.activeRuns);
+  const loadingRuns = useWorkflowStore((s) => s.loadingRuns);
+  const loadActiveRuns = useWorkflowStore((s) => s.loadActiveRuns);
 
-  const [query, setQuery] = useState("");
+  const query = useWorkflowUiStore((s) => s.search);
+  const setQuery = useWorkflowUiStore((s) => s.setSearch);
+  const view = useWorkflowUiStore((s) => s.view);
+  const editingId = useWorkflowUiStore((s) => s.selectedTemplateId);
+  const navigate = useWorkflowUiStore((s) => s.navigate);
+  const openEditorView = useWorkflowUiStore((s) => s.openEditor);
   const [modal, setModal] = useState<ModalMode>(null);
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
   const [tagsText, setTagsText] = useState("");
-  const [view, setView] = useState<"list" | "editor">("list");
-  const [editingId, setEditingId] = useState<string | null>(null);
   const [panel, setPanel] = useState<RunnerPanel | null>(null);
   const [picker, setPicker] = useState<TaskPickerState | null>(null);
 
@@ -59,6 +66,10 @@ export default function WorkflowPage() {
     void loadList();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (view === "runs") void loadActiveRuns();
+  }, [loadActiveRuns, view]);
 
   // 注意：所有 hook 必须在条件 return（编辑器视图早退）之前调用，
   // 否则切视图时 hook 数量变化会触发 React "Rendered fewer hooks than expected"。
@@ -74,8 +85,7 @@ export default function WorkflowPage() {
   }, [list, query]);
 
   const openEditor = (id: string) => {
-    setEditingId(id);
-    setView("editor");
+    openEditorView(id);
     void load(id);
   };
 
@@ -110,7 +120,7 @@ export default function WorkflowPage() {
     if (!current || current.id !== editingId) {
       // 加载失败/记录不存在时给出逃生出口（Phase 3：避免永久「加载中」卡死）
       return (
-        <div className="mx-auto w-full max-w-4xl">
+        <WorkflowShell view={view} onViewChange={navigate}>
           <div className="flex items-center justify-between rounded-md border border-border-subtle glass-surface p-4">
             <div className="text-sm text-text-muted">
               {current === null ? "加载中…" : "Workflow 不存在或已删除"}
@@ -128,8 +138,7 @@ export default function WorkflowPage() {
               )}
               <button
                 onClick={() => {
-                  setView("list");
-                  setEditingId(null);
+                  navigate("library");
                   void loadList();
                 }}
                 className="rounded-md bg-accent px-3 py-1.5 text-xs text-on-accent hover:bg-accent-hover"
@@ -138,25 +147,26 @@ export default function WorkflowPage() {
               </button>
             </div>
           </div>
-        </div>
+        </WorkflowShell>
       );
     }
     return (
-      <div style={{ height: "calc(100vh - 150px)" }} className="w-full">
-        <WorkflowEditorView
-          workflow={current}
-          onBack={() => {
-            setView("list");
-            setEditingId(null);
-            void loadList();
-          }}
-          onSaved={() => {
-            void loadList();
-            if (editingId) void load(editingId);
-            pushToast("success", "Workflow 已保存");
-          }}
-        />
-      </div>
+      <WorkflowShell view={view} onViewChange={navigate}>
+        <div style={{ height: "calc(100vh - 260px)" }} className="min-h-[34rem] w-full">
+          <WorkflowEditorView
+            workflow={current}
+            onBack={() => {
+              navigate("library");
+              void loadList();
+            }}
+            onSaved={() => {
+              void loadList();
+              if (editingId) void load(editingId);
+              pushToast("success", "Workflow 已保存");
+            }}
+          />
+        </div>
+      </WorkflowShell>
     );
   }
 
@@ -265,20 +275,48 @@ export default function WorkflowPage() {
   const inputCls =
     "w-full rounded-md border border-border-strong bg-surface px-3 py-2 text-sm text-text-primary outline-none placeholder:text-text-faint focus:border-accent";
 
+  if (view === "runs") {
+    return (
+      <WorkflowShell view={view} onViewChange={navigate} onCreate={openCreate}>
+        <div className="rounded-2xl border border-border-subtle bg-surface/70 p-5">
+          <div className="mb-5 flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-base font-semibold text-text-primary">运行中心</h2>
+              <p className="mt-1 text-sm text-text-muted">继续等待确认或尚未结束的自动化。</p>
+            </div>
+            <span className="rounded-full bg-surface-muted px-2.5 py-1 text-xs text-text-muted">{activeRuns.length} 个进行中</span>
+          </div>
+          {loadingRuns ? (
+            <p className="py-12 text-center text-sm text-text-muted">正在读取运行记录…</p>
+          ) : activeRuns.length === 0 ? (
+            <div className="grid min-h-48 place-items-center rounded-xl border border-dashed border-border-strong px-6 text-center">
+              <div className="max-w-md">
+            <ListChecks className="mx-auto text-text-faint" size={28} />
+                <h3 className="mt-3 text-sm font-semibold text-text-primary">没有待处理的运行</h3>
+                <p className="mt-1 text-sm leading-6 text-text-muted">从模板库启动自动化后，可以在这里恢复和确认。</p>
+              </div>
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {activeRuns.map((run) => (
+                <li key={run.id} className="flex items-center justify-between rounded-xl border border-border-subtle bg-bg-app/70 px-4 py-3">
+                  <div>
+                    <p className="text-sm font-medium text-text-primary">{list.find((item) => item.id === run.workflowId)?.name ?? "Workflow"}</p>
+                    <p className="mt-0.5 text-xs text-text-muted">状态：{run.state}</p>
+                  </div>
+                  <button type="button" className="min-h-10 cursor-pointer rounded-lg border border-border-strong px-3 text-sm text-text-secondary hover:bg-surface-hover">继续处理</button>
+                </li>
+              ))}
+            </ul>
+          )}
+            {panel && <p className="mt-3 text-xs text-accent-strong">当前运行：{panel.wfName} · {panel.state}</p>}
+        </div>
+      </WorkflowShell>
+    );
+  }
+
   return (
-    <div className="mx-auto w-full max-w-4xl">
-      <PageHeader
-        title="Workflow"
-        description="Workflow = 应该怎么做；WorkflowRun = 这一次实际怎么做。"
-        actions={
-          <button
-            onClick={openCreate}
-            className="flex items-center gap-1 rounded-md bg-accent px-3 py-2 text-sm text-on-accent hover:bg-accent-hover"
-          >
-            <Plus size={16} /> 新建
-          </button>
-        }
-      />
+    <WorkflowShell view={view} onViewChange={navigate} onCreate={openCreate}>
 
       {panel && (
         <div className="rounded-md border border-border-subtle glass-surface p-3">
@@ -545,6 +583,6 @@ export default function WorkflowPage() {
           </div>
         </div>
       )}
-    </div>
+    </WorkflowShell>
   );
 }
