@@ -48,4 +48,9 @@ export const workflowSystemBridge = {
     invoke<FileWriteResult>("workflow_copy_path", { input }),
   executeProcess: (input: ProcessExecutionInput) =>
     invoke<ProcessExecutionResult>("workflow_execute_process", { input }),
+  launchProcess: (input: ProcessExecutionInput) =>
+    invoke<void>("workflow_launch_process_v2", { input }),
+  openFile: (path: string) => invoke<void>("workflow_open_file", { path }),
+  openFolder: (path: string) => invoke<void>("workflow_open_folder", { path }),
+  openUrl: (url: string) => invoke<void>("workflow_open_url", { url }),
 };

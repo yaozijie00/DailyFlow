@@ -126,6 +126,7 @@ export interface WorkflowExecutionContext {
   variables: WorkflowVariableValues;
   resolvedConfig: Record<string, unknown>;
   trace: string[];
+  taskId?: number | null;
   signal?: AbortSignal;
 }
 

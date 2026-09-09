@@ -1304,6 +1304,60 @@ fn workflow_execute_process(
     })
 }
 
+#[tauri::command]
+fn workflow_launch_process_v2(input: WorkflowExecuteProcessInput) -> Result<(), String> {
+    let executable = ensure_absolute_path(&input.executable)?;
+    if !executable.is_file() {
+        return Err(format!("程序不存在：{}", executable.display()));
+    }
+    let mut command = std::process::Command::new(executable);
+    command.args(input.arguments);
+    if let Some(directory) = input.working_directory {
+        if !directory.trim().is_empty() {
+            let resolved = ensure_absolute_path(&directory)?;
+            if !resolved.is_dir() {
+                return Err(format!("工作目录不存在：{}", resolved.display()));
+            }
+            command.current_dir(resolved);
+        }
+    }
+    command
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("启动程序失败：{error}"))
+}
+
+#[tauri::command]
+fn workflow_open_url(url: String) -> Result<(), String> {
+    use windows_sys::Win32::UI::Shell::ShellExecuteW;
+    let normalized = url.trim();
+    if !(normalized.starts_with("https://") || normalized.starts_with("http://"))
+        || normalized.contains(['\r', '\n'])
+    {
+        return Err("网址必须使用 http:// 或 https://".to_string());
+    }
+    let wide_url: Vec<u16> = normalized
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .collect();
+    let wide_open: Vec<u16> = "open".encode_utf16().chain(std::iter::once(0)).collect();
+    let result = unsafe {
+        ShellExecuteW(
+            std::ptr::null_mut(),
+            wide_open.as_ptr(),
+            wide_url.as_ptr(),
+            std::ptr::null(),
+            std::ptr::null(),
+            1,
+        )
+    };
+    if result as i32 > 32 {
+        Ok(())
+    } else {
+        Err(format!("打开网址失败（系统错误码 {}）", result as i32))
+    }
+}
+
 /// 启动失败时弹出可读提示（避免「白屏挂起」无从排查）。
 fn show_startup_error(message: &str) {
     let title: Vec<u16> = "DailyFlow 启动失败"
@@ -1457,7 +1511,9 @@ pub fn run() {
             workflow_create_directories,
             workflow_write_text_file,
             workflow_copy_path,
-            workflow_execute_process
+            workflow_execute_process,
+            workflow_launch_process_v2,
+            workflow_open_url
         ])
         .run(tauri::generate_context!());
 
