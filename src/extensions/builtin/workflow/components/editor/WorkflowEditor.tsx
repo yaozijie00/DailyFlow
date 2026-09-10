@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { AlignHorizontalSpaceAround, ArrowLeft, Play, Redo2, Save, Trash2, Undo2 } from "lucide-react";
 import type { WorkflowNodeRegistry } from "../../domain/nodeRegistry";
 import { validateAndOrderWorkflowGraph } from "../../domain/planner";
@@ -66,6 +66,10 @@ export function WorkflowEditor({ workflow, registry, onSave, onBack, onPreview }
   const draft = history.present;
   const selected = draft.nodes.find((node) => node.id === selectedIds[0]) ?? null;
   const definitions = useMemo(() => registry.list(), [registry]);
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const updateSelection = useCallback((ids: string[]) => {
+    setSelectedIds((current) => current.length === ids.length && current.every((id, index) => id === ids[index]) ? current : ids);
+  }, []);
 
   const commit = (next: WorkflowV2, base?: WorkflowV2) => {
     setHistory((current) => commitEditorHistory(base ? replaceEditorPresent(current, base) : current, next));
@@ -132,8 +136,8 @@ export function WorkflowEditor({ workflow, registry, onSave, onBack, onPreview }
         <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-text-primary">{draft.name}</p><p className="text-[10px] text-text-faint">v{draft.version}{isEditorHistoryDirty(history) ? " · 未保存" : " · 已保存"}</p></div>
         <button type="button" aria-label="撤销" disabled={history.past.length === 0} onClick={() => setHistory(undoEditorHistory)} className="grid size-10 cursor-pointer place-items-center rounded-lg text-text-muted hover:bg-surface-hover disabled:opacity-30"><Undo2 size={15} /></button>
         <button type="button" aria-label="重做" disabled={history.future.length === 0} onClick={() => setHistory(redoEditorHistory)} className="grid size-10 cursor-pointer place-items-center rounded-lg text-text-muted hover:bg-surface-hover disabled:opacity-30"><Redo2 size={15} /></button>
-        <button type="button" onClick={autoArrange} className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-xs text-text-secondary hover:bg-surface-hover"><AlignHorizontalSpaceAround size={14} />自动排列</button>
-        <button type="button" onClick={() => void onPreview(draft)} className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg border border-border-strong px-3 text-xs text-text-secondary hover:bg-surface-hover"><Play size={14} />试运行</button>
+        <button type="button" aria-label="自动排列" onClick={autoArrange} className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg px-2.5 text-xs text-text-secondary hover:bg-surface-hover"><AlignHorizontalSpaceAround size={14} /><span className="max-[900px]:sr-only">自动排列</span></button>
+        <button type="button" aria-label="试运行" onClick={() => void onPreview(draft)} className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg border border-border-strong px-3 text-xs text-text-secondary hover:bg-surface-hover"><Play size={14} /><span className="max-[900px]:sr-only">试运行</span></button>
         <button type="button" disabled={saving} onClick={() => void save()} className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg bg-accent px-3.5 text-xs font-medium text-on-accent hover:bg-accent-hover disabled:opacity-50"><Save size={14} />{saving ? "保存中…" : "保存"}</button>
       </header>
       {saveError && <div role="alert" className="flex items-center gap-2 border-b border-danger/20 bg-danger-soft px-4 py-2 text-xs text-danger">{saveError}<span className="ml-auto">草稿仍保留在编辑器中</span></div>}
@@ -141,10 +145,10 @@ export function WorkflowEditor({ workflow, registry, onSave, onBack, onPreview }
         <NodePalette definitions={definitions} onAdd={addNode} />
         <div className="relative flex min-w-0 flex-1 flex-col">
           {selectedIds.length > 1 && <button type="button" onClick={deleteSelected} className="absolute right-3 top-3 z-10 inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg border border-danger/20 bg-bg-elevated px-3 text-xs text-danger shadow-popover"><Trash2 size={13} />删除 {selectedIds.length} 个节点</button>}
-          <WorkflowCanvas workflow={draft} selectedIds={new Set(selectedIds)} onDraftChange={replace} onCommit={commit} onSelectionChange={setSelectedIds} onDropNode={addNode} />
+          <WorkflowCanvas workflow={draft} selectedIds={selectedIdSet} onDraftChange={replace} onCommit={commit} onSelectionChange={updateSelection} onDropNode={addNode} />
           <ValidationPanel issues={issues} onSelectNode={(nodeId) => setSelectedIds([nodeId])} />
         </div>
-        <NodeInspector node={selected} definition={selected ? registry.get(selected.type) : undefined} onChange={(node) => commit({ ...draft, nodes: draft.nodes.map((item) => item.id === node.id ? node : item) })} onDuplicate={duplicateSelected} onDelete={deleteSelected} />
+        <NodeInspector node={selected} definition={selected ? registry.get(selected.type) : undefined} onChange={(node) => commit({ ...draft, nodes: draft.nodes.map((item) => item.id === node.id ? node : item) })} onDuplicate={duplicateSelected} onDelete={deleteSelected} onClose={() => setSelectedIds([])} />
       </div>
     </div>
   );

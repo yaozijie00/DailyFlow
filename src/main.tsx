@@ -12,6 +12,9 @@ import "./index.css";
 window.addEventListener("error", (e) => {
   const msg = e.message ?? String(e.error ?? "unknown");
   log(`window.onerror: ${msg}`);
+  // Chromium 在同一帧仍有待投递的 ResizeObserver 通知时会发出该浏览器级提示。
+  // 布局会在下一帧继续收敛，它不是应用崩溃，不能用致命覆盖层阻断用户操作。
+  if (msg.includes("ResizeObserver loop")) return;
   showFatal(msg);
 });
 window.addEventListener("unhandledrejection", (e) => {

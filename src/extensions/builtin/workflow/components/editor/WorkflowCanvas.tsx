@@ -45,13 +45,17 @@ export function WorkflowCanvas({ workflow, selectedIds, onDraftChange, onCommit,
 }) {
   const dragBase = useRef<WorkflowV2 | null>(null);
   const nodes = useMemo(() => toCanvasNodes(workflow.nodes, selectedIds), [selectedIds, workflow.nodes]);
-  const edges: Edge[] = workflow.edges.map((edge) => ({ ...edge }));
+  const edges: Edge[] = useMemo(() => workflow.edges.map((edge) => ({ ...edge })), [workflow.edges]);
   const onNodesChange = (changes: NodeChange<CanvasNode>[]) => {
-    const isDragging = changes.some((change) => change.type === "position" && change.dragging === true);
-    const dragEnded = changes.some((change) => change.type === "position" && change.dragging === false);
+    // React Flow 会用 dimensions/select 变化维护自己的内部测量状态。把这些变化写回
+    // 领域草稿会立即重建受控节点，尺寸被清空后再次测量，最终形成隐藏节点或更新循环。
+    const domainChanges = changes.filter((change) => change.type === "position" || change.type === "remove");
+    if (domainChanges.length === 0) return;
+    const isDragging = domainChanges.some((change) => change.type === "position" && change.dragging === true);
+    const dragEnded = domainChanges.some((change) => change.type === "position" && change.dragging === false);
     if (isDragging && !dragBase.current) dragBase.current = workflow;
-    const nextCanvas = applyNodeChanges(changes, nodes);
-    const removed = new Set(changes.filter((change) => change.type === "remove").map((change) => change.id));
+    const nextCanvas = applyNodeChanges(domainChanges, nodes);
+    const removed = new Set(domainChanges.filter((change) => change.type === "remove").map((change) => change.id));
     let next = updatePositions(workflow, nextCanvas);
     if (removed.size > 0) next = { ...next, nodes: next.nodes.filter((node) => !removed.has(node.id)), edges: next.edges.filter((edge) => !removed.has(edge.source) && !removed.has(edge.target)) };
     if (removed.size > 0) {
@@ -66,7 +70,9 @@ export function WorkflowCanvas({ workflow, selectedIds, onDraftChange, onCommit,
     }
   };
   const onEdgesChange = (changes: EdgeChange[]) => {
-    const nextEdges = applyEdgeChanges(changes, edges).map((edge): WorkflowEdgeV2 => ({ id: edge.id, source: edge.source, target: edge.target, ...(edge.sourceHandle ? { sourcePort: edge.sourceHandle } : {}), ...(edge.targetHandle ? { targetPort: edge.targetHandle } : {}) }));
+    const domainChanges = changes.filter((change) => change.type === "remove");
+    if (domainChanges.length === 0) return;
+    const nextEdges = applyEdgeChanges(domainChanges, edges).map((edge): WorkflowEdgeV2 => ({ id: edge.id, source: edge.source, target: edge.target, ...(edge.sourceHandle ? { sourcePort: edge.sourceHandle } : {}), ...(edge.targetHandle ? { targetPort: edge.targetHandle } : {}) }));
     onCommit({ ...workflow, edges: nextEdges });
   };
   const onConnect: OnConnect = (connection) => {

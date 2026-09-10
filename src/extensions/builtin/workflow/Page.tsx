@@ -36,6 +36,10 @@ export default function WorkflowPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (view === "editor" && editingId && current?.id !== editingId) void load(editingId);
+  }, [current?.id, editingId, load, view]);
+
   const openEditor = (id: string) => {
     openEditorView(id);
     void load(id);
