@@ -9,6 +9,7 @@ import { formatTimeRange } from "../../lib/timeline";
 import { TASK_STATUS_LABEL } from "../../lib/taskLabels";
 import { postponeTargets } from "../../lib/postpone";
 import { todayString } from "../../lib/date";
+import { ExtensionErrorBoundary, useEnabledTaskActions } from "../../extensions/host";
 
 export default function TaskDetail() {
   const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
@@ -25,6 +26,7 @@ export default function TaskDetail() {
   const selectTask = useTaskStore((s) => s.selectTask);
   const openTaskDetail = useTaskStore((s) => s.openTaskDetail);
   const openEdit = useTaskStore((s) => s.openEdit);
+  const extensionActions = useEnabledTaskActions();
 
   const [notesEditing, setNotesEditing] = useState(false);
   const [notesDraft, setNotesDraft] = useState("");
@@ -91,7 +93,7 @@ export default function TaskDetail() {
         {!completed && !cancelled && (
           <button
             onClick={() => completeTask(task.id)}
-            className="flex shrink-0 items-center gap-1 rounded-md bg-green-600 px-3 py-1.5 text-sm text-white hover:bg-green-500"
+            className="flex min-h-11 shrink-0 items-center gap-1 rounded-lg bg-success px-3 py-1.5 text-sm text-white hover:brightness-95"
           >
             <Check size={14} /> 完成任务
           </button>
@@ -326,7 +328,7 @@ export default function TaskDetail() {
                   void updateTask(task.id, { scheduledDate: p.date });
                   selectTask(null);
                 }}
-                className="rounded-md border border-border-strong bg-surface px-2.5 py-1 text-xs text-text-secondary hover:border-accent hover:bg-surface-hover"
+                className="min-h-10 rounded-lg border border-border-strong bg-surface px-2.5 py-1 text-xs text-text-secondary hover:border-accent hover:bg-surface-hover"
               >
                 {p.label}
                 <span className="ml-1 text-text-faint">
@@ -342,7 +344,7 @@ export default function TaskDetail() {
                 void updateTask(task.id, { scheduledDate: e.target.value });
                 selectTask(null);
               }}
-              className="rounded-md border border-border-strong bg-surface px-2 py-1 text-xs text-text-primary outline-none transition-colors focus:border-accent"
+              className="min-h-10 rounded-lg border border-border-strong bg-surface px-2 py-1 text-xs text-text-primary outline-none transition-colors focus:border-accent"
               title="自定义日期"
             />
           </div>
@@ -350,23 +352,28 @@ export default function TaskDetail() {
       )}
 
       <div className="flex flex-wrap gap-2">
+        {extensionActions.map(({ key, Component }) => (
+          <ExtensionErrorBoundary key={key} label={key}>
+            <Component task={{ id: task.id, title: task.title, status: task.status }} />
+          </ExtensionErrorBoundary>
+        ))}
         {!completed && !cancelled && (
           <button
             onClick={() => cancelTask(task.id)}
-            className="rounded-md bg-surface-muted px-3 py-1.5 text-sm text-text-secondary hover:bg-surface-hover"
+            className="min-h-11 rounded-lg bg-surface-muted px-3 py-1.5 text-sm text-text-secondary hover:bg-surface-hover"
           >
             取消任务
           </button>
         )}
         <button
           onClick={() => openEdit(task.id)}
-          className="flex items-center gap-1 rounded-md border border-border-strong bg-surface px-3 py-1.5 text-sm text-text-secondary hover:bg-surface-hover"
+          className="flex min-h-11 items-center gap-1 rounded-lg border border-border-strong bg-surface px-3 py-1.5 text-sm text-text-secondary hover:bg-surface-hover"
         >
           <Pencil size={14} /> 编辑
         </button>
         <button
           onClick={() => deleteTask(task.id)}
-          className="flex items-center gap-1 rounded-md border border-red-200 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50"
+          className="flex min-h-11 items-center gap-1 rounded-lg border border-danger/25 px-3 py-1.5 text-sm text-danger hover:bg-danger-soft"
         >
           <Trash2 size={14} /> 删除
         </button>

@@ -7,8 +7,11 @@ import {
   getNavContribution,
   getSettingsContributions,
   getSlotComponents,
+  getQuickLaunchComponents,
+  getTaskActionContributions,
 } from "./registry";
 import type { ExtensionCapability, ExtensionSlotId } from "./types";
+import type { ExtensionTaskContext } from "./types";
 import { log } from "../lib/startupLog";
 
 /* ==================== React 订阅层（Core UI 与 Registry 之间的薄绑定） ==================== */
@@ -36,6 +39,25 @@ export function useEnabledSlotComponents(slot: ExtensionSlotId): Array<{
   const revision = useExtensionStore((s) => s.revision);
   void revision;
   return getSlotComponents(slot).filter((x) => enabled[x.id]);
+}
+
+export function useEnabledQuickLaunchComponents(): Array<{ id: string; Component: ComponentType }> {
+  const enabled = useExtensionStore((s) => s.enabled);
+  const revision = useExtensionStore((s) => s.revision);
+  void revision;
+  return getQuickLaunchComponents().filter((item) => enabled[item.id]);
+}
+
+export function useEnabledTaskActions(): Array<{
+  key: string;
+  Component: ComponentType<{ task: ExtensionTaskContext }>;
+}> {
+  const enabled = useExtensionStore((s) => s.enabled);
+  const revision = useExtensionStore((s) => s.revision);
+  void revision;
+  return getTaskActionContributions()
+    .filter((item) => enabled[item.extensionId])
+    .map((item) => ({ key: `${item.extensionId}:${item.contribution.id}`, Component: item.contribution.Component }));
 }
 
 /** 启用扩展贡献的设置分组（Settings 页面用）。 */

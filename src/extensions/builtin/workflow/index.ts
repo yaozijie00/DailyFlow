@@ -13,6 +13,7 @@ import {
   initializeWorkflowPreferences,
 } from "./preferences";
 import { setWorkflowTemplateStorage } from "./services/workflowService";
+import { WorkflowQuickLaunch, WorkflowTaskAction } from "./components/WorkflowQuickLaunch";
 
 /**
  * DailyFlow 第二个 Extension：Workflow。
@@ -30,6 +31,8 @@ export const manifest = {
   capabilities: [
     "ui.page",
     "ui.settings",
+    "ui.today-slot",
+    "ui.task-action",
     "tasks.read",
     "tasks.write",
     "storage.core",
@@ -81,6 +84,8 @@ export function activate(ctx: CoreContext) {
   return {
     nav: { page: "ext:workflow", label: "Workflow" },
     Page: WorkflowPage,
+    quickLaunch: { Component: WorkflowQuickLaunch },
+    taskActions: [{ id: "run-workflow", Component: WorkflowTaskAction }],
     settings: [{ id: "preferences", label: "偏好", Component: WorkflowSettings }],
   };
 }

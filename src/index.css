@@ -236,6 +236,17 @@ html.glass {
     transition-duration: 0.01ms !important;
   }
 }
+
+:where(button, input, select, textarea, [role="button"]):focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+:where(button, input, select, textarea):disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
 [data-layout-mode="focus"] .glass-surface {
   box-shadow: none; /* 减干扰：弱化卡片阴影 */
 }

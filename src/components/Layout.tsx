@@ -78,7 +78,7 @@ function NavButton({
       aria-current={current === page ? "page" : undefined}
       title={collapsed ? label : undefined}
       aria-label={label}
-      className={`relative flex w-full items-center rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 ${
+      className={`relative flex min-h-11 w-full items-center rounded-lg text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 ${
         collapsed ? "justify-center px-0 py-2.5" : "gap-2 px-3 py-2"
       } ${
         current === page
@@ -164,7 +164,7 @@ export default function Layout({ children }: { children: ReactNode }) {
             onClick={toggleSidebar}
             aria-label={collapsed ? "展开侧栏" : "折叠侧栏"}
             title={collapsed ? "展开侧栏" : "折叠侧栏"}
-            className={`flex items-center justify-center py-2 text-text-faint transition-colors hover:bg-surface-hover hover:text-text-primary ${
+            className={`flex min-h-11 items-center justify-center py-2 text-text-faint transition-colors hover:bg-surface-hover hover:text-text-primary ${
               collapsed ? "" : "justify-end pr-2"
             }`}
           >

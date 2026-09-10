@@ -5,6 +5,7 @@ import { EXTENSION_API_VERSION } from "../../extensions/types";
 const CAPABILITY_LABELS = {
   "ui.page": "独立页面",
   "ui.today-slot": "今日视图",
+  "ui.task-action": "任务操作",
   "ui.settings": "设置分组",
   "tasks.read": "读取任务",
   "tasks.write": "修改任务",

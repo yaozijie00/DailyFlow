@@ -15,7 +15,7 @@ import Timeline from "../components/timeline/Timeline";
 import TodaySummary from "../components/today/TodaySummary";
 import TodayFestival from "../components/today/TodayFestival";
 import ReminderRail, { REMINDER_RAIL_WIDTH } from "../components/today/ReminderRail";
-import { useEnabledSlotComponents, ExtensionErrorBoundary } from "../extensions/host";
+import { useEnabledQuickLaunchComponents, useEnabledSlotComponents, ExtensionErrorBoundary } from "../extensions/host";
 import { computeReminderSummary, hasAnyReminder } from "../lib/dayWarnings";
 import NoteList from "../components/notes/NoteList";
 import CalendarPopover from "../components/today/CalendarPopover";
@@ -71,6 +71,7 @@ export default function Today() {
   );
   const showRail = hasAnyReminder(reminderSummary);
   const todaySlotComponents = useEnabledSlotComponents("today");
+  const quickLaunchComponents = useEnabledQuickLaunchComponents();
   const [railNarrow, setRailNarrow] = useState(false);
   const [railOpen, setRailOpen] = useState(false);
 
@@ -253,7 +254,7 @@ export default function Today() {
               onClick={() => setShowInbox((value) => !value)}
               aria-expanded={showInbox}
               aria-controls="today-inbox"
-              className={`flex h-9 items-center gap-1.5 rounded-md border px-2.5 text-xs transition-colors ${
+              className={`flex min-h-11 items-center gap-1.5 rounded-lg border px-3 text-xs transition-colors ${
                 showInbox
                   ? "border-accent/30 bg-accent-soft text-accent"
                   : "border-border-subtle bg-surface text-text-secondary hover:bg-surface-hover"
@@ -270,7 +271,7 @@ export default function Today() {
                 onClick={() => setRailOpen((v) => !v)}
                 aria-label="今日提醒（点击展开）"
                 title="今日提醒"
-                className="relative flex h-9 w-9 items-center justify-center rounded-md border border-border-subtle bg-surface text-text-secondary transition-colors hover:bg-surface-hover"
+                className="relative flex size-11 items-center justify-center rounded-lg border border-border-subtle bg-surface text-text-secondary transition-colors hover:bg-surface-hover"
               >
                 <Bell size={15} />
                 <span className="absolute -right-1 -top-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-red-500 px-0.5 text-[9px] font-semibold leading-none text-white">
@@ -316,6 +317,12 @@ export default function Today() {
         <TodaySummary />
       </div>
 
+      {selectedDate === todayString() && quickLaunchComponents.map(({ id, Component }) => (
+        <ExtensionErrorBoundary key={`quick:${id}`} label={id}>
+          <Component />
+        </ExtensionErrorBoundary>
+      ))}
+
       {/* 今日扩展槽位（如课程表「今日课程」；仅查看今天时显示，由 Extension 决定内容）。
           Rule 04：每个槽位组件独立包错误边界——单个扩展渲染异常只替换该区块，不崩 Today 页。 */}
       {selectedDate === todayString() &&
@@ -338,7 +345,7 @@ export default function Today() {
               <h2 className="text-sm font-medium text-text-secondary">今日任务</h2>
               <button
                 onClick={() => openCreate()}
-                className="flex items-center gap-1 rounded-md bg-accent px-2 py-1 text-xs text-on-accent hover:bg-accent-hover"
+                className="flex min-h-10 items-center gap-1 rounded-lg bg-accent px-3 py-1 text-xs text-on-accent hover:bg-accent-hover"
               >
                 <Plus size={14} /> 新建
               </button>

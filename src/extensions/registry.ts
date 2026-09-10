@@ -12,6 +12,7 @@ import {
   type ExtensionModule,
   type ExtensionSettingsContribution,
   type ExtensionSlotId,
+  type ExtensionTaskActionContribution,
 } from "./types";
 
 /**
@@ -194,6 +195,13 @@ export function validateContributions(
     if (settingIds.has(id)) return `扩展设置分组 ID 重复：${id}`;
     settingIds.add(id);
   }
+  const taskActionIds = new Set<string>();
+  for (const action of contributions.taskActions ?? []) {
+    const id = action.id.trim();
+    if (!id) return "任务动作 ID 不能为空";
+    if (taskActionIds.has(id)) return `任务动作 ID 重复：${id}`;
+    taskActionIds.add(id);
+  }
   return null;
 }
 
@@ -208,6 +216,12 @@ export function validateContributionCapabilities(
   }
   if (contributions.slots?.today && !capabilities.has("ui.today-slot")) {
     return "今日页面槽位贡献需要声明 ui.today-slot 能力";
+  }
+  if (contributions.quickLaunch && !capabilities.has("ui.today-slot")) {
+    return "今日快捷启动贡献需要声明 ui.today-slot 能力";
+  }
+  if ((contributions.taskActions?.length ?? 0) > 0 && !capabilities.has("ui.task-action")) {
+    return "任务动作贡献需要声明 ui.task-action 能力";
   }
   if ((contributions.settings?.length ?? 0) > 0 && !capabilities.has("ui.settings")) {
     return "扩展设置贡献需要声明 ui.settings 能力";
@@ -452,6 +466,30 @@ export function getSlotComponents(slot: ExtensionSlotId): Array<{
     if (act.error) continue;
     const Component = act.contributions.slots?.[slot];
     if (Component) out.push({ id: act.id, Component });
+  }
+  return out;
+}
+
+export function getQuickLaunchComponents(): Array<{ id: string; Component: ComponentType }> {
+  const out: Array<{ id: string; Component: ComponentType }> = [];
+  for (const act of activated.values()) {
+    if (act.error) continue;
+    const Component = act.contributions.quickLaunch?.Component;
+    if (Component) out.push({ id: act.id, Component });
+  }
+  return out;
+}
+
+export function getTaskActionContributions(): Array<{
+  extensionId: string;
+  contribution: ExtensionTaskActionContribution;
+}> {
+  const out: Array<{ extensionId: string; contribution: ExtensionTaskActionContribution }> = [];
+  for (const act of activated.values()) {
+    if (act.error) continue;
+    for (const contribution of act.contributions.taskActions ?? []) {
+      out.push({ extensionId: act.id, contribution });
+    }
   }
   return out;
 }

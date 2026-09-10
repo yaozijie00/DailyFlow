@@ -146,6 +146,8 @@ describe("Extension Platform（V1）", () => {
         nav: { page: "ext:a", label: "A" },
         Page,
         slots: { today: Page },
+        quickLaunch: { Component: Page },
+        taskActions: [{ id: "run", Component: Page }],
         settings: [{ id: "main", label: "设置", Component: Page }],
       };
       expect(validateContributionCapabilities([], contributions)).toMatch(/ui\.page/);
@@ -154,10 +156,16 @@ describe("Extension Platform（V1）", () => {
       );
       expect(
         validateContributionCapabilities(["ui.page", "ui.today-slot"], contributions),
+      ).toMatch(/ui\.task-action/);
+      expect(
+        validateContributionCapabilities(
+          ["ui.page", "ui.today-slot", "ui.task-action"],
+          contributions,
+        ),
       ).toMatch(/ui\.settings/);
       expect(
         validateContributionCapabilities(
-          ["ui.page", "ui.today-slot", "ui.settings"],
+          ["ui.page", "ui.today-slot", "ui.task-action", "ui.settings"],
           contributions,
         ),
       ).toBeNull();

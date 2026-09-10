@@ -19,6 +19,7 @@ export const EXTENSION_API_VERSION = 1;
 export const EXTENSION_CAPABILITIES = [
   "ui.page",
   "ui.today-slot",
+  "ui.task-action",
   "ui.settings",
   "tasks.read",
   "tasks.write",
@@ -71,6 +72,21 @@ export interface ExtensionSettingsContribution {
   Component: ComponentType;
 }
 
+export interface ExtensionTaskContext {
+  id: number;
+  title: string;
+  status: string;
+}
+
+export interface ExtensionQuickLaunchContribution {
+  Component: ComponentType;
+}
+
+export interface ExtensionTaskActionContribution {
+  id: string;
+  Component: ComponentType<{ task: ExtensionTaskContext }>;
+}
+
 /** Extension 激活结果：声明它向 Core UI 提供的贡献。 */
 export interface ExtensionContributions {
   nav?: ExtensionNavContribution;
@@ -78,6 +94,10 @@ export interface ExtensionContributions {
   slots?: Partial<Record<ExtensionSlotId, ComponentType>>;
   /** 可选设置分组；宿主会自动隔离渲染错误并添加扩展命名空间。 */
   settings?: ExtensionSettingsContribution[];
+  /** 今日页中的轻量快捷启动区；不获得 Core store。 */
+  quickLaunch?: ExtensionQuickLaunchContribution;
+  /** 任务详情中的扩展动作；宿主仅传任务最小上下文。 */
+  taskActions?: ExtensionTaskActionContribution[];
   /** nav 指向的页面组件 */
   Page?: ComponentType;
 }

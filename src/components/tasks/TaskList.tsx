@@ -172,7 +172,7 @@ export default function TaskList() {
                 <button
                   key={f.key}
                   onClick={() => setStatusFilter(f.key)}
-                  className={`rounded px-2 py-1 text-xs transition-colors ${
+                  className={`min-h-10 rounded-lg px-2.5 py-1 text-xs transition-colors ${
                     statusFilter === f.key
                       ? "bg-accent text-on-accent"
                       : "text-text-muted hover:bg-surface-hover"
@@ -186,7 +186,7 @@ export default function TaskList() {
               <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="min-w-0 flex-1 rounded-md border border-border-strong bg-surface px-2 py-1 text-xs text-text-secondary"
+                className="min-h-10 min-w-0 flex-1 rounded-lg border border-border-strong bg-surface px-2 py-1 text-xs text-text-secondary"
               >
                 <option value="">全部分类</option>
                 {categories.map((c) => (
@@ -200,7 +200,7 @@ export default function TaskList() {
                 value={priorityFilter}
                 onChange={(e) => setPriorityFilter(e.target.value)}
                 aria-label="按优先级筛选"
-                className="min-w-0 flex-1 rounded-md border border-border-strong bg-surface px-2 py-1 text-xs text-text-secondary"
+                className="min-h-10 min-w-0 flex-1 rounded-lg border border-border-strong bg-surface px-2 py-1 text-xs text-text-secondary"
               >
                 <option value="">全部优先级</option>
                 {TASK_PRIORITIES.map((p) => (
