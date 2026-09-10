@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
+import tempfile
 import time
 import uuid
 from pathlib import Path
@@ -77,6 +79,9 @@ def main() -> None:
     args.output.mkdir(parents=True, exist_ok=True)
 
     title = f"DailyFlow E2E {time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
+    workflow_project = f"Workflow-E2E-{uuid.uuid4().hex[:6]}"
+    workflow_root = Path(tempfile.mkdtemp(prefix="dailyflow-workflow-e2e-"))
+    workflow_target = workflow_root / workflow_project
     report: dict[str, object] = {
         "status": "running",
         "taskTitle": title,
@@ -86,6 +91,9 @@ def main() -> None:
         "taskCreated": False,
         "taskCleaned": False,
         "workflowPreferenceRestored": False,
+        "workflowTarget": str(workflow_target),
+        "workflowCreated": False,
+        "workflowCleaned": False,
     }
     browser = None
     page: Page | None = None
@@ -159,6 +167,33 @@ def main() -> None:
                 raise AssertionError("Workflow 偏好未能恢复原值")
             passed("Workflow 扩展偏好可持久化并恢复原值")
 
+            navigate(page, "Workflow")
+            card = page.get_by_role("article").filter(has_text="创建通用项目目录").first
+            card.get_by_role("button", name="运行", exact=True).click()
+            run_dialog = page.get_by_role("dialog", name="创建通用项目目录")
+            run_dialog.get_by_label("保存位置").fill(str(workflow_root))
+            run_dialog.get_by_label("项目名称").fill(workflow_project)
+            run_dialog.get_by_role("button", name="预览操作", exact=True).click()
+            run_dialog.get_by_text(workflow_project, exact=False).first.wait_for(state="visible")
+            passed("Workflow 运行前展示目标路径与影响预览")
+
+            run_dialog.get_by_role("button", name="确认并运行", exact=True).click()
+            run_dialog.get_by_text("Workflow 已完成", exact=True).wait_for(state="visible")
+            if not workflow_target.is_dir():
+                raise AssertionError(f"Workflow 未创建目标目录：{workflow_target}")
+            expected_directories = ("01_资料", "02_规划", "03_制作", "04_交付", "99_归档")
+            missing = [name for name in expected_directories if not (workflow_target / name).is_dir()]
+            if missing:
+                raise AssertionError(f"Workflow 缺少目录：{missing}")
+            report["workflowCreated"] = True
+            passed("Workflow 在临时根目录创建完整项目结构")
+
+            run_dialog.get_by_role("button", name="关闭运行面板", exact=True).click()
+            page.get_by_role("tab", name="运行中心", exact=True).click()
+            page.get_by_role("heading", name="运行中心", exact=True).wait_for(state="visible")
+            page.get_by_text("创建通用项目目录", exact=True).first.wait_for(state="visible")
+            passed("运行中心显示刚完成的快照与步骤记录")
+
             navigate(page, "今日")
             page.get_by_role("button", name="新建", exact=True).click()
             dialog = page.get_by_role("dialog")
@@ -215,6 +250,11 @@ def main() -> None:
                 browser.close()
             except Exception:
                 pass
+        try:
+            shutil.rmtree(workflow_root)
+            report["workflowCleaned"] = not workflow_root.exists()
+        except Exception as cleanup_error:
+            report["workflowCleanupError"] = str(cleanup_error)
         report_path = args.output / "report.json"
         report_path.write_text(
             json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"

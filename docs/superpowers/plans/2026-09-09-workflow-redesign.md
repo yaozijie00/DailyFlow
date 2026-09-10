@@ -648,25 +648,25 @@ git commit -m "feat(workflow): add workflow run center"
 - Create: `src/extensions/builtin/workflow/components/WorkflowQuickLaunch.tsx`
 - Create: `src/extensions/builtin/workflow/components/WorkflowQuickLaunch.test.tsx`
 
-- [ ] **Step 1: 扩展宿主贡献点测试**
+- [x] **Step 1: 扩展宿主贡献点测试**
 
 Workflow 启用时 Today 可显示固定模板快捷入口，任务菜单可调用 Workflow；禁用或加载错误时本体不显示入口且不崩溃。
 
-- [ ] **Step 2: 增加窄化贡献接口**
+- [x] **Step 2: 增加窄化贡献接口**
 
 在现有 Extension API 中加入模板快速启动和任务动作贡献，宿主只传任务 id 与最小上下文，不向 Workflow 暴露 store。
 
-- [ ] **Step 3: 优化本体视觉细节**
+- [x] **Step 3: 优化本体视觉细节**
 
 保持现有导航与页面结构，统一：主要/次要/危险按钮状态、输入框错误与禁用状态、Dialog 间距、卡片边界、空状态、焦点环、44 px 点击区域和减少动效媒体查询。
 
-- [ ] **Step 4: 运行本体回归测试**
+- [x] **Step 4: 运行本体回归测试**
 
 Run: `npm test -- src/extensions/platform.test.ts src/extensions/builtin/workflow/components/WorkflowQuickLaunch.test.tsx src/components/tasks/TaskDetail.test.tsx src/components/tasks/TaskList.test.tsx`
 
 Expected: PASS。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/pages/Today.tsx src/components/tasks src/components/Layout.tsx src/index.css src/extensions
@@ -685,19 +685,19 @@ git commit -m "feat(workflow): integrate quick launch with DailyFlow"
 - Modify: `README.md`
 - Modify: `CHANGELOG.md`
 
-- [ ] **Step 1: 扩展响应式自动检查**
+- [x] **Step 1: 扩展响应式自动检查**
 
 在 800×600、960×720、1180×800、1440×900 检查模板库、编辑器抽屉、运行器和运行中心；断言无页面横向溢出、无控制台错误、主要操作可见。
 
-- [ ] **Step 2: 扩展真实 Tauri E2E**
+- [x] **Step 2: 扩展真实 Tauri E2E**
 
 测试使用临时根目录运行“创建通用项目目录”：填写变量、检查预览、执行、验证目录和文件、打开运行记录、清理临时目录并恢复 Workflow 偏好。
 
-- [ ] **Step 3: 更新作者文档**
+- [x] **Step 3: 更新作者文档**
 
 `workflow-authoring-zh.md` 说明模板变量、节点、冲突策略、权限、试运行和日志；扩展文档说明如何注册新 Workflow 节点及能力。
 
-- [ ] **Step 4: 运行全部质量门禁**
+- [x] **Step 4: 运行全部质量门禁**
 
 ```bash
 npm test
@@ -719,7 +719,7 @@ Expected:
 - 真实桌面 E2E 完成文件创建与清理，控制台和页面错误均为 0。
 - 四档视口无横向溢出。
 
-- [ ] **Step 5: 更新变更记录并提交**
+- [x] **Step 5: 更新变更记录并提交**
 
 ```bash
 git add scripts docs README.md CHANGELOG.md

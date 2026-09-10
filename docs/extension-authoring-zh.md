@@ -79,6 +79,7 @@ Manifest 必须列出扩展实际使用的能力。旧扩展省略 `capabilities
 | --- | --- |
 | `ui.page` | 贡献独立导航与页面 |
 | `ui.today-slot` | 在今日页标准槽位渲染组件 |
+| `ui.task-action` | 在任务详情中贡献动作；只接收任务 id、标题和状态 |
 | `ui.settings` | 贡献独立设置分组 |
 | `tasks.read` | 通过 `ctx.tasks` 查询任务 |
 | `tasks.write` | 通过 `ctx.tasks` 创建或完成任务 |
@@ -87,6 +88,12 @@ Manifest 必须列出扩展实际使用的能力。旧扩展省略 `capabilities
 | `storage.core` | 声明使用随主程序迁移的核心库存储 |
 
 宿主会在运行时限制任务读写、扩展存储、旧数据读取和 UI 贡献。`storage.core` 当前仍用于管理页审计；内置扩展与主程序共同编译，因此这套能力系统不是恶意代码安全沙箱。开放外部安装前仍需增加签名、进程隔离和文件系统权限控制。
+
+### 快捷启动与任务动作
+
+`quickLaunch` 使用 `ui.today-slot` 能力在今日页提供轻量入口。`taskActions` 需要 `ui.task-action`，组件只接收 `{ id, title, status }`，不得导入任务 Store。宿主在扩展禁用、激活失败或渲染异常时自动隐藏并隔离入口。
+
+Workflow 节点实现 `WorkflowNodeDefinition`，再通过 `createBuiltInNodeRegistry({ additionalDefinitions })` 注册。节点必须声明能力，并保持 `validate`、`preview` 无副作用。变量、冲突策略、重试和日志要求见 [Workflow 模板与节点开发指南](./workflow-authoring-zh.md)。
 
 ## 数据变化与状态
 
