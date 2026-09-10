@@ -40,6 +40,7 @@ export default function PomodoroPanel() {
 
   const tasks = useTaskStore((s) => s.tasks);
   const completeTask = useTaskStore((s) => s.completeTask);
+  const loadToday = useTaskStore((s) => s.loadToday);
   const pomodoroDurationMinutes = useSettingsStore(
     (s) => s.settings.pomodoroDurationMinutes,
   );
@@ -117,6 +118,7 @@ export default function PomodoroPanel() {
     await completeTask(taskId);
     reset();
     setSelectedId("");
+    await loadToday(); // 完成后重载「今天」任务，保证专注页选择器始终显示今天
   };
 
   /**

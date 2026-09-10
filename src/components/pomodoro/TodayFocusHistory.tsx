@@ -78,7 +78,7 @@ export default function TodayFocusHistory() {
                   <span className="shrink-0 text-amber-600">专注中…</span>
                 )}
                 <span className="shrink-0 tabular-nums text-text-muted">
-                  {durationText(s.actualDuration)}
+                  {s.endedAt == null ? "—" : durationText(s.actualDuration)}
                 </span>
               </button>
             </li>
@@ -113,7 +113,9 @@ export default function TodayFocusHistory() {
             </div>
             <div className="flex justify-between">
               <span className="text-text-muted">实际时长</span>
-              <span className="tabular-nums text-text-primary">{durationText(detail.actualDuration)}</span>
+              <span className="tabular-nums text-text-primary">
+                {detail.endedAt == null ? "进行中" : durationText(detail.actualDuration)}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-text-muted">计划时长</span>

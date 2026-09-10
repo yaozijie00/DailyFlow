@@ -57,8 +57,9 @@ interface TaskState {
   /** 今日任务列表的项目筛选（UI 态；长期页点项目卡跳转时设置） */
   projectFilter: { id: number; title: string } | null;
 
-  load: () => Promise<void>;
-  /** 加载「今天」任务（专注页使用，始终今天） */
+  /** 加载任务列表；可传 date 覆盖当前 selectedDate（专注页加载「今天」而不改视图日期） */
+  load: (date?: string) => Promise<void>;
+  /** 加载「今天」任务（专注页使用，始终今天；不重置 Today 页选中的日期） */
   loadToday: () => Promise<void>;
   /** 加载昨日未完成任务（逾期结转横幅用；非「今天」视图时清空） */
   loadOverdue: () => Promise<void>;
@@ -132,12 +133,13 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   projectSummary: {},
   projectFilter: null,
 
-  load: async () => {
+  load: async (date?: string) => {
     const seq = ++loadSeq; // A1-P0Fix-④：丢弃过期响应（快速切日期时旧查询不覆盖新视图）
     set({ loading: true });
     try {
+      const target = date ?? get().selectedDate;
       const [tasks, categories] = await Promise.all([
-        taskService.getTasksByDate(get().selectedDate),
+        taskService.getTasksByDate(target),
         categoryService.findAll(),
       ]);
       if (seq !== loadSeq) return; // 已有更新的 load 发起 → 丢弃本次结果
@@ -151,8 +153,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
   },
 
   loadToday: async () => {
-    set({ selectedDate: todayString() });
-    await get().load();
+    await get().load(todayString());
   },
 
   loadOverdue: async () => {
