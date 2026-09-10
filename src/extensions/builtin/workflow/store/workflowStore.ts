@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { workflowService } from "../services/workflowService";
 import { useAppStore } from "../../../../stores/appStore";
 import type { Workflow, WorkflowRun } from "../models";
+import type { WorkflowTemplate } from "../templates/templateService";
 
 export type WorkflowSummary = {
   id: string;
@@ -16,11 +17,13 @@ interface WorkflowState {
   list: WorkflowSummary[];
   /** 当前打开（编辑）的 Workflow 全文 */
   current: Workflow | null;
+  currentTemplate: WorkflowTemplate | null;
   loading: boolean;
   activeRuns: WorkflowRun[];
   loadingRuns: boolean;
   loadList: () => Promise<void>;
   load: (id: string) => Promise<void>;
+  loadTemplate: (id: string) => Promise<void>;
   clearCurrent: () => void;
   create: (input: { name: string; description?: string; tags?: string[] }) => Promise<string | null>;
   updateMeta: (
@@ -39,6 +42,7 @@ function fail(text: string): void {
 export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   list: [],
   current: null,
+  currentTemplate: null,
   loading: false,
   activeRuns: [],
   loadingRuns: false,
@@ -64,11 +68,20 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     }
   },
 
-  clearCurrent: () => set({ current: null }),
+  loadTemplate: async (id) => {
+    try {
+      set({ currentTemplate: await workflowService.getTemplate(id) });
+    } catch {
+      set({ currentTemplate: null });
+      fail("加载 Workflow 模板失败");
+    }
+  },
+
+  clearCurrent: () => set({ current: null, currentTemplate: null }),
 
   create: async (input) => {
     try {
-      const wf = await workflowService.create(input);
+      const wf = await workflowService.createTemplate(input);
       await get().loadList();
       useAppStore.getState().pushToast("success", "Workflow 已创建");
       return wf.id;

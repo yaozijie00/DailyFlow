@@ -1,6 +1,7 @@
 import type { Db } from "../../../../db/db";
 import { WorkflowRepository } from "../repository/workflowRepository";
 import type { Workflow, WorkflowEdge, WorkflowNode, WorkflowRun } from "../models";
+import { newEdgeId, newNodeId, newWorkflowId } from "../models";
 import type { ExtensionStorage } from "../../../types";
 import {
   createExtensionTemplateMetadataStore,
@@ -63,6 +64,34 @@ export const workflowService = {
     templates().then((service) => service.setFavorite(id, favorite)),
 
   markTemplateUsed: (id: string) => templates().then((service) => service.markUsed(id)),
+
+  createTemplate: async (input: WorkflowMetaInput) => {
+    const repository = await repo();
+    const now = Date.now();
+    const startId = newNodeId();
+    const finishId = newNodeId();
+    const workflow = {
+      id: newWorkflowId(),
+      schemaVersion: 2 as const,
+      name: input.name,
+      description: input.description,
+      version: 1,
+      variables: [],
+      nodes: [
+        { id: startId, type: "core.start", typeVersion: 1, title: "开始", position: { x: 80, y: 120 }, config: {} },
+        { id: finishId, type: "core.finish", typeVersion: 1, title: "完成", position: { x: 440, y: 120 }, config: {} },
+      ],
+      edges: [{ id: newEdgeId(), source: startId, target: finishId, sourcePort: "out", targetPort: "in" }],
+      tags: input.tags ?? [],
+      createdAt: now,
+      updatedAt: now,
+    };
+    await repository.saveMigratedWorkflow(workflow);
+    return workflow;
+  },
+
+  saveTemplate: (workflow: import("../domain/types").WorkflowV2) =>
+    repo().then((repository) => repository.saveMigratedWorkflow(workflow)),
 
   prepareTemplateForRun: async (id: string) => {
     const [repository, service] = await Promise.all([repo(), templates()]);

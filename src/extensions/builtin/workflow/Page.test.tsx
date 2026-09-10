@@ -7,8 +7,10 @@ import { useWorkflowUiStore, workflowUiStorageKey } from "./store/workflowUiStor
 const workflowMock = vi.hoisted(() => ({
   list: [{ id: "w1", name: "石材材质流程", description: "", version: 1, tags: [], updatedAt: 1 }],
   current: null as null | { id: string },
+  currentTemplate: null as null | { id: string },
   loadList: vi.fn(async () => undefined),
   load: vi.fn(async () => undefined),
+  loadTemplate: vi.fn(async () => undefined),
   create: vi.fn(async () => "w1"),
   remove: vi.fn(async () => undefined),
   duplicate: vi.fn(async () => undefined),
@@ -64,6 +66,7 @@ beforeEach(() => {
   localStorage.clear();
   useWorkflowUiStore.getState().reset();
   workflowMock.current = null;
+  workflowMock.currentTemplate = null;
   preferenceMock.openEditorAfterCreate = true;
   vi.clearAllMocks();
 });
@@ -101,7 +104,7 @@ describe("WorkflowPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "编辑" }));
 
     await waitFor(() => expect(serviceMock.duplicateTemplateForEdit).toHaveBeenCalledWith(template.id));
-    expect(workflowMock.load).toHaveBeenCalledWith("w1");
+    expect(workflowMock.loadTemplate).toHaveBeenCalledWith("w1");
     expect(screen.getByRole("tab", { name: "编辑器" }).getAttribute("aria-selected")).toBe("true");
   });
 
@@ -113,7 +116,7 @@ describe("WorkflowPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "创建" }));
 
     await waitFor(() => expect(workflowMock.create).toHaveBeenCalled());
-    expect(workflowMock.load).not.toHaveBeenCalled();
+    expect(workflowMock.loadTemplate).not.toHaveBeenCalled();
     expect(screen.getByRole("tab", { name: "模板库" }).getAttribute("aria-selected")).toBe("true");
   });
 });

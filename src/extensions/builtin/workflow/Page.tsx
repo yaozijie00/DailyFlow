@@ -15,9 +15,9 @@ type ModalMode = { kind: "create" } | null;
 export default function WorkflowPage() {
   const pushToast = useAppStore((s) => s.pushToast);
   const list = useWorkflowStore((s) => s.list);
-  const current = useWorkflowStore((s) => s.current);
+  const current = useWorkflowStore((s) => s.currentTemplate);
   const loadList = useWorkflowStore((s) => s.loadList);
-  const load = useWorkflowStore((s) => s.load);
+  const load = useWorkflowStore((s) => s.loadTemplate);
   const create = useWorkflowStore((s) => s.create);
   const activeRuns = useWorkflowStore((s) => s.activeRuns);
   const loadingRuns = useWorkflowStore((s) => s.loadingRuns);
