@@ -482,19 +482,19 @@ git commit -m "feat(workflow): add built-in automation templates"
 - Create: `src/extensions/builtin/workflow/components/WorkflowShell.tsx`
 - Modify: `src/extensions/builtin/workflow/Page.test.tsx`
 
-- [ ] **Step 1: 写页面导航测试**
+- [x] **Step 1: 写页面导航测试**
 
 验证默认进入模板库；编辑模板进入 editor；启动模板进入 runner；运行中心可恢复未结束运行；URL/页面刷新不丢失当前顶层视图。
 
-- [ ] **Step 2: 拆分领域状态与临时 UI 状态**
+- [x] **Step 2: 拆分领域状态与临时 UI 状态**
 
 `workflowStore` 只保存领域数据与异步操作；`workflowUiStore` 保存 `library/editor/runs` 视图、筛选条件、选中模板和运行器阶段。不得把 React 组件或 Tauri 对象放入 store。
 
-- [ ] **Step 3: 实现三视图壳并通过测试**
+- [x] **Step 3: 实现三视图壳并通过测试**
 
 Run: `npm test -- src/extensions/builtin/workflow/Page.test.tsx`
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git add src/extensions/builtin/workflow/Page* src/extensions/builtin/workflow/store src/extensions/builtin/workflow/components/WorkflowShell.tsx
@@ -512,15 +512,15 @@ git commit -m "refactor(workflow): add library editor and runs shell"
 - Create: `src/extensions/builtin/workflow/components/library/TemplateLibrary.test.tsx`
 - Modify: `src/extensions/builtin/workflow/Page.tsx`
 
-- [ ] **Step 1: 写模板库交互测试**
+- [x] **Step 1: 写模板库交互测试**
 
 覆盖搜索、分类、收藏、最近使用、空结果、运行、编辑内置模板时复制、加载错误和键盘焦点顺序。
 
-- [ ] **Step 2: 实现模板库 UI**
+- [x] **Step 2: 实现模板库 UI**
 
 卡片只显示名称、说明、标签、步骤数、能力摘要和最近运行状态。主要按钮为“运行”，编辑与复制放入次级菜单。800 px 下使用单列，宽屏最多三列。
 
-- [ ] **Step 3: 运行测试并提交**
+- [x] **Step 3: 运行测试并提交**
 
 Run: `npm test -- src/extensions/builtin/workflow/components/library/TemplateLibrary.test.tsx`
 
@@ -542,19 +542,19 @@ git commit -m "feat(workflow): build template library experience"
 - Modify: `src/extensions/builtin/workflow/preferences.ts`
 - Modify: `src/extensions/builtin/workflow/Settings.tsx`
 
-- [ ] **Step 1: 写运行向导测试**
+- [x] **Step 1: 写运行向导测试**
 
 验证变量错误靠近字段、合法输入触发预览、文件树显示冲突策略、缺少能力阻止运行、命令节点二次确认、失败保留参数、完成后打开目标目录。
 
-- [ ] **Step 2: 实现四阶段运行器**
+- [x] **Step 2: 实现四阶段运行器**
 
 阶段固定为 `variables → preview → running → result`。异步按钮执行时禁用；关闭运行中对话框只隐藏面板，不取消运行。
 
-- [ ] **Step 3: 增加安全偏好**
+- [x] **Step 3: 增加安全偏好**
 
 偏好增加 `enableCommandNodes`、`rememberNonSensitiveVariables` 和默认文件冲突策略。旧偏好读取时补齐默认值。
 
-- [ ] **Step 4: 运行测试并提交**
+- [x] **Step 4: 运行测试并提交**
 
 Run: `npm test -- src/extensions/builtin/workflow/components/runner/WorkflowRunDialog.test.tsx src/extensions/builtin/workflow/preferences.test.ts`
 
@@ -577,25 +577,25 @@ git commit -m "feat(workflow): add preview-first run experience"
 - Create: `src/extensions/builtin/workflow/components/editor/editorHistory.ts`
 - Create: `src/extensions/builtin/workflow/components/editor/WorkflowEditor.test.tsx`
 
-- [ ] **Step 1: 写编辑器行为测试**
+- [x] **Step 1: 写编辑器行为测试**
 
 覆盖拖入节点、右侧配置、复制、多选删除、边清理、撤销重做、自动排列、未保存提示、点击问题定位、保存失败保留草稿和试运行无副作用。
 
-- [ ] **Step 2: 抽离 React Flow 适配层**
+- [x] **Step 2: 抽离 React Flow 适配层**
 
 `WorkflowCanvas` 只负责 React Flow 事件与领域图转换；属性表单通过注册表配置模式生成；复杂节点允许定义自有 inspector 组件，但注册表的领域定义不依赖 React。
 
-- [ ] **Step 3: 实现编辑历史**
+- [x] **Step 3: 实现编辑历史**
 
 历史项保存领域图快照，最多 50 项；拖动同一节点产生一个历史项；保存成功只更新 clean revision，不清除撤销历史。
 
-- [ ] **Step 4: 运行编辑器测试并检查包体**
+- [x] **Step 4: 运行编辑器测试并检查包体**
 
 Run: `npm test -- src/extensions/builtin/workflow/components/editor/WorkflowEditor.test.tsx && npm run build`
 
 Expected: 测试通过，任一 JavaScript 分块不超过 300 KB，Vite 无警告。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add src/extensions/builtin/workflow/components/WorkflowEditorView.tsx src/extensions/builtin/workflow/components/editor
@@ -614,19 +614,19 @@ git commit -m "feat(workflow): redesign the visual editor"
 - Modify: `src/extensions/builtin/workflow/services/workflowService.ts`
 - Modify: `src/extensions/builtin/workflow/repository/workflowRepository.ts`
 
-- [ ] **Step 1: 写运行中心测试**
+- [x] **Step 1: 写运行中心测试**
 
 覆盖运行中、等待确认、失败、完成筛选；步骤时间线；取消；安全重试；打开实际结果路径；模板已删除时仍显示快照名称。
 
-- [ ] **Step 2: 增加跨模板运行查询**
+- [x] **Step 2: 增加跨模板运行查询**
 
 仓库增加分页 `listRuns({ states, cursor, limit })`，服务组合步骤和快照形成 `WorkflowRunDetail`。列表默认先显示未结束运行，再按创建时间倒序。
 
-- [ ] **Step 3: 实现 UI 并通过测试**
+- [x] **Step 3: 实现 UI 并通过测试**
 
 Run: `npm test -- src/extensions/builtin/workflow/components/runs/RunCenter.test.tsx src/extensions/builtin/workflow/repository/workflowRepository.test.ts`
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git add src/extensions/builtin/workflow/components/runs src/extensions/builtin/workflow/services/workflowService.ts src/extensions/builtin/workflow/repository/workflowRepository.ts
