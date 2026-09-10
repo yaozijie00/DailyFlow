@@ -47,6 +47,7 @@ const serviceMock = vi.hoisted(() => ({
   setTemplateFavorite: vi.fn(async () => undefined),
   markTemplateUsed: vi.fn(async () => undefined),
   listActiveRuns: vi.fn(async () => []),
+  listRunDetails: vi.fn(async () => ({ items: [], nextCursor: null })),
   saveGraph: vi.fn(async () => undefined),
 }));
 
@@ -84,7 +85,7 @@ describe("WorkflowPage", () => {
 
     fireEvent.click(screen.getByRole("tab", { name: "运行中心" }));
     expect(screen.getByRole("heading", { name: "运行中心" })).toBeTruthy();
-    expect(workflowMock.loadActiveRuns).toHaveBeenCalled();
+    expect(serviceMock.listRunDetails).toHaveBeenCalled();
   });
 
   it("persists the top-level view and selected template for a remount", () => {

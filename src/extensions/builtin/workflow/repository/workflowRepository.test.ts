@@ -124,9 +124,47 @@ describe("WorkflowRepository（扩展专属表 · 迁移 0021）", () => {
       completedAt: 2000,
     });
     expect(finished?.state).toBe("completed");
-    const runs = await repo.listRuns(wf.id);
+    const runs = await repo.listRunsForWorkflow(wf.id);
     expect(runs).toHaveLength(1);
     expect(runs[0].taskId).toBe(7);
+  });
+
+  it("V2 runs：跨模板筛选分页，进行中优先且模板删除后快照仍可读取", async () => {
+    const makeWorkflow = async (name: string) => {
+      const now = Date.now();
+      const id = `wf-${name}`;
+      await repo.saveMigratedWorkflow({
+        id,
+        schemaVersion: 2,
+        name,
+        version: 1,
+        variables: [],
+        nodes: [],
+        edges: [],
+        tags: [],
+        createdAt: now,
+        updatedAt: now,
+      });
+      return (await repo.getV2(id))!;
+    };
+    const completedWorkflow = await makeWorkflow("已完成模板");
+    const activeWorkflow = await makeWorkflow("进行中模板");
+    const completed = await repo.createRunWithSnapshot(completedWorkflow, {});
+    await repo.updateRun(completed.id, { state: "running", startedAt: 1 });
+    await repo.updateRun(completed.id, { state: "completed", completedAt: 2 });
+    const active = await repo.createRunWithSnapshot(activeWorkflow, {});
+    await repo.updateRun(active.id, { state: "running", startedAt: 3 });
+
+    const first = await repo.listRuns({ limit: 1 });
+    expect(first.items.map((run) => run.id)).toEqual([active.id]);
+    expect(first.nextCursor).toBe(active.id);
+    const second = await repo.listRuns({ cursor: first.nextCursor!, limit: 1 });
+    expect(second.items.map((run) => run.id)).toEqual([completed.id]);
+    expect((await repo.listRuns({ states: ["completed"] })).items).toHaveLength(1);
+
+    expect(await repo.delete(completedWorkflow.id)).toBe(true);
+    expect(await repo.getV2(completedWorkflow.id)).toBeNull();
+    expect((await repo.listRuns({ states: ["completed"] })).items[0].workflowSnapshot.name).toBe("已完成模板");
   });
 
   it("A5：countCompletedRuns 只统计 completed 的 run（跨全部 Workflow）", async () => {

@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { ListChecks } from "lucide-react";
 import { useAppStore } from "../../../stores/appStore";
 import { useWorkflowStore } from "./store/workflowStore";
 import WorkflowEditorView from "./components/WorkflowEditorView";
@@ -9,19 +8,16 @@ import { useWorkflowUiStore } from "./store/workflowUiStore";
 import { TemplateLibrary } from "./components/library/TemplateLibrary";
 import { WorkflowRunDialog } from "./components/runner/WorkflowRunDialog";
 import type { WorkflowTemplate } from "./templates/templateService";
+import { RunCenter } from "./components/runs/RunCenter";
 
 type ModalMode = { kind: "create" } | null;
 
 export default function WorkflowPage() {
   const pushToast = useAppStore((s) => s.pushToast);
-  const list = useWorkflowStore((s) => s.list);
   const current = useWorkflowStore((s) => s.currentTemplate);
   const loadList = useWorkflowStore((s) => s.loadList);
   const load = useWorkflowStore((s) => s.loadTemplate);
   const create = useWorkflowStore((s) => s.create);
-  const activeRuns = useWorkflowStore((s) => s.activeRuns);
-  const loadingRuns = useWorkflowStore((s) => s.loadingRuns);
-  const loadActiveRuns = useWorkflowStore((s) => s.loadActiveRuns);
 
   const view = useWorkflowUiStore((s) => s.view);
   const editingId = useWorkflowUiStore((s) => s.selectedTemplateId);
@@ -39,10 +35,6 @@ export default function WorkflowPage() {
     void loadList();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    if (view === "runs") void loadActiveRuns();
-  }, [loadActiveRuns, view]);
 
   const openEditor = (id: string) => {
     openEditorView(id);
@@ -133,38 +125,7 @@ export default function WorkflowPage() {
   if (view === "runs") {
     return (
       <WorkflowShell view={view} onViewChange={navigate} onCreate={openCreate}>
-        <div className="rounded-2xl border border-border-subtle bg-surface/70 p-5">
-          <div className="mb-5 flex items-start justify-between gap-4">
-            <div>
-              <h2 className="text-base font-semibold text-text-primary">运行中心</h2>
-              <p className="mt-1 text-sm text-text-muted">继续等待确认或尚未结束的自动化。</p>
-            </div>
-            <span className="rounded-full bg-surface-muted px-2.5 py-1 text-xs text-text-muted">{activeRuns.length} 个进行中</span>
-          </div>
-          {loadingRuns ? (
-            <p className="py-12 text-center text-sm text-text-muted">正在读取运行记录…</p>
-          ) : activeRuns.length === 0 ? (
-            <div className="grid min-h-48 place-items-center rounded-xl border border-dashed border-border-strong px-6 text-center">
-              <div className="max-w-md">
-            <ListChecks className="mx-auto text-text-faint" size={28} />
-                <h3 className="mt-3 text-sm font-semibold text-text-primary">没有待处理的运行</h3>
-                <p className="mt-1 text-sm leading-6 text-text-muted">从模板库启动自动化后，可以在这里恢复和确认。</p>
-              </div>
-            </div>
-          ) : (
-            <ul className="space-y-2">
-              {activeRuns.map((run) => (
-                <li key={run.id} className="flex items-center justify-between rounded-xl border border-border-subtle bg-bg-app/70 px-4 py-3">
-                  <div>
-                    <p className="text-sm font-medium text-text-primary">{list.find((item) => item.id === run.workflowId)?.name ?? "Workflow"}</p>
-                    <p className="mt-0.5 text-xs text-text-muted">状态：{run.state}</p>
-                  </div>
-                  <button type="button" className="min-h-10 cursor-pointer rounded-lg border border-border-strong px-3 text-sm text-text-secondary hover:bg-surface-hover">继续处理</button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        <RunCenter />
       </WorkflowShell>
     );
   }

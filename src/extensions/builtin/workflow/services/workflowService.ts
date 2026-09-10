@@ -8,6 +8,8 @@ import {
   WorkflowTemplateService,
   type WorkflowTemplateQuery,
 } from "../templates/templateService";
+import type { WorkflowRunListQuery } from "../repository/workflowRepository";
+import type { WorkflowRunStep, WorkflowRunV2 } from "../domain/types";
 
 /**
  * Workflow Service（UI ↔ Repository 桥）。
@@ -50,6 +52,22 @@ export interface WorkflowMetaInput {
   name: string;
   description?: string;
   tags?: string[];
+}
+
+export interface WorkflowRunDetail {
+  run: WorkflowRunV2;
+  steps: WorkflowRunStep[];
+  workflowName: string;
+  templateDeleted: boolean;
+}
+
+async function runDetail(repository: WorkflowRepository, run: WorkflowRunV2): Promise<WorkflowRunDetail> {
+  return {
+    run,
+    steps: await repository.listRunSteps(run.id),
+    workflowName: run.workflowSnapshot.name,
+    templateDeleted: (await repository.getV2(run.workflowId)) === null,
+  };
 }
 
 export const workflowService = {
@@ -143,4 +161,19 @@ export const workflowService = {
   getRun: (runId: string): Promise<WorkflowRun | null> => repo().then((r) => r.getRun(runId)),
 
   listActiveRuns: () => repo().then((r) => r.listActiveRuns()),
+
+  listRunDetails: async (query: WorkflowRunListQuery = {}) => {
+    const repository = await repo();
+    const page = await repository.listRuns(query);
+    return {
+      items: await Promise.all(page.items.map((run) => runDetail(repository, run))),
+      nextCursor: page.nextCursor,
+    };
+  },
+
+  getRunDetail: async (runId: string) => {
+    const repository = await repo();
+    const run = await repository.getRunV2(runId);
+    return run ? runDetail(repository, run) : null;
+  },
 };

@@ -88,6 +88,23 @@ function mapRunRow(r: typeof workflowRuns.$inferSelect): WorkflowRun {
   };
 }
 
+export interface WorkflowRunListQuery {
+  states?: WorkflowRunState[];
+  cursor?: string;
+  limit?: number;
+}
+
+export interface WorkflowRunPage {
+  items: WorkflowRunV2[];
+  nextCursor: string | null;
+}
+
+const DELETED_WORKFLOW_TAG = "__dailyflow_deleted__";
+
+function isDeletedWorkflow(tagsJson: string): boolean {
+  return safeParseJson<string[]>(tagsJson, []).includes(DELETED_WORKFLOW_TAG);
+}
+
 function mapRunV2Row(r: typeof workflowRuns.$inferSelect): WorkflowRunV2 | null {
   if (
     r.workflowVersion === null ||
@@ -267,7 +284,7 @@ export class WorkflowRepository {
 
   async getV2(id: string): Promise<WorkflowV2 | null> {
     const row = await this.db.select().from(workflows).where(eq(workflows.id, id)).get();
-    if (!row || row.schemaVersion !== 2) return null;
+    if (!row || row.schemaVersion !== 2 || isDeletedWorkflow(row.tagsJson)) return null;
     const nodeRows = await this.db
       .select()
       .from(workflowNodes)
@@ -345,7 +362,7 @@ export class WorkflowRepository {
 
   async get(id: string): Promise<Workflow | null> {
     const row = await this.db.select().from(workflows).where(eq(workflows.id, id)).get();
-    if (!row) return null;
+    if (!row || isDeletedWorkflow(row.tagsJson)) return null;
     const nodeRows = await this.db
       .select()
       .from(workflowNodes)
@@ -381,7 +398,7 @@ export class WorkflowRepository {
     }>
   > {
     const rows = await this.db.select().from(workflows).orderBy(workflows.updatedAt).all();
-    return rows.map((r) => ({
+    return rows.filter((r) => !isDeletedWorkflow(r.tagsJson)).map((r) => ({
       id: r.id,
       name: r.name,
       description: r.description ?? undefined,
@@ -474,10 +491,22 @@ export class WorkflowRepository {
   }
 
   async delete(id: string): Promise<boolean> {
-    // 显式清理（不依赖 FK 是否开启）：runs → edges → nodes → workflow
-    await this.db.delete(workflowRuns).where(eq(workflowRuns.workflowId, id)).run();
+    const existing = await this.db.select().from(workflows).where(eq(workflows.id, id)).get();
+    if (!existing) return false;
+    const runRows = await this.db.select().from(workflowRuns).where(eq(workflowRuns.workflowId, id)).all();
+    const hasSnapshotHistory = runRows.some((run) => run.workflowSnapshotJson !== null);
     await this.db.delete(workflowEdges).where(eq(workflowEdges.workflowId, id)).run();
     await this.db.delete(workflowNodes).where(eq(workflowNodes.workflowId, id)).run();
+    if (hasSnapshotHistory) {
+      await this.db.update(workflows).set({
+        description: null,
+        variablesJson: "[]",
+        tagsJson: JSON.stringify([DELETED_WORKFLOW_TAG]),
+        updatedAt: Date.now(),
+      }).where(eq(workflows.id, id)).run();
+      return true;
+    }
+    await this.db.delete(workflowRuns).where(eq(workflowRuns.workflowId, id)).run();
     const rows = await this.db
       .delete(workflows)
       .where(eq(workflows.id, id))
@@ -759,7 +788,7 @@ export class WorkflowRepository {
     return rows.some((r) => active.includes(r.state as WorkflowRunState));
   }
 
-  async listRuns(workflowId: string): Promise<WorkflowRun[]> {
+  async listRunsForWorkflow(workflowId: string): Promise<WorkflowRun[]> {
     const rows = await this.db
       .select()
       .from(workflowRuns)
@@ -767,6 +796,27 @@ export class WorkflowRepository {
       .orderBy(workflowRuns.createdAt)
       .all();
     return rows.map(mapRunRow);
+  }
+
+  async listRuns(query: WorkflowRunListQuery = {}): Promise<WorkflowRunPage> {
+    const active = new Set<WorkflowRunState>(["pending", "running", "paused", "awaiting-confirm"]);
+    const rows = await this.db.select().from(workflowRuns).all();
+    const states = query.states ? new Set(query.states) : null;
+    const ordered = rows
+      .map(mapRunV2Row)
+      .filter((run): run is WorkflowRunV2 => run !== null && (!states || states.has(run.state)))
+      .sort((a, b) => {
+        const activeDifference = Number(active.has(b.state)) - Number(active.has(a.state));
+        return activeDifference || b.createdAt - a.createdAt || b.id.localeCompare(a.id);
+      });
+    const limit = Math.max(1, Math.min(query.limit ?? 30, 100));
+    const cursorIndex = query.cursor ? ordered.findIndex((run) => run.id === query.cursor) : -1;
+    const start = cursorIndex >= 0 ? cursorIndex + 1 : 0;
+    const items = ordered.slice(start, start + limit);
+    return {
+      items,
+      nextCursor: start + limit < ordered.length ? items[items.length - 1]?.id ?? null : null,
+    };
   }
 
   async listActiveRuns(): Promise<WorkflowRun[]> {
