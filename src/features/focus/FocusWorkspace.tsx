@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ArrowRight, Search, Maximize2, Minimize2, ChevronDown, Play } from "lucide-react";
 import { eq, sql } from "drizzle-orm";
 import { getDb } from "../../db/db";
 import { tasks, projects, goals } from "../../db/schema";
@@ -15,7 +16,10 @@ import { useBreakTimerStore } from "./breakTimerStore";
 import "./focus.css";
 
 const repo = new TaskRepository(getDb());
-function hours(seconds: number) { return `${Math.floor(seconds / 3600)}h ${Math.round(seconds % 3600 / 60)}m`; }
+function hours(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  return minutes >= 60 ? `${Math.floor(minutes / 60)} 小时 ${minutes % 60} 分钟` : `${minutes} 分钟`;
+}
 
 function TaskPicker({ onSelect, disabled = false }: { onSelect: (id: number) => void; disabled?: boolean }) {
   const [search, setSearch] = useState(""), [rows, setRows] = useState<Task[]>([]), [error, setError] = useState("");
@@ -30,9 +34,18 @@ function TaskPicker({ onSelect, disabled = false }: { onSelect: (id: number) => 
     }, search ? 180 : 0);
     return () => { alive = false; window.clearTimeout(timer); };
   }, [search]);
-  return <section className="focus-picker"><label>选择接下来推进的事<input type="search" placeholder="搜索全部任务…" value={search} onChange={(e) => setSearch(e.target.value)} /></label>{loading && <p role="status" className="focus-muted">正在寻找任务…</p>}{error && <p role="alert">{error}</p>}
+  const recommended = !search.trim() && !loading && !error ? rows[0] : undefined;
+  const description = (task: Task) => task.plannedStart && task.plannedEnd && task.plannedStart <= Date.now() && task.plannedEnd > Date.now() ? "当前时间块" : task.scheduledDate === todayString() ? "今日任务" : task.scheduledDate || "尚未排期";
+  return <section className="focus-picker" aria-label="选择任务">
+    {recommended && <div className="focus-recommendation">
+      <p className="focus-eyebrow">接下来推进</p>
+      <h2>{recommended.title}</h2>
+      <p className="focus-muted">{description(recommended)}{recommended.estimatedDuration ? ` · 预计 ${hours(recommended.estimatedDuration)}` : ""}</p>
+      <button className="focus-primary focus-begin" disabled={disabled} onClick={() => onSelect(recommended.id)}><Play size={16} aria-hidden="true" />开始专注<ArrowRight size={16} aria-hidden="true" /></button>
+    </div>}
+    <label className="focus-search"><span>{recommended ? "或者，选择另一件事" : "选择接下来推进的事"}</span><span className="focus-search-input"><Search size={16} aria-hidden="true" /><input type="search" placeholder="搜索全部任务…" value={search} onChange={(e) => setSearch(e.target.value)} /></span></label>{loading && <p role="status" className="focus-muted">正在寻找任务…</p>}{error && <p role="alert">{error}</p>}
     {!loading && !rows.length && <p className="focus-muted">{search ? "没有匹配的任务。可以直接用这个名称创建。" : "暂时没有待推进的任务，创建一个足够小的行动。"}</p>}
-    <div className="focus-task-list">{rows.slice(0, search ? 30 : 5).map((task, index) => <button key={task.id} disabled={disabled} onClick={() => onSelect(task.id)}><span><strong>{task.title}</strong><small>{task.plannedStart && task.plannedEnd && task.plannedStart <= Date.now() && task.plannedEnd > Date.now() ? "当前时间块" : task.scheduledDate === todayString() ? "今日" : task.scheduledDate || "尚未排期"}{!index && !search ? " · 推荐下一步" : ""}</small></span><span>开始 →</span></button>)}</div>
+    <div className="focus-task-list">{(error || loading ? [] : rows.slice(recommended ? 1 : 0, search ? 30 : 5)).map((task) => <button key={task.id} disabled={disabled} onClick={() => onSelect(task.id)}><span><strong>{task.title}</strong><small>{description(task)}</small></span><ArrowRight size={16} aria-hidden="true" /></button>)}</div>
     {search.trim() && <button disabled={creating || disabled} onClick={() => { setCreating(true); void taskService.createTask({ title: search.trim() }).then((task) => onSelect(task.id)).catch(() => setError("创建失败，输入已保留，请重试。")).finally(() => setCreating(false)); }}>创建任务「{search.trim()}」并开始</button>}
   </section>;
 }
@@ -46,7 +59,12 @@ function TaskContext({ record }: { record: FocusRecord }) {
     return () => { alive = false; };
   }, [record.taskId, version]);
   const task = context?.task;
-  return <div className="focus-context"><p>{[context?.goal, context?.project].filter(Boolean).join(" / ") || "真实投入将保留在任务与复盘中"}</p>{task && <><p>已保存投入 <strong>{hours(task.actualDuration ?? 0)}</strong> · 预计 {task.estimatedDuration ? hours(task.estimatedDuration) : "未设置"}</p>{task.plannedStart != null && task.plannedEnd != null && <p>计划时间 {new Date(task.plannedStart).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}—{new Date(task.plannedEnd).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} · {Math.round((task.plannedEnd - task.plannedStart) / 60000)} 分钟</p>}</>}</div>;
+  return <section className="focus-context" aria-label="任务上下文">
+    <h3>任务上下文</h3>
+    {[context?.goal, context?.project].some(Boolean) && <p className="focus-parent">{[context?.goal, context?.project].filter(Boolean).join(" / ")}</p>}
+    {task ? <><dl><div><dt>已保存投入</dt><dd>{hours(task.actualDuration ?? 0)}</dd></div><div><dt>任务预计</dt><dd>{task.estimatedDuration ? hours(task.estimatedDuration) : "尚未设置"}</dd></div>
+      {task.plannedStart != null && task.plannedEnd != null && <div><dt>计划时段</dt><dd>{new Date(task.plannedStart).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })} — {new Date(task.plannedEnd).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</dd></div>}</dl><p className="focus-muted">本次结束后，投入会自动汇入任务。</p></> : <p className="focus-muted">{record.taskId == null ? "这次投入会保留在专注记录中。" : "投入以已保存的任务记录为准。"}</p>}
+  </section>;
 }
 
 export function BreakTimer() {
@@ -119,8 +137,39 @@ export default function FocusWorkspace() {
   useEffect(() => { document.documentElement.classList.toggle("focus-immersive", immersive); return () => document.documentElement.classList.remove("focus-immersive"); }, [immersive]);
   const validGoal = mode === "stopwatch" || (Number.isFinite(goal) && goal >= 1 && goal <= 1440);
   const start = (id: number | null) => { if (validGoal) void useFocusStore.getState().start(id, mode, mode === "stopwatch" ? null : Math.round(goal * 60)).then(() => setChoose(false)); };
-  return <div className="focus-workspace"><header className="focus-heading"><div><h1>专注</h1><p className="focus-muted">从现在开始，推进一件事。</p></div><button onClick={() => setImmersive(!immersive)}>{immersive ? "退出沉浸" : "沉浸模式"}</button></header><FocusError /><FocusRecovery />
-    {active ? <section className={`focus-running ${active.status}`}><p className="focus-eyebrow">{active.status === "running" ? "正在推进" : active.status === "paused" ? "暂时暂停" : "等待确认"}</p><h2>{active.taskTitle}</h2><TaskContext record={active} /><div className="focus-time"><span>本次已投入</span><FocusClock record={active} /></div>{active.goalSeconds && <p className="focus-muted">本次目标 {Math.round(active.goalSeconds / 60)} 分钟 · 到达后可继续，不会自动结束</p>}{active.status === "paused" && <p className="focus-muted">暂停 <FocusClock record={active} paused /></p>}<FocusControls /><label className="focus-note">记下进展或卡点（可选）<textarea rows={3} value={note} onChange={(e) => useFocusStore.getState().setDraft("noteDraft", e.target.value)} placeholder="做了什么，下一步是什么…" /></label><div className="focus-actions"><button disabled={busy || active.status === "recovery"} onClick={() => setChoose(!choose)}>切换任务</button><button disabled={busy || active.status === "recovery"} onClick={() => void useFocusStore.getState().perform({ action: "interrupt" })}>记一次中断 · {active.interruptionCount}</button></div>{choose && <TaskPicker onSelect={start} disabled={busy || !validGoal} />}</section> : <><div className="focus-mode"><label>计时模式<select value={mode} onChange={(e) => { const value = e.target.value as FocusMode; setMode(value); if (value === "pomodoro") setGoal(pomodoroMinutes); }}><option value="stopwatch">自由计时</option><option value="countdown">目标计时</option><option value="pomodoro">番茄节奏</option></select></label>{mode !== "stopwatch" && <label>本次目标（分钟）<input type="number" min="1" max="1440" value={goal} onChange={(e) => setGoal(Number(e.target.value))} /></label>}</div><TaskPicker onSelect={start} disabled={busy || !validGoal} /><button disabled={busy || !validGoal} className="focus-unlinked" onClick={() => start(null)}>开始无关联专注</button>{(last || breakUntil) && <BreakTimer />}</>}
-    {!immersive && (active ? <details className="focus-history-collapse"><summary>查看投入记录 / 补录时间</summary><FocusHistory /></details> : <FocusHistory />)}
+  return <div className={`focus-workspace ${active ? "has-session" : "is-idle"}`}>
+    <header className="focus-heading"><div><h1>专注</h1><p className="focus-muted">{active ? "把注意力，留给眼前这件事。" : "选一件值得推进的事，从现在开始。"}</p></div>
+      <button className="focus-immersion-toggle" onClick={() => setImmersive(!immersive)}>{immersive ? <Minimize2 size={16} aria-hidden="true" /> : <Maximize2 size={16} aria-hidden="true" />}{immersive ? "退出沉浸" : "沉浸模式"}</button>
+    </header>
+    <FocusError /><FocusRecovery />
+    {active ? <section className={`focus-running ${active.status}`} aria-label="本次专注">
+      <div className="focus-session-main">
+        <p className="focus-eyebrow"><span className="focus-state-dot" />{active.status === "running" ? "正在推进" : active.status === "paused" ? "已暂停" : "等待确认恢复"}</p>
+        <h2>{active.taskTitle}</h2>
+        <div className="focus-time"><span>本次已投入</span><FocusClock record={active} /></div>
+        <div className="focus-session-caption">
+          {active.status === "paused" ? <p>已暂停 <FocusClock record={active} paused /> · 暂停期间不计时</p> : <p>{active.goalSeconds ? `本次目标 ${Math.round(active.goalSeconds / 60)} 分钟 · 达到后可继续` : "自由计时 · 按自己的节奏推进"}</p>}
+        </div>
+        <FocusControls />
+        <label className="focus-note"><span>随手记 <small>进展、卡点，或下一步</small></span><textarea rows={3} value={note} onChange={(e) => useFocusStore.getState().setDraft("noteDraft", e.target.value)} placeholder="记下想法，继续手上的事…" /></label>
+      </div>
+      <aside className="focus-session-aside">
+        <TaskContext record={active} />
+        <div className="focus-secondary-actions">
+          <button disabled={busy || active.status === "recovery"} aria-expanded={choose} aria-controls="focus-switch-picker" onClick={() => setChoose(!choose)}>切换任务<ArrowRight size={14} aria-hidden="true" /></button>
+          <button disabled={busy || active.status === "recovery"} onClick={() => void useFocusStore.getState().perform({ action: "interrupt" })}>记一次中断<span>{active.interruptionCount}</span></button>
+        </div>
+      </aside>
+      {choose && <div id="focus-switch-picker" className="focus-switch-picker"><TaskPicker onSelect={start} disabled={busy || !validGoal} /></div>}
+    </section> : <div className="focus-idle-grid">
+      <TaskPicker onSelect={start} disabled={busy || !validGoal} />
+      <aside className="focus-setup" aria-label="本次专注设置"><h2>按你的节奏</h2><p className="focus-muted">默认自由计时，也可以为这次投入设一个目标。</p>
+        <div className="focus-mode"><label>计时模式<select value={mode} onChange={(e) => { const value = e.target.value as FocusMode; setMode(value); if (value === "pomodoro") setGoal(pomodoroMinutes); }}><option value="stopwatch">自由计时</option><option value="countdown">目标计时</option><option value="pomodoro">番茄节奏</option></select></label>{mode !== "stopwatch" && <label>本次目标（分钟）<input type="number" min="1" max="1440" value={goal} onChange={(e) => setGoal(Number(e.target.value))} /></label>}</div>
+        {!validGoal && <p role="alert" className="focus-muted">请输入 1–1440 分钟。</p>}
+        <div className="focus-unlinked-area"><p className="focus-muted">还没决定关联哪个任务？</p><button disabled={busy || !validGoal} className="focus-unlinked" onClick={() => start(null)}>开始无关联专注<ArrowRight size={14} aria-hidden="true" /></button></div>
+        {(last || breakUntil) && <BreakTimer />}
+      </aside>
+    </div>}
+    {!immersive && <details className="focus-history-collapse"><summary><span>投入记录</span><span className="focus-muted">回看与补录<ChevronDown size={15} aria-hidden="true" /></span></summary><FocusHistory /></details>}
   </div>;
 }

@@ -5,20 +5,38 @@ import FocusWorkspace, { HistoryEditor, BreakTimer } from "./FocusWorkspace";
 import { useBreakTimerStore } from "./breakTimerStore";
 import type { FocusRecord } from "./types";
 
-const mocks = vi.hoisted(() => ({ perform: vi.fn(), overlaps: vi.fn(), start: vi.fn() }));
-vi.mock("../../db/db", () => ({ getDb: () => { const query = { select: () => query, from: () => query, where: () => query, orderBy: () => query, limit: () => query, all: async () => [] }; return query; } }));
+const mocks = vi.hoisted(() => ({ perform: vi.fn(), overlaps: vi.fn(), start: vi.fn(), active: null as FocusRecord | null, rows: [] as { id: number; title: string; scheduledDate: string; estimatedDuration: number }[] }));
+vi.mock("../../db/db", () => ({ getDb: () => { const query = { select: () => query, from: () => query, where: () => query, orderBy: () => query, limit: () => query, all: async () => mocks.rows }; return query; } }));
 vi.mock("../../stores/settingsStore", () => ({ useSettingsStore: (select: (state: unknown) => unknown) => select({ settings: { shortBreakMinutes: 8, pomodoroDurationMinutes: 40 } }) }));
 vi.mock("../../db/repositories/taskRepository", () => ({ TaskRepository: class { searchByTitle = async () => []; } }));
 vi.mock("../../stores/taskStore", () => ({ taskService: {} }));
 vi.mock("./focusStore", () => {
-  const state = { active: null, busy: false, noteDraft: "", lastFinished: null, focusVersion: 0, perform: mocks.perform, start: mocks.start, error: "保存失败" };
+  const state = { get active() { return mocks.active; }, busy: false, noteDraft: "", lastFinished: null, focusVersion: 0, perform: mocks.perform, start: mocks.start, error: "保存失败" };
   return { executeFocus: vi.fn().mockResolvedValue({ sessions: [] }), useFocusStore: Object.assign((select: (state: unknown) => unknown) => select(state), { getState: () => state }) };
 });
 vi.mock("./FocusController", () => ({ FocusClock: () => null, FocusControls: () => null, FocusError: () => null, FocusRecovery: () => null, StartFocusButton: () => null }));
 vi.mock("./historyEditor", async (load) => ({ ...await load<typeof import("./historyEditor")>(), findFocusOverlaps: mocks.overlaps }));
 const row: FocusRecord = { id: 4, taskId: null, taskTitle: "设计", startedAt: new Date(2026, 8, 19, 10, 0, 37, 125).getTime(), endedAt: 0, actualSeconds: 91.875, status: "finished", runningSince: null, pausedAt: null, goalSeconds: null, mode: "stopwatch", note: "", nextAction: "", interruptionCount: 0, source: "timer", checkpointAt: 0, revision: 3 };
-beforeEach(() => { mocks.perform.mockReset().mockResolvedValue(true); mocks.overlaps.mockReset().mockResolvedValue([]); mocks.start.mockReset().mockResolvedValue(true); useBreakTimerStore.getState().cancel(); });
+beforeEach(() => { mocks.active = null; mocks.rows = []; mocks.perform.mockReset().mockResolvedValue(true); mocks.overlaps.mockReset().mockResolvedValue([]); mocks.start.mockReset().mockResolvedValue(true); useBreakTimerStore.getState().cancel(); });
 afterEach(cleanup);
+
+it("gives the recommended task one primary start without duplicating it in the list", async () => {
+  mocks.rows = [{ id: 10, title: "完成蓝图通信", scheduledDate: "", estimatedDuration: 5400 }];
+  render(<FocusWorkspace />);
+  await screen.findByRole("heading", { name: "完成蓝图通信" });
+  expect(screen.getAllByText("完成蓝图通信")).toHaveLength(1);
+  fireEvent.click(screen.getByRole("button", { name: "开始专注" }));
+  await waitFor(() => expect(mocks.start).toHaveBeenCalledWith(10, "stopwatch", null));
+});
+
+it("paused state separates session context from mode setup and explains excluded time", () => {
+  mocks.active = { ...row, status: "paused", pausedAt: Date.now() };
+  render(<FocusWorkspace />);
+  expect(screen.getByRole("heading", { name: "设计" })).toBeTruthy();
+  expect(screen.getByText(/暂停期间不计时/)).toBeTruthy();
+  expect(screen.queryByLabelText("计时模式")).toBeNull();
+  expect(screen.getByRole("region", { name: "任务上下文" })).toBeTruthy();
+});
 
 it("a note-only save sends no rounded timing fields or overlap query", async () => {
   render(<HistoryEditor session={row} onClose={() => {}} onSaved={() => {}} />);

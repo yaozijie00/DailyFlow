@@ -34,6 +34,15 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe("GlobalFocusBar", () => {
+  it("专注页隐藏重复浮动条，仍保留结束面板", () => {
+    useAppStore.setState({ currentPage: "focus" });
+    useFocusStore.setState({ active: record(), finishOpen: false });
+    const view = render(<GlobalFocusBar />);
+    expect(screen.queryByRole("complementary", { name: "当前专注" })).toBeNull();
+    useFocusStore.setState({ finishOpen: true });
+    view.rerender(<GlobalFocusBar />);
+    expect(screen.getByRole("dialog", { name: "结束本次专注" })).toBeTruthy();
+  });
   it("错误面板刷新状态不会提交结束表单", async () => {
     useFocusStore.setState({ active: record({ status: "paused", runningSince: null }), finishOpen: true, error: "保存失败" });
     const perform = vi.spyOn(useFocusStore.getState(), "perform");

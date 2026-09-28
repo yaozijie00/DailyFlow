@@ -87,7 +87,7 @@ export default function Statistics() {
     <div className="df-page-wide flex flex-col gap-5">
       <PageHeader
         title="统计"
-        description="基于完成的番茄钟实时聚合你的时间投入，并解锁成就。"
+        description="回看真实投入、任务进展与长期积累。"
       />
 
       {/* 顶层 Tab：统计 / 成就 */}

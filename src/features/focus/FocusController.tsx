@@ -113,6 +113,8 @@ export function FocusSwitchDialog() {
 }
 
 export default function FocusController({ mini = false }: { mini?: boolean }) {
+  const page = useAppStore((s) => s.currentPage);
+  const showBar = mini || page !== "focus";
   const active = useFocusStore((s) => s.active), open = useFocusStore((s) => s.finishOpen), error = useFocusStore((s) => s.error);
   const bar = useRef<HTMLElement>(null), drag = useWindowDrag();
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
@@ -122,7 +124,7 @@ export default function FocusController({ mini = false }: { mini?: boolean }) {
     window.addEventListener("resize", resize);
     return () => window.removeEventListener("resize", resize);
   }, []);
-  return <><FocusFinishPanel /><FocusSwitchDialog />{active && !open && <aside ref={bar} style={!mini && position ? { left: position.x, top: position.y, right: "auto", bottom: "auto" } : undefined} className={mini ? "focus-mini" : "focus-controller"} aria-label="当前专注">{!mini && <button className="focus-drag" aria-label="移动专注条" title="拖动调整位置；方向键移动，Home 复位" onMouseDown={(event) => {
+  return <><FocusFinishPanel /><FocusSwitchDialog />{active && !open && showBar && <aside ref={bar} style={!mini && position ? { left: position.x, top: position.y, right: "auto", bottom: "auto" } : undefined} className={mini ? "focus-mini" : "focus-controller"} aria-label="当前专注">{!mini && <button className="focus-drag" aria-label="移动专注条" title="拖动调整位置；方向键移动，Home 复位" onMouseDown={(event) => {
     if (event.button !== 0 || !bar.current) return;
     event.preventDefault(); const rect = bar.current.getBoundingClientRect(), before = position, x = event.clientX, y = event.clientY;
     drag.start({ onMove: (move) => setPosition(clamp(rect.left + move.clientX - x, rect.top + move.clientY - y)), onUp: () => {} }, () => setPosition(before));
@@ -131,5 +133,5 @@ export default function FocusController({ mini = false }: { mini?: boolean }) {
     const delta = { ArrowLeft: [-16, 0], ArrowRight: [16, 0], ArrowUp: [0, -16], ArrowDown: [0, 16] }[event.key];
     if (!delta || !bar.current) return;
     event.preventDefault(); const rect = bar.current.getBoundingClientRect(); setPosition(clamp(rect.left + delta[0], rect.top + delta[1]));
-  }}><GripVertical size={16} /></button>}<button className="focus-controller-title" onClick={() => useAppStore.getState().setPage("focus")}>{active.taskTitle}<span className="focus-muted">{active.status === "recovery" ? "需要确认恢复" : active.status === "paused" ? "已暂停" : "专注中"}</span></button><FocusClock record={active} /><FocusControls />{mini && <FocusRecovery />}{error && <FocusError />}</aside>}{!active && error && <aside className="focus-controller"><FocusError /></aside>}</>;
+  }}><GripVertical size={16} /></button>}<button className="focus-controller-title" onClick={() => useAppStore.getState().setPage("focus")}>{active.taskTitle}<span className="focus-muted">{active.status === "recovery" ? "需要确认恢复" : active.status === "paused" ? "已暂停" : "专注中"}</span></button><FocusClock record={active} /><FocusControls />{mini && <FocusRecovery />}{error && <FocusError />}</aside>}{!active && error && showBar && <aside className="focus-controller"><FocusError /></aside>}</>;
 }

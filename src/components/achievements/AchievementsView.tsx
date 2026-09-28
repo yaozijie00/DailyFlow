@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { motion } from "motion/react";
-import { Trophy } from "lucide-react";
+import { Trophy, Check, LockKeyhole } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
 import {
   useAchievementStore,
@@ -13,6 +12,8 @@ import { Dialog } from "../ui/Dialog";
 import { EmptyState } from "../ui/EmptyState";
 import { AchievementIcon } from "./AchievementIcon";
 import { formatProgress, formatDurationCompact } from "../../lib/format";
+
+import "./achievements.css";
 
 const FILTERS: { key: AchievementFilter; label: string }[] = [
   { key: "all", label: "全部" },
@@ -37,6 +38,8 @@ const GROUP_LABELS: Record<string, string> = {
   explore: "探索",
 };
 
+const categoryKey = (category: string) => category === "task" ? "tasks" : category === "secret" ? "category" : category;
+
 function remainingText(a: AchievementProgressView): string {
   const left = Math.max(0, a.target - a.current);
   switch (a.unit) {
@@ -52,62 +55,24 @@ function remainingText(a: AchievementProgressView): string {
 }
 
 function ProgressBar({ percentage }: { percentage: number }) {
-  return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-surface-muted">
-      <div
-        className="h-full rounded-full bg-accent"
-        style={{ width: `${Math.max(2, percentage)}%` }}
-      />
-    </div>
-  );
+  const value = Number.isFinite(percentage) ? Math.min(100, Math.max(0, percentage)) : 0;
+  return <div className="achievement-progress" role="progressbar" aria-label="成就进度" aria-valuemin={0} aria-valuemax={100} aria-valuenow={value}>
+    <div style={{ width: `${value}%` }} />
+  </div>;
 }
 
-function AchievementCard({
-  item,
-  onOpen,
-}: {
-  item: AchievementProgressView;
-  onOpen: () => void;
-}) {
+function AchievementCard({ item, onOpen }: { item: AchievementProgressView; onOpen: () => void }) {
   const hidden = item.hidden && !item.unlocked;
-  return (
-    <button
-      onClick={onOpen}
-      className="flex flex-col gap-2 rounded-md glass-surface border border-border-subtle p-4 text-left transition-colors hover:border-border-strong hover:bg-surface-hover"
-    >
-      <div className="flex items-center gap-2">
-        <span
-          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md ${
-            item.unlocked ? "bg-amber-100 text-amber-600" : "bg-surface-muted text-text-muted"
-          }`}
-        >
-          {hidden ? <Trophy size={18} /> : <AchievementIcon name={item.icon} size={18} />}
-        </span>
-        <div className="min-w-0">
-          <div className="truncate text-sm font-medium text-text-primary">
-            {hidden ? "？？？" : item.name}
-          </div>
-          <div className="truncate text-xs text-text-muted">
-            {hidden ? "达成后揭晓" : item.description}
-          </div>
-        </div>
-      </div>
-
-      {item.unlocked ? (
-        <div className="text-xs font-medium text-amber-600">✓ 已解锁</div>
-      ) : (
-        <div className="space-y-1">
-          <ProgressBar percentage={item.percentage} />
-          <div className="flex items-center justify-between text-xs text-text-muted">
-            <span className="tabular-nums">
-              {formatProgress(item.current, item.target, item.unit)}
-            </span>
-            <span className="tabular-nums">{item.percentage}%</span>
-          </div>
-        </div>
-      )}
-    </button>
-  );
+  return <button onClick={onOpen} className={`achievement-card ${item.unlocked ? "is-unlocked" : ""}`} aria-label={hidden ? "隐藏成就，达成后揭晓" : `${item.name}，${item.unlocked ? "已解锁" : "查看进度"}`}>
+    <div className="achievement-card-header">
+      <span className="achievement-emblem" aria-hidden="true">{hidden ? <LockKeyhole size={22} /> : <AchievementIcon name={item.icon} size={22} />}</span>
+      <div className="achievement-copy"><h3>{hidden ? "隐藏成就" : item.name}</h3><p>{hidden ? "继续探索，达成后揭晓。" : item.description}</p></div>
+    </div>
+    <div className="achievement-card-footer">
+      <div className="achievement-status">{item.unlocked ? <span className="achievement-earned"><Check size={14} aria-hidden="true" />已解锁</span> : <span>{hidden ? "等待发现" : formatProgress(item.current, item.target, item.unit)}</span>}<span>{hidden ? "—" : item.unlocked ? "100%" : `${Math.min(100, Math.max(0, item.percentage))}%`}</span></div>
+      {hidden ? <div className="achievement-progress" aria-hidden="true" /> : <ProgressBar percentage={item.unlocked ? 100 : item.percentage} />}
+    </div>
+  </button>;
 }
 
 /**
@@ -144,17 +109,17 @@ export default function AchievementsView() {
           ? items.filter((i) => !i.unlocked)
           : items.filter((i) => !i.unlocked && i.hidden);
   // 分组页签（2.0.x）：按成就分类过滤
-  const groups = Array.from(new Set(items.map((i) => i.category)))
+  const groups = Array.from(new Set(items.map((i) => categoryKey(i.category))))
     .sort((a, b) => (GROUP_LABELS[a] ?? a).localeCompare(GROUP_LABELS[b] ?? b));
-  const visible = group === "" ? statusVisible : statusVisible.filter((i) => i.category === group);
+  const visible = group === "" ? statusVisible : statusVisible.filter((i) => categoryKey(i.category) === group);
   const selected = items.find((i) => i.id === selectedId) ?? null;
   const unlockPct = totals.total === 0 ? 0 : Math.round((totals.unlocked / totals.total) * 100);
 
   return (
-    <>
+    <section className="achievements-view" aria-label="成就收藏">
       {/* 顶部总览：已解锁 X / 共 Y · 完成度 */}
       {totals.total > 0 && (
-        <div className="flex items-center gap-4 rounded-md border border-border-subtle bg-surface px-4 py-3">
+        <div className="achievement-overview">
           <div className="shrink-0">
             <div className="text-lg font-semibold text-text-primary tabular-nums">
               已解锁 {totals.unlocked}
@@ -166,7 +131,7 @@ export default function AchievementsView() {
             <div className="h-1.5 overflow-hidden rounded-full bg-surface-muted">
               <div
                 className="h-full rounded-full bg-amber-500"
-                style={{ width: `${Math.max(2, unlockPct)}%` }}
+                style={{ width: `${Math.min(100, Math.max(0, unlockPct))}%` }}
               />
             </div>
           </div>
@@ -179,6 +144,7 @@ export default function AchievementsView() {
           <button
             key={f.key}
             onClick={() => setFilter(f.key)}
+            aria-pressed={filter === f.key}
             className={`rounded px-3 py-1.5 text-sm transition-colors ${
               filter === f.key
                 ? "bg-accent text-on-accent"
@@ -195,6 +161,7 @@ export default function AchievementsView() {
         <div className="flex flex-wrap items-center gap-1">
           <button
             onClick={() => setGroup("")}
+            aria-pressed={group === ""}
             className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
               group === ""
                 ? "border-accent bg-accent text-on-accent"
@@ -207,6 +174,7 @@ export default function AchievementsView() {
             <button
               key={g}
               onClick={() => setGroup(group === g ? "" : g)}
+              aria-pressed={group === g}
               className={`rounded-full border px-2.5 py-0.5 text-xs transition-colors ${
                 group === g
                   ? "border-accent bg-accent text-on-accent"
@@ -229,25 +197,13 @@ export default function AchievementsView() {
             filter === "hidden"
               ? "隐藏成就达成后才会揭晓。"
               : filter === "unlocked"
-                ? "还没有解锁的成就，完成番茄钟后会显示在这里。"
-                : "完成番茄钟后，这里会解锁你的成就。"
+                ? "每一次任务完成与真实投入，都会留下积累。"
+                : "当前筛选没有匹配的成就，试试其他分类。"
           }
         />
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {visible.map((item, i) => (
-            <motion.div
-              key={item.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2, delay: Math.min(i * 0.03, 0.3) }}
-            >
-              <AchievementCard
-                item={item}
-                onOpen={() => setSelectedId(item.id)}
-              />
-            </motion.div>
-          ))}
+        <div className="achievement-grid">
+          {visible.map((item) => <AchievementCard key={item.id} item={item} onOpen={() => setSelectedId(item.id)} />)}
         </div>
       )}
 
@@ -257,19 +213,19 @@ export default function AchievementsView() {
           <div className="flex flex-col items-center gap-3 text-center">
             <span
               className={`flex h-16 w-16 items-center justify-center rounded-full ${
-                selected.unlocked ? "bg-amber-100 text-amber-600" : "bg-surface-muted text-text-muted"
+                selected.unlocked ? "bg-accent/10 text-accent" : "bg-surface-muted text-text-muted"
               }`}
             >
-              <AchievementIcon name={selected.icon} size={30} />
+              {selected.hidden && !selected.unlocked ? <LockKeyhole size={30} /> : <AchievementIcon name={selected.icon} size={30} />}
             </span>
             <div>
-              <div className="text-lg font-semibold text-text-primary">{selected.name}</div>
-              <p className="mt-1 text-sm text-text-muted">{selected.description}</p>
+              <div className="text-lg font-semibold text-text-primary">{selected.hidden && !selected.unlocked ? "隐藏成就" : selected.name}</div>
+              <p className="mt-1 text-sm text-text-muted">{selected.hidden && !selected.unlocked ? "继续探索，达成后会揭晓名称与条件。" : selected.description}</p>
             </div>
 
             {selected.unlocked ? (
-              <div className="text-sm font-medium text-amber-600">✓ 已解锁</div>
-            ) : (
+              <div className="text-sm font-medium text-accent">✓ 已解锁</div>
+            ) : selected.hidden ? null : (
               <div className="w-full max-w-xs space-y-2">
                 <ProgressBar percentage={selected.percentage} />
                 <div className="flex items-center justify-between text-sm text-text-secondary">
@@ -284,6 +240,6 @@ export default function AchievementsView() {
           </div>
         )}
       </Dialog>
-    </>
+    </section>
   );
 }

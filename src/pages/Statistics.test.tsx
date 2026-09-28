@@ -127,7 +127,7 @@ describe("Statistics 页面（统计 + 成就 Tab）", () => {
     statsState.tab = "achievements";
     render(<Statistics />);
     expect(screen.getByText("第一个番茄")).toBeTruthy();
-    expect(screen.getByText("✓ 已解锁")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "第一个番茄，已解锁" })).toBeTruthy();
   });
 
   it("成就 Tab 空状态", () => {
