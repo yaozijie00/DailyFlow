@@ -49,12 +49,12 @@ describe("Dialog", () => {
 
   it("点击遮罩触发 onClose（closeOnBackdrop=true）", () => {
     const onClose = vi.fn();
-    const { container } = render(
+    render(
       <Dialog open onClose={onClose} title="标题">
         内容
       </Dialog>,
     );
-    fireEvent.mouseDown(container.firstChild as HTMLElement);
+    fireEvent.mouseDown(screen.getByRole("dialog").parentElement!);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 

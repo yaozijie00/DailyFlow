@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useAppStore } from "../../stores/appStore";
 import { useTaskStore } from "../../stores/taskStore";
 import { useSettingsStore } from "../../stores/settingsStore";
-import { usePomodoroStore } from "../../stores/pomodoroStore";
+import { useFocusStore } from "../../features/focus/focusStore";
 import { useNoteStore } from "../../stores/noteStore";
 import { useWindowDrag } from "../../hooks/useWindowDrag";
 import type { Task } from "../../db/repositories/taskRepository";
@@ -149,8 +148,7 @@ export default function Timeline() {
   function handleTaskDoubleClick(task: Task) {
     // 已完成/已取消的任务不再进入专注
     if (task.status === "COMPLETED" || task.status === "CANCELLED") return;
-    useAppStore.getState().setPage("focus");
-    usePomodoroStore.getState().setPendingTaskId(task.id);
+    void useFocusStore.getState().start(task.id);
   }
 
   const scheduledTasks = tasks.filter(
@@ -282,6 +280,7 @@ export default function Timeline() {
                     height,
                     startMs,
                     endMs,
+                    actualSeconds: task.actualDuration ?? 0,
                     color,
                     selected,
                     isPreviewing,

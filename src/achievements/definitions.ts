@@ -21,7 +21,7 @@ export interface AchievementDefinition {
   /** 成就链内顺序（升序；order 表示顺序而非条件目标值） */
   order: number;
   /**
-   * 归属扩展 id（如 com.dailyflow.course-schedule）：
+   * 归属扩展 id（如 com.example.extension）：
    * 有值则仅在对应扩展【启用】时于成就页展示（解锁记录保留）；
    * 无值 = Core 成就，始终展示。
    */

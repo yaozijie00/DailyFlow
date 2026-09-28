@@ -63,17 +63,22 @@ export class ProjectService {
       if (p) {
         const snapshot = { ...p };
         const taskIds = await this.projects.taskIdsByProject(id);
+        const planning = await this.projects.snapshotPlanning(id);
+        const deleted = await this.projects.delete(id);
+        if (!deleted) return false;
         undoManager.push({
           type: "project.delete",
           label: "删除项目",
           undo: async () => {
             await this.projects.insertRestored(snapshot);
             if (taskIds.length > 0) await this.projects.relinkTasks(taskIds, snapshot.id);
+            await this.projects.restorePlanning(planning);
           },
           redo: async () => {
             await this.projects.delete(snapshot.id);
           },
         });
+        return true;
       }
     }
     return this.projects.delete(id);

@@ -1,6 +1,7 @@
 import { eq, inArray } from "drizzle-orm";
 import type { Db } from "../db";
 import { goals, projects, tasks } from "../schema";
+import { snapshotPlanning, restorePlanning, type PlanningSnapshot } from "./planningSnapshot";
 
 export type Project = typeof projects.$inferSelect;
 
@@ -88,6 +89,9 @@ export class ProjectRepository {
   }
 
   /* ---------- 撤销支持 ---------- */
+
+  snapshotPlanning(id: number): Promise<PlanningSnapshot> { return snapshotPlanning(this.db, `project:${id}`); }
+  restorePlanning(snapshot: PlanningSnapshot): Promise<void> { return restorePlanning(this.db, snapshot); }
 
   /** 以显式 id 还原被删除的项目。 */
   async insertRestored(project: Project): Promise<void> {

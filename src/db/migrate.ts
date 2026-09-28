@@ -142,13 +142,12 @@ export async function runMigrations(
   );
 
   // 迁移前钩子：仅在存在待应用迁移时触发
+  const recorded = await db.values(sql`SELECT name FROM __drizzle_migrations`);
+  const recordedNames = new Set(recorded.map((row) => String(row[0])));
   const pendingNames: string[] = [];
   for (const [path] of entries) {
     const name = path.split("/").pop() ?? path;
-    const existing = await db.all(
-      sql`SELECT name FROM __drizzle_migrations WHERE name = ${name}`,
-    );
-    if (existing.length === 0) pendingNames.push(name);
+    if (!recordedNames.has(name)) pendingNames.push(name);
   }
   if (pendingNames.length > 0 && options.onBeforeApply) {
     await options.onBeforeApply(pendingNames);
@@ -157,10 +156,7 @@ export async function runMigrations(
   for (const [path, content] of entries) {
     const name = path.split("/").pop() ?? path;
 
-    const existing = await db.all(
-      sql`SELECT name FROM __drizzle_migrations WHERE name = ${name}`,
-    );
-    if (existing.length > 0) continue;
+    if (recordedNames.has(name)) continue;
 
     // 换表迁移收敛守卫：若判定「迁移实际已完成（记录丢失）」，跳过 SQL 仅补记记录
     const guard = TABLE_SWAP_GUARDS[name];
@@ -171,6 +167,7 @@ export async function runMigrations(
           sql`INSERT INTO __drizzle_migrations (name, created_at) VALUES (${name}, ${Date.now()})`,
         );
         applied.push(name);
+        recordedNames.add(name);
         continue;
       }
     }
@@ -205,6 +202,7 @@ export async function runMigrations(
     );
 
     applied.push(name);
+    recordedNames.add(name);
   }
 
   return applied;

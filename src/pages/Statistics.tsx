@@ -6,7 +6,7 @@ import {
   type RangePreset,
   type StatsTab,
 } from "../stores/statisticsStore";
-import { usePomodoroStore } from "../stores/pomodoroStore";
+import { useFocusStore } from "../features/focus/focusStore";
 import { useDataVersion } from "../lib/dataVersion";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card } from "../components/ui/Card";
@@ -63,12 +63,11 @@ export default function Statistics() {
   const hourlyStats = useStatisticsStore((s) => s.hourlyStats);
   const overview = useStatisticsStore((s) => s.overview);
   const dailyTasks = useStatisticsStore((s) => s.dailyTasks);
-  const workflowExecution = useStatisticsStore((s) => s.workflowExecution);
   const setRange = useStatisticsStore((s) => s.setRange);
   const setCustomRange = useStatisticsStore((s) => s.setCustomRange);
   // A1-P0Fix-④：数据变化（任务/专注落库）使统计/成就派生视图失效，自动刷新
   const taskVersion = useDataVersion("task");
-  const focusVersionSignal = usePomodoroStore((s) => s.focusVersion);
+  const focusVersionSignal = useFocusStore((s) => s.focusVersion);
 
   useEffect(() => {
     if (dbStatus === "ready") {
@@ -208,27 +207,6 @@ export default function Statistics() {
                   />
                 </div>
               </details>
-
-              {/* A6：Workflow 执行指标（区间内存在已完成/失败 run 时显示） */}
-              {workflowExecution != null &&
-                (workflowExecution.completedRuns > 0 || workflowExecution.failedRuns > 0) && (
-                  <section className="glass-surface rounded-md border border-border-subtle p-5">
-                    <h2 className="mb-4 text-sm font-medium text-text-secondary">Workflow 执行</h2>
-                    <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                      <StatCard label="完成流程" value={String(workflowExecution.completedRuns)} />
-                      <StatCard label="失败流程" value={String(workflowExecution.failedRuns)} />
-                      <StatCard
-                        label="平均执行时长"
-                        value={formatDurationCompact(workflowExecution.avgRunSeconds * 1000)}
-                      />
-                      <StatCard
-                        label="最常用流程"
-                        value={workflowExecution.topWorkflow ?? "—"}
-                        sub={workflowExecution.topWorkflow ? "按完成次数" : undefined}
-                      />
-                    </div>
-                  </section>
-                )}
 
               {/* 类别投入柱状图 */}
               <section className="glass-surface rounded-md border border-border-subtle p-5">

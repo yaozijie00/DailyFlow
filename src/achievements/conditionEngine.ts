@@ -74,10 +74,6 @@ export interface EstimateStreakCondition {
   type: "estimate_streak";
   target: number;
 }
-export interface CourseTasksCondition {
-  type: "course_tasks_completed";
-  target: number;
-}
 export interface UndoDailyCondition {
   type: "undo_daily";
   target: number;
@@ -96,11 +92,6 @@ export interface DailyPomodorosCondition {
 }
 export interface HighPriorityTasksCondition {
   type: "high_priority_tasks_completed";
-  target: number;
-}
-/** A5：累计完成的 WorkflowRun 数（Workflow 扩展数据源经 Host Provider 提供）。 */
-export interface WorkflowRunsCompletedCondition {
-  type: "workflow_runs_completed";
   target: number;
 }
 export interface AndCondition {
@@ -133,13 +124,11 @@ export type Condition =
   | TaskStreakCondition
   | NightSessionsCondition
   | EstimateStreakCondition
-  | CourseTasksCondition
   | UndoDailyCondition
   | MorningSessionsCondition
   | WeekendSessionsCondition
   | DailyPomodorosCondition
   | HighPriorityTasksCondition
-  | WorkflowRunsCompletedCondition
   | AndCondition
   | OrCondition
   | NotCondition;
@@ -188,8 +177,6 @@ export interface AchievementContext {
   nightFocusCount: number;
   /** 连续「预计误差 ≤15%」的完成任务次数（计划准确） */
   estimateAccurateStreak: number;
-  /** 累计完成的课程任务数（tasks.course_id 非空且已完成） */
-  courseTasksCompleted: number;
   /** 今日撤销次数（行为探索：撤回大师） */
   undoCountToday: number;
   /** 上午 9 点前开始且走满的专注次数（早起鸟） */
@@ -200,8 +187,6 @@ export interface AchievementContext {
   maxDailyPomodoros: number;
   /** 累计完成的高优先级任务数（优先级之王） */
   highPriorityTasksCompleted: number;
-  /** 累计完成的 WorkflowRun 数（A5；Workflow 扩展经 Host Provider 提供，缺省 0） */
-  workflowRunsCompleted: number;
 }
 
 function pct(current: number, target: number): number {
@@ -232,13 +217,11 @@ export function isValidCondition(cond: unknown): boolean {
     case "task_streak_days":
     case "night_sessions":
     case "estimate_streak":
-    case "course_tasks_completed":
     case "undo_daily":
     case "morning_sessions":
     case "weekend_sessions":
     case "daily_pomodoros":
     case "high_priority_tasks_completed":
-    case "workflow_runs_completed":
       return typeof c.target === "number" && Number.isFinite(c.target) && c.target > 0;
     case "category_duration":
       return (
@@ -298,8 +281,6 @@ export const ConditionEngine = {
         return ctx.nightFocusCount >= condition.target;
       case "estimate_streak":
         return ctx.estimateAccurateStreak >= condition.target;
-      case "course_tasks_completed":
-        return ctx.courseTasksCompleted >= condition.target;
       case "undo_daily":
         return ctx.undoCountToday >= condition.target;
       case "morning_sessions":
@@ -310,8 +291,6 @@ export const ConditionEngine = {
         return ctx.maxDailyPomodoros >= condition.target;
       case "high_priority_tasks_completed":
         return ctx.highPriorityTasksCompleted >= condition.target;
-      case "workflow_runs_completed":
-        return ctx.workflowRunsCompleted >= condition.target;
       case "and":
         return condition.conditions.every((c) => ConditionEngine.evaluate(c, ctx));
       case "or":
@@ -474,16 +453,6 @@ export const ConditionEngine = {
           unit: "count",
         };
       }
-      case "course_tasks_completed": {
-        const current = ctx.courseTasksCompleted;
-        return {
-          current,
-          target: condition.target,
-          percentage: pct(current, condition.target),
-          completed: current >= condition.target,
-          unit: "count",
-        };
-      }
       case "undo_daily": {
         const current = ctx.undoCountToday;
         return {
@@ -526,16 +495,6 @@ export const ConditionEngine = {
       }
       case "high_priority_tasks_completed": {
         const current = ctx.highPriorityTasksCompleted;
-        return {
-          current,
-          target: condition.target,
-          percentage: pct(current, condition.target),
-          completed: current >= condition.target,
-          unit: "count",
-        };
-      }
-      case "workflow_runs_completed": {
-        const current = ctx.workflowRunsCompleted;
         return {
           current,
           target: condition.target,

@@ -5,6 +5,7 @@ import { GoalRepository } from "../db/repositories/goalRepository";
 import { TaskRepository } from "../db/repositories/taskRepository";
 import { GoalService } from "./goalService";
 import { undoManager } from "../lib/undoManager";
+import { LongTermPlanRepository } from "../db/repositories/longTermPlanRepository";
 
 describe("GoalService Undo 集成（长期目标全操作可撤销，数据与 SQLite 一致）", () => {
   let db: Db;
@@ -102,6 +103,38 @@ describe("GoalService Undo 集成（长期目标全操作可撤销，数据与 S
     await undoManager.redo();
     expect(await goals.findById(g.id)).toBeNull();
     expect((await tasks.findById(t.id))?.goalId).toBeNull();
+  });
+
+  it("删除长期计划后撤销会恢复阶段、任务阶段关联与计划记录", async () => {
+    const plans = new LongTermPlanRepository(db);
+    const g = await svc.create({
+      title: "UE 系统学习",
+      deadline: "2026-12-15",
+      weeklyTargetMinutes: 360,
+    });
+    const phase = await plans.createPhase(g.id, { title: "Blueprint", estimatedMinutes: 480 });
+    const task = await tasks.create({
+      title: "Blueprint Communication",
+      scheduledDate: "2026-09-14",
+      goalId: g.id,
+      phaseId: phase.id,
+    });
+    const historyBefore = await plans.listHistory(g.id);
+    expect(historyBefore.some((entry) => entry.field === "created")).toBe(true);
+
+    await svc.delete(g.id);
+    expect((await tasks.findById(task.id))?.goalId).toBeNull();
+    expect((await tasks.findById(task.id))?.phaseId).toBeNull();
+
+    await undoManager.undo();
+    expect((await plans.listPhases(g.id)).map((item) => item.title)).toEqual(["Blueprint"]);
+    expect((await tasks.findById(task.id))?.goalId).toBe(g.id);
+    expect((await tasks.findById(task.id))?.phaseId).toBe(phase.id);
+    expect((await plans.listHistory(g.id)).some((entry) => entry.field === "created")).toBe(true);
+
+    await undoManager.redo();
+    expect(await goals.findById(g.id)).toBeNull();
+    expect((await tasks.findById(task.id))?.phaseId).toBeNull();
   });
 
   it("删除后再执行新操作：redo 栈清空", async () => {

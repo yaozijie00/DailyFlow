@@ -57,6 +57,8 @@ export const tasks = sqliteTable("tasks", {
   courseId: integer("course_id").references(() => courses.id, { onDelete: "set null" }),
   /** 优先级（v2.3.x）：high / medium / low，默认 medium */
   priority: text("priority").notNull().default("medium"),
+  /** 长期计划阶段（0025；删除阶段时置空） */
+  phaseId: integer("phase_id").references(() => longTermPhases.id, { onDelete: "set null" }),
 });
 
 export const focusSessions = sqliteTable("focus_sessions", {
@@ -129,6 +131,41 @@ export const goals = sqliteTable("goals", {
   createdAt: integer("created_at").notNull(),
   updatedAt: integer("updated_at").notNull(),
   completedAt: integer("completed_at"),
+  /** 每周计划投入（分钟） */
+  weeklyTargetMinutes: integer("weekly_target_minutes").notNull().default(0),
+  /** estimated=按预计耗时 / tasks=按任务数 / manual=手动 */
+  progressMode: text("progress_mode").notNull().default("estimated"),
+  estimatedCompletionDate: text("estimated_completion_date"),
+  /** 当前阶段 id；为避免循环 FK，由服务层校验归属 */
+  currentPhaseId: integer("current_phase_id"),
+  nextAction: text("next_action"),
+  /** 轻量周节奏 JSON：[{weekday,minutes}] */
+  weeklyRhythmJson: text("weekly_rhythm_json").notNull().default("[]"),
+  pausedAt: integer("paused_at"),
+});
+
+/** 长期计划固定一层阶段。Task 通过 phase_id 关联，子任务继续复用 tasks.parent_id。 */
+export const longTermPhases = sqliteTable("long_term_phases", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  goalId: integer("goal_id").notNull().references(() => goals.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  sortOrder: integer("sort_order").notNull().default(0),
+  estimatedMinutes: integer("estimated_minutes"),
+  manualProgress: integer("manual_progress"),
+  status: text("status").notNull().default("not_started"),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
+/** 仅记录长期计划关键结构变化。 */
+export const longTermPlanHistory = sqliteTable("long_term_plan_history", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  goalId: integer("goal_id").notNull().references(() => goals.id, { onDelete: "cascade" }),
+  field: text("field").notNull(),
+  label: text("label").notNull(),
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+  createdAt: integer("created_at").notNull(),
 });
 
 /**
@@ -227,7 +264,14 @@ export const workflowRuns = sqliteTable("workflow_runs", {
   workflowVersion: integer("workflow_version"),
   workflowSnapshotJson: text("workflow_snapshot_json"),
   variablesSnapshotJson: text("variables_snapshot_json"),
+  /** 长期页面 Project id；Workflow 只保存外部引用，不复制 Project。 */
+  externalProjectId: integer("external_project_id"),
+  /** 本次运行统一上下文，包含输入、派生路径和节点输出。 */
+  contextJson: text("context_json").notNull().default("{}"),
+  /** 本次运行引用的 Standard id/version 快照。 */
+  standardSnapshotsJson: text("standard_snapshots_json").notNull().default("[]"),
   createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull().default(0),
 });
 
 export const workflowRunSteps = sqliteTable(
@@ -249,6 +293,49 @@ export const workflowRunSteps = sqliteTable(
   },
   (table) => [uniqueIndex("idx_workflow_run_steps_sequence").on(table.runId, table.sequence)],
 );
+
+/** Workflow 统一规范；不存储长期项目生命周期。 */
+export const workflowStandards = sqliteTable("workflow_standards", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  type: text("type").notNull(),
+  description: text("description"),
+  version: integer("version").notNull().default(1),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
+
+export const workflowStandardRules = sqliteTable("workflow_standard_rules", {
+  id: text("id").primaryKey(),
+  standardId: text("standard_id").notNull().references(() => workflowStandards.id, { onDelete: "cascade" }),
+  key: text("key").notNull(),
+  value: text("value").notNull(),
+  ruleType: text("rule_type").notNull().default("template"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+export const workflowFolderNodes = sqliteTable("workflow_folder_nodes", {
+  id: text("id").primaryKey(),
+  standardId: text("standard_id").notNull().references(() => workflowStandards.id, { onDelete: "cascade" }),
+  parentId: text("parent_id"),
+  nameTemplate: text("name_template").notNull(),
+  /** 可选 Context 输出名，例如 ReferencePath。 */
+  contextKey: text("context_key"),
+  sortOrder: integer("sort_order").notNull().default(0),
+});
+
+/** 外部软件注册表；节点仅保存 application_id。 */
+export const workflowApplications = sqliteTable("workflow_applications", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  executablePath: text("executable_path").notNull(),
+  defaultArgsJson: text("default_args_json").notNull().default("[]"),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  createdAt: integer("created_at").notNull(),
+  updatedAt: integer("updated_at").notNull(),
+});
 
 /** 宿主管理的扩展 JSON 键值；extension_id + key 构成隔离边界。 */
 export const extensionStorage = sqliteTable(

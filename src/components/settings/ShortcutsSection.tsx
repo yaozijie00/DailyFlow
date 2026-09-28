@@ -21,7 +21,7 @@ export default function ShortcutsSection() {
     setRecording(action);
   };
 
-  const handleKey = (e: React.KeyboardEvent, action: ShortcutAction) => {
+  const handleKey = async (e: React.KeyboardEvent, action: ShortcutAction) => {
     e.preventDefault();
     e.stopPropagation();
     if (recording !== action) return;
@@ -36,18 +36,18 @@ export default function ShortcutsSection() {
       setMsg({ type: "error", text: `该快捷键已被「${SHORTCUT_ACTION_LABELS[dup]}」使用` });
       return;
     }
-    void saveShortcuts(next);
+    if (!await saveShortcuts(next)) { setMsg({ type: "error", text: "保存失败，请重试" }); return; }
     setRecording(null);
     setMsg({ type: "ok", text: `已保存：${SHORTCUT_ACTION_LABELS[action]} = ${combo}` });
   };
 
-  const handleClear = (action: ShortcutAction) => {
-    void saveShortcuts({ ...shortcuts, [action]: "" });
+  const handleClear = async (action: ShortcutAction) => {
+    if (!await saveShortcuts({ ...shortcuts, [action]: "" })) { setMsg({ type: "error", text: "保存失败，请重试" }); return; }
     setMsg({ type: "ok", text: `已禁用：${SHORTCUT_ACTION_LABELS[action]}` });
   };
 
-  const handleReset = () => {
-    void saveShortcuts({ ...DEFAULT_SHORTCUTS });
+  const handleReset = async () => {
+    if (!await saveShortcuts({ ...DEFAULT_SHORTCUTS })) { setMsg({ type: "error", text: "保存失败，请重试" }); return; }
     setMsg({ type: "ok", text: "已恢复默认快捷键" });
   };
 

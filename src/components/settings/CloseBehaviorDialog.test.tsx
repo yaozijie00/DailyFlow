@@ -17,8 +17,8 @@ const settingsMock = vi.hoisted(() => ({
   update: vi.fn(),
 }));
 
-const pomodoroMock = vi.hoisted(() => ({
-  snapshot: { state: "IDLE" },
+const focusMock = vi.hoisted(() => ({
+  active: null as { status: "running" | "paused" } | null,
 }));
 
 const behaviorMock = vi.hoisted(() => ({
@@ -35,10 +35,10 @@ vi.mock("../../stores/appStore", () => ({
 vi.mock("../../stores/settingsStore", () => ({
   useSettingsStore: (selector: (s: unknown) => unknown) => selector(settingsMock),
 }));
-vi.mock("../../stores/pomodoroStore", () => ({
-  usePomodoroStore: Object.assign(
-    (selector: (s: unknown) => unknown) => selector(pomodoroMock),
-    { getState: () => pomodoroMock },
+vi.mock("../../features/focus/focusStore", () => ({
+  useFocusStore: Object.assign(
+    (selector: (s: unknown) => unknown) => selector(focusMock),
+    { getState: () => focusMock },
   ),
 }));
 vi.mock("../../services/windowBehaviorService", () => ({
@@ -59,7 +59,7 @@ describe("CloseBehaviorDialog（关闭行为对话框）", () => {
       closeBehaviorConfigured: false,
       notificationsEnabled: true,
     };
-    pomodoroMock.snapshot = { state: "IDLE" };
+    focusMock.active = null;
   });
 
   it("未打开时不渲染", () => {
@@ -104,7 +104,7 @@ describe("CloseBehaviorDialog（关闭行为对话框）", () => {
 
   it("Focus 运行中选「退出」→ 弹出退出确认，确认后退出", async () => {
     appMock.closeDialog = "first";
-    pomodoroMock.snapshot = { state: "RUNNING" };
+    focusMock.active = { status: "running" };
     render(<CloseBehaviorDialog />);
     fireEvent.click(screen.getByText("确定")); // 默认 exit
     await vi.waitFor(() =>
@@ -122,7 +122,7 @@ describe("CloseBehaviorDialog（关闭行为对话框）", () => {
   it("退出确认对话框：取消不退出", () => {
     appMock.closeDialog = "exit-focus";
     render(<CloseBehaviorDialog />);
-    expect(screen.getByText(/当前正在进行专注，退出后本次专注将被结束/)).toBeTruthy();
+    expect(screen.getByText(/退出前会保存并暂停本次专注/)).toBeTruthy();
     fireEvent.click(screen.getByText("取消"));
     expect(behaviorMock.exitApp).not.toHaveBeenCalled();
     expect(appMock.closeCloseDialog).toHaveBeenCalled();

@@ -62,6 +62,23 @@ function openPalette() {
 }
 
 describe("CommandPalette（Ctrl+K 命令面板）", () => {
+  it("旧搜索晚返回时不能覆盖新查询", async () => {
+    vi.useFakeTimers();
+    let resolveOld!: (tasks: Task[]) => void;
+    taskState.searchTasks.mockImplementationOnce(() => new Promise<Task[]>((resolve) => { resolveOld = resolve; }));
+    taskState.searchTasks.mockResolvedValueOnce([makeTask(8, "新查询")]);
+    render(<CommandPalette />);
+    openPalette();
+    const input = screen.getByPlaceholderText(/跳转页面/);
+    fireEvent.change(input, { target: { value: "旧查询" } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(200); });
+    fireEvent.change(input, { target: { value: "新查询" } });
+    await act(async () => { await vi.advanceTimersByTimeAsync(200); });
+    await act(async () => { resolveOld([makeTask(7, "旧查询")]); });
+    expect(screen.getByText("新查询")).toBeTruthy();
+    expect(screen.queryByText("旧查询")).toBeNull();
+  });
+
   beforeEach(() => {
     appState.setPage.mockClear();
     taskState.openCreate.mockClear();

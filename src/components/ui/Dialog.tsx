@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
 import { X } from "lucide-react";
+import { createPortal } from "react-dom";
 
 export interface DialogProps {
   open: boolean;
@@ -37,13 +38,16 @@ export function Dialog({
       : null;
     const panel = panelRef.current;
     if (panel) {
-      const autofocus = panel.querySelector<HTMLElement>("[autofocus]");
+      const autofocus = panel.querySelector<HTMLElement>("[autofocus]:not([disabled])");
       const focusable = panel.querySelector<HTMLElement>(
-        "button, input, select, textarea, [href], [tabindex]:not([tabindex='-1'])",
+        "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex='-1'])",
       );
       (autofocus ?? focusable ?? panel).focus();
     }
     const onKey = (e: KeyboardEvent) => {
+      if (e.isComposing || e.defaultPrevented) return;
+      const dialogs = document.querySelectorAll('[role="dialog"][aria-modal="true"]');
+      if (dialogs[dialogs.length - 1] !== panel) return;
       if (e.key === "Escape") {
         e.preventDefault();
         onCloseRef.current();
@@ -78,9 +82,9 @@ export function Dialog({
 
   if (!open) return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4"
+      className="fixed inset-0 z-[80] grid items-center overflow-y-auto bg-black/40 p-4"
       onMouseDown={(e) => {
         if (closeOnBackdrop && e.target === e.currentTarget) onClose();
       }}
@@ -91,9 +95,9 @@ export function Dialog({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="mx-auto mt-[6vh] w-full max-w-md rounded-lg bg-bg-elevated p-6 shadow-popover outline-none"
+        className="mx-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col rounded-[var(--radius-floating)] border border-border-subtle bg-bg-elevated p-6 shadow-popover outline-none"
       >
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4 flex shrink-0 items-center justify-between">
           <h2 id={titleId} className="text-lg font-semibold text-text-primary">{title}</h2>
           <button
             onClick={onClose}
@@ -103,9 +107,10 @@ export function Dialog({
             <X size={18} />
           </button>
         </div>
-        {children}
-        {footer != null && <div className="mt-5 flex justify-end gap-2">{footer}</div>}
+        <div className="df-scroll-area">{children}</div>
+        {footer != null && <div className="mt-5 flex shrink-0 flex-wrap justify-end gap-2">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

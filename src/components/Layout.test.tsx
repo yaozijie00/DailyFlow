@@ -25,17 +25,6 @@ vi.mock("../stores/appStore", () => ({
   useAppStore: (selector: (s: unknown) => unknown) => selector(mockState),
 }));
 
-const pomodoroMock = vi.hoisted(() => ({
-  snapshot: { state: "IDLE", remainingMs: 0, elapsedMs: 0, progress: 0 },
-  refresh: vi.fn(),
-  endFocus: vi.fn(),
-  pause: vi.fn(),
-  resume: vi.fn(),
-  taskTitle: null,
-}));
-vi.mock("../stores/pomodoroStore", () => ({
-  usePomodoroStore: (selector: (s: unknown) => unknown) => selector(pomodoroMock),
-}));
 
 const extMock = vi.hoisted(() => ({
   enabled: {},

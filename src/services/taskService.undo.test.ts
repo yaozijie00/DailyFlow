@@ -163,7 +163,8 @@ describe("TaskService Undo 集成（数据与 SQLite 一致）", () => {
 
     await svc.deleteTask(t.id);
     expect(await tasks.findById(t.id)).toBeNull();
-    expect((await new FocusSessionRepository(db).findById(s.id))).toBeNull();
+    expect((await new FocusSessionRepository(db).findById(s.id))?.taskId).toBeNull();
+    expect((await new FocusSessionRepository(db).findById(s.id))?.actualDuration).toBe(600);
 
     await undoManager.undo();
     const restored = await tasks.findById(t.id);

@@ -1,14 +1,21 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, cleanup, act } from "@testing-library/react";
 import MiniApp from "./MiniApp";
+import { useFocusStore } from "../features/focus/focusStore";
+import type { FocusRecord } from "../features/focus/types";
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
-/* ---- 环境 mock：Tauri invoke + DB + pomodoroStore + 时间 ---- */
+/* ---- 环境 mock：Tauri invoke + DB ---- */
 
 const invokeMock = vi.hoisted(() => vi.fn());
 vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
+vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn().mockResolvedValue(() => {}) }));
+vi.mock("../services/achievementRuntime", () => ({ evaluateAndNotify: vi.fn() }));
+vi.mock("../services/notificationService", () => ({
+  scheduleFocusEndNotification: vi.fn(), cancelScheduledFocusEndNotification: vi.fn(),
+}));
 
 // 任务数据层：直接 mock repository 查询结果，避免真实 SQLite
 const taskRows = vi.hoisted(() => ({
@@ -46,26 +53,11 @@ vi.mock("../db/repositories/focusSessionRepository", () => ({
   FocusSessionRepository: class {},
 }));
 
-const pomodoroState = vi.hoisted(() => ({
-  snapshot: { state: "IDLE", remainingMs: 0, durationMs: 0, elapsedMs: 0 },
-  phase: "focus",
-  taskTitle: null as string | null,
-  taskId: null as number | null,
-  pause: vi.fn(),
-  resume: vi.fn(),
-  refresh: vi.fn(),
-}));
-
-vi.mock("../stores/pomodoroStore", () => ({
-  usePomodoroStore: (selector: (s: unknown) => unknown) => selector(pomodoroState),
-}));
-
-describe("MiniApp（V2.4 重设计）", () => {
+describe("MiniApp", () => {
   beforeEach(() => {
     taskRows.rows = [];
-    pomodoroState.snapshot = { state: "IDLE", remainingMs: 0, durationMs: 0, elapsedMs: 0 };
-    pomodoroState.taskId = null;
-    pomodoroState.taskTitle = null;
+    useFocusStore.setState(useFocusStore.getInitialState(), true);
+    vi.spyOn(useFocusStore.getState(), "sync").mockResolvedValue(undefined);
     invokeMock.mockReset();
     invokeMock.mockResolvedValue(undefined); // 所有 invoke 返回 resolved Promise（组件 .catch 链安全）
   });
@@ -104,27 +96,29 @@ describe("MiniApp（V2.4 重设计）", () => {
     expect(invokeMock).toHaveBeenCalledWith("notify_tasks_changed");
   });
 
-  it("专注运行中显示剩余时间与暂停按钮；暂停后变为继续", async () => {
-    pomodoroState.snapshot = {
-      state: "RUNNING",
-      remainingMs: 25 * 60_000,
-      durationMs: 25 * 60_000,
-      elapsedMs: 0,
+  it("共享专注控制器显示已投入时间，支持暂停与继续", async () => {
+    const now = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(now);
+    const active: FocusRecord = {
+      id: 1, taskId: 7, taskTitle: "编码", startedAt: now - 300_000,
+      endedAt: null, actualSeconds: 300, status: "running", runningSince: now,
+      pausedAt: null, goalSeconds: 1500, mode: "countdown", note: "", nextAction: "",
+      interruptionCount: 0, source: "timer", checkpointAt: now, revision: 1,
     };
-    pomodoroState.taskTitle = "编码";
+    useFocusStore.setState({ active });
+    const perform = vi.spyOn(useFocusStore.getState(), "perform").mockResolvedValue(true);
     render(<MiniApp />);
-    // 剩余 25:00
-    expect(screen.getByText("25:00")).toBeTruthy();
+    await waitFor(() => expect(screen.queryByText("加载中…")).toBeNull());
+    expect(screen.getByText("编码")).toBeTruthy();
+    expect(screen.getByLabelText("本次已投入").textContent).toBe("05:00");
+    expect(screen.queryByText("20:00")).toBeNull();
     const pauseBtn = screen.getByRole("button", { name: "暂停" });
     fireEvent.click(pauseBtn);
-    expect(pomodoroState.pause).toHaveBeenCalled();
-    // 暂停态切换按钮文案
-    pomodoroState.snapshot = { ...pomodoroState.snapshot, state: "PAUSED" };
-    cleanup();
-    render(<MiniApp />);
+    expect(perform).toHaveBeenCalledWith({ action: "pause" });
+    act(() => useFocusStore.setState({ active: { ...active, status: "paused", runningSince: null, pausedAt: now } }));
     const resumeBtn = await screen.findByRole("button", { name: "继续" });
     fireEvent.click(resumeBtn);
-    expect(pomodoroState.resume).toHaveBeenCalled();
+    expect(perform).toHaveBeenLastCalledWith({ action: "resume" });
   });
 
   it("标题条：返回主窗口触发 close_mini_window", async () => {

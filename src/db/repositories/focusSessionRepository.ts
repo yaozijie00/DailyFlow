@@ -1,6 +1,7 @@
-import { and, count, desc, eq, gte, isNull, lt, sql } from "drizzle-orm";
+import { readFocusSlices, splitFocusHours } from "../focusAnalytics";
+import { and, desc, eq, gte, isNull, lt, sql } from "drizzle-orm";
 import type { Db } from "../db";
-import { categories, focusSessions, projects, tasks } from "../schema";
+import { categories, focusSessions, tasks } from "../schema";
 
 export type FocusSession = typeof focusSessions.$inferSelect;
 
@@ -115,60 +116,29 @@ export class FocusSessionRepository {
     await this.db.insert(focusSessions).values(session).run();
   }
 
+  /** Undo a task deletion without recreating or losing its metadata/work segments. */
+  async reattach(taskId: number, ids: number[]): Promise<void> {
+    for (const id of ids) await this.db.update(focusSessions).set({ taskId }).where(and(eq(focusSessions.id, id), isNull(focusSessions.taskId))).run();
+  }
+
   /** 统计 [from, to) 内开始会话的总实际时长（秒）与次数，单条 SQL 实时聚合。 */
   async getTodayStats(from: number, to: number): Promise<{ totalSeconds: number; count: number }> {
-    const rows = await this.db
-      .select({
-        totalSeconds: sql<number>`coalesce(sum(${focusSessions.actualDuration}), 0)`,
-        count: count(),
-      })
-      .from(focusSessions)
-      .where(
-        and(
-          gte(focusSessions.startedAt, from),
-          lt(focusSessions.startedAt, to),
-        ),
-      )
-      .all();
-    return {
-      totalSeconds: Number(rows[0]?.totalSeconds ?? 0),
-      count: rows[0]?.count ?? 0,
-    };
+    const { totalSeconds, count } = await this.summaryInRange(from, to);
+    return { totalSeconds, count };
   }
 
   /** 列出 [from, to) 内开始的所有会话（轻量投影），供统计/成就统一聚合。 */
   async listInRange(from: number, to: number): Promise<FocusSessionAggregate[]> {
-    return this.db
-      .select({
-        categoryId: focusSessions.categoryId,
-        actualDuration: focusSessions.actualDuration,
-        completed: focusSessions.completed,
-        startedAt: focusSessions.startedAt,
-      })
-      .from(focusSessions)
-      .where(
-        and(
-          gte(focusSessions.startedAt, from),
-          lt(focusSessions.startedAt, to),
-        ),
-      )
-      .all();
+    return splitFocusHours(await readFocusSlices(this.db, from, to)).map((r) => ({ categoryId: r.categoryId, actualDuration: r.seconds, completed: r.completed, startedAt: r.startedAt }));
   }
 
   /** 列出全部会话（轻量投影），供成就上下文构建（累计口径需全历史）。 */
   async listAll(): Promise<FocusSessionAggregate[]> {
-    return this.db
-      .select({
-        categoryId: focusSessions.categoryId,
-        actualDuration: focusSessions.actualDuration,
-        completed: focusSessions.completed,
-        startedAt: focusSessions.startedAt,
-      })
-      .from(focusSessions)
-      .all();
+    const slices = await readFocusSlices(this.db);
+    const totals = new Map<number, number>();
+    for (const row of slices) totals.set(row.sessionId, (totals.get(row.sessionId) ?? 0) + row.seconds);
+    return splitFocusHours(slices).map((r) => ({ categoryId: r.categoryId, actualDuration: r.seconds, completed: r.completed && (totals.get(r.sessionId) ?? 0) >= 1500, startedAt: r.startedAt }));
   }
-
-  /* ---------- 专注页历史（v1.6.2：今日专注列表 + 任务/分类名） ---------- */
 
   /** 列出 [from, to) 内开始会话的明细，按开始时间倒序（任务已删除时标题兜底）。 */
   async listWithTaskInRange(from: number, to: number): Promise<FocusSessionDetail[]> {
@@ -195,117 +165,46 @@ export class FocusSessionRepository {
   /* ---------- v1.7：SQL 级聚合（统计不下沉数据到 JS，10 万级会话不卡） ---------- */
 
   /** [from, to) 单条 SQL 汇总：总秒 / 次数 / 走满数。 */
-  async summaryInRange(
-    from: number,
-    to: number,
-  ): Promise<{ totalSeconds: number; count: number; completedCount: number }> {
-    const rows = await this.db
-      .select({
-        totalSeconds: sql<number>`coalesce(sum(${focusSessions.actualDuration}), 0)`,
-        count: count(),
-        completedCount: sql<number>`coalesce(sum(case when ${focusSessions.completed} then 1 else 0 end), 0)`,
-      })
-      .from(focusSessions)
-      .where(and(gte(focusSessions.startedAt, from), lt(focusSessions.startedAt, to)))
-      .all();
-    const r = rows[0];
-    return {
-      totalSeconds: Number(r?.totalSeconds ?? 0),
-      count: r?.count ?? 0,
-      completedCount: Number(r?.completedCount ?? 0),
-    };
+  async summaryInRange(from: number, to: number): Promise<{ totalSeconds: number; count: number; completedCount: number }> {
+    const rows = await readFocusSlices(this.db, from, to);
+    return { totalSeconds: rows.reduce((sum, row) => sum + row.seconds, 0), count: new Set(rows.map((row) => row.sessionId)).size, completedCount: new Set(rows.filter((row) => row.completed).map((row) => row.sessionId)).size };
   }
 
   /** [from, to) 按本地日期 GROUP BY：每日总秒/走满数。 */
-  async dailyAggregateInRange(
-    from: number,
-    to: number,
-  ): Promise<Array<{ date: string; seconds: number; completedCount: number }>> {
-    const dateExpr = sql<string>`strftime('%Y-%m-%d', ${focusSessions.startedAt}/1000, 'unixepoch', 'localtime')`;
-    const rows = await this.db
-      .select({
-        date: dateExpr,
-        seconds: sql<number>`coalesce(sum(${focusSessions.actualDuration}), 0)`,
-        completedCount: sql<number>`coalesce(sum(case when ${focusSessions.completed} then 1 else 0 end), 0)`,
-      })
-      .from(focusSessions)
-      .where(and(gte(focusSessions.startedAt, from), lt(focusSessions.startedAt, to)))
-      .groupBy(dateExpr)
-      .all();
-    return rows.map((r) => ({
-      date: String(r.date),
-      seconds: Number(r.seconds),
-      completedCount: Number(r.completedCount),
-    }));
+  async dailyAggregateInRange(from: number, to: number): Promise<Array<{ date: string; seconds: number; completedCount: number }>> {
+    const groups = new Map<string, { seconds: number; completed: Set<number> }>();
+    for (const row of splitFocusHours(await readFocusSlices(this.db, from, to))) {
+      const group = groups.get(row.date) ?? { seconds: 0, completed: new Set<number>() };
+      group.seconds += row.seconds; if (row.completed) group.completed.add(row.sessionId); groups.set(row.date, group);
+    }
+    return [...groups].map(([date, group]) => ({ date, seconds: group.seconds, completedCount: group.completed.size }));
   }
 
   /** [from, to) 按本地小时 GROUP BY（0..23）。 */
-  async hourlyAggregateInRange(
-    from: number,
-    to: number,
-  ): Promise<Array<{ hour: number; seconds: number }>> {
-    const hourExpr = sql<number>`cast(strftime('%H', ${focusSessions.startedAt}/1000, 'unixepoch', 'localtime') as integer)`;
-    const rows = await this.db
-      .select({
-        hour: hourExpr,
-        seconds: sql<number>`coalesce(sum(${focusSessions.actualDuration}), 0)`,
-      })
-      .from(focusSessions)
-      .where(and(gte(focusSessions.startedAt, from), lt(focusSessions.startedAt, to)))
-      .groupBy(hourExpr)
-      .all();
-    return rows.map((r) => ({ hour: Number(r.hour), seconds: Number(r.seconds) }));
+  async hourlyAggregateInRange(from: number, to: number): Promise<Array<{ hour: number; seconds: number }>> {
+    const groups = new Map<number, number>();
+    for (const row of splitFocusHours(await readFocusSlices(this.db, from, to))) groups.set(row.hour, (groups.get(row.hour) ?? 0) + row.seconds);
+    return [...groups].map(([hour, seconds]) => ({ hour, seconds }));
   }
 
   /** [from, to) 按类别 GROUP BY（category_id 快照；服务层负责名称映射）。 */
-  async categoryAggregateInRange(
-    from: number,
-    to: number,
-  ): Promise<Array<{ categoryId: number | null; seconds: number; count: number }>> {
-    const rows = await this.db
-      .select({
-        categoryId: focusSessions.categoryId,
-        seconds: sql<number>`coalesce(sum(${focusSessions.actualDuration}), 0)`,
-        count: count(),
-      })
-      .from(focusSessions)
-      .where(and(gte(focusSessions.startedAt, from), lt(focusSessions.startedAt, to)))
-      .groupBy(focusSessions.categoryId)
-      .all();
-    return rows.map((r) => ({
-      categoryId: r.categoryId,
-      seconds: Number(r.seconds),
-      count: r.count ?? 0,
-    }));
+  async categoryAggregateInRange(from: number, to: number): Promise<Array<{ categoryId: number | null; seconds: number; count: number }>> {
+    const groups = new Map<number | null, { seconds: number; ids: Set<number> }>();
+    for (const row of await readFocusSlices(this.db, from, to)) {
+      const group = groups.get(row.categoryId) ?? { seconds: 0, ids: new Set<number>() }; group.seconds += row.seconds; group.ids.add(row.sessionId); groups.set(row.categoryId, group);
+    }
+    return [...groups].map(([categoryId, group]) => ({ categoryId, seconds: group.seconds, count: group.ids.size }));
   }
-
-  /* ---------- v1.9 复盘：项目维度投入 ---------- */
 
   /** [from, to) 按任务所属项目 GROUP BY（v1.9；任务已删/未归项目 → projectId null）。 */
-  async projectAggregateInRange(
-    from: number,
-    to: number,
-  ): Promise<Array<{ projectId: number | null; projectTitle: string | null; seconds: number; count: number }>> {
-    const rows = await this.db
-      .select({
-        projectId: tasks.projectId,
-        projectTitle: projects.title,
-        seconds: sql<number>`coalesce(sum(${focusSessions.actualDuration}), 0)`,
-        count: count(),
-      })
-      .from(focusSessions)
-      .leftJoin(tasks, eq(tasks.id, focusSessions.taskId))
-      .leftJoin(projects, eq(projects.id, tasks.projectId))
-      .where(and(gte(focusSessions.startedAt, from), lt(focusSessions.startedAt, to)))
-      .groupBy(tasks.projectId)
-      .all();
-    return rows.map((r) => ({
-      projectId: r.projectId,
-      projectTitle: r.projectTitle ?? null,
-      seconds: Number(r.seconds),
-      count: r.count ?? 0,
-    }));
+  async projectAggregateInRange(from: number, to: number): Promise<Array<{ projectId: number | null; projectTitle: string | null; seconds: number; count: number }>> {
+    const groups = new Map<number | null, { title: string | null; seconds: number; ids: Set<number> }>();
+    for (const row of await readFocusSlices(this.db, from, to)) {
+      const group = groups.get(row.projectId) ?? { title: row.projectTitle, seconds: 0, ids: new Set<number>() }; group.seconds += row.seconds; group.ids.add(row.sessionId); groups.set(row.projectId, group);
+    }
+    return [...groups].map(([projectId, group]) => ({ projectId, projectTitle: group.title, seconds: group.seconds, count: group.ids.size }));
   }
+
 }
 
 /** 会话 + 任务/分类名的明细（专注页「今日专注」列表用）。 */

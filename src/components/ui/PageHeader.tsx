@@ -11,9 +11,9 @@ export interface PageHeaderProps {
 /** 统一页面头部：标题 + 可选说明 + 右侧操作（全站一致层级与间距）。 */
 export function PageHeader({ title, description, actions }: PageHeaderProps) {
   return (
-    <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
+    <header className="mb-4 flex shrink-0 flex-wrap items-start justify-between gap-4">
       <div className="min-w-0">
-        <h1 className="text-[22px] font-semibold leading-tight tracking-[-0.01em] text-text-primary">
+        <h1 className="text-page font-semibold leading-tight tracking-[-0.02em] text-text-primary">
           {title}
         </h1>
         {description != null && (

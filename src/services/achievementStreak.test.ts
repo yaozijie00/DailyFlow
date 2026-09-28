@@ -23,13 +23,11 @@ function ctx(partial: Partial<AchievementContext> = {}): AchievementContext {
     taskStreakDays: 0,
     nightFocusCount: 0,
     estimateAccurateStreak: 0,
-    courseTasksCompleted: 0,
     undoCountToday: 0,
     morningFocusCount: 0,
     weekendFocusCount: 0,
     maxDailyPomodoros: 0,
     highPriorityTasksCompleted: 0,
-    workflowRunsCompleted: 0,
     ...partial,
   };
 }
@@ -89,13 +87,6 @@ describe("计划准确 / 夜猫子", () => {
     expect(isValidCondition({ type: "estimate_streak", target: 0 })).toBe(false);
   });
 
-  it("course_tasks_completed：课程任务计数评估", () => {
-    expect(ConditionEngine.evaluate({ type: "course_tasks_completed", target: 1 } as Condition, ctx({ courseTasksCompleted: 1 }))).toBe(true);
-    expect(ConditionEngine.evaluate({ type: "course_tasks_completed", target: 10 } as Condition, ctx({ courseTasksCompleted: 9 }))).toBe(false);
-    const p = ConditionEngine.getProgress({ type: "course_tasks_completed", target: 10 } as Condition, ctx({ courseTasksCompleted: 3 }));
-    expect(p).toMatchObject({ current: 3, target: 10, unit: "count", completed: false });
-    expect(isValidCondition({ type: "course_tasks_completed", target: 10 })).toBe(true);
-  });
 
   it("undo_daily：撤回大师条件", () => {
     expect(ConditionEngine.evaluate({ type: "undo_daily", target: 10 } as Condition, ctx({ undoCountToday: 10 }))).toBe(true);

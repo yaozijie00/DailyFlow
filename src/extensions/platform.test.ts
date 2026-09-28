@@ -10,9 +10,6 @@ import {
 } from "./types";
 import { createExtensionStore } from "./extensionStoreFactory";
 import {
-  registerCourseCompletedProvider,
-  unregisterCourseCompletedProvider,
-  getCourseCompletedProvider,
   scopeContextCapabilities,
   validateContributions,
   validateContributionCapabilities,
@@ -35,13 +32,13 @@ describe("Extension Platform（V1）", () => {
   describe("Manifest 校验", () => {
     it("合法 manifest 通过", () => {
       const m = validateManifest({
-        id: "com.dailyflow.course-schedule",
+        id: "com.example.extension",
         name: "课程表",
         description: "x",
         version: "1.0.0",
         apiVersion: EXTENSION_API_VERSION,
       });
-      expect(m?.id).toBe("com.dailyflow.course-schedule");
+      expect(m?.id).toBe("com.example.extension");
       expect(m?.apiVersion).toBe(1);
       expect(m?.capabilities).toEqual([]);
     });
@@ -241,14 +238,6 @@ describe("Extension Platform（V1）", () => {
   });
 
   describe("停用反注册（禁用=服务停，数据保留）", () => {
-    it("课程成就 Provider：register → get 可取 → unregister 后消失", () => {
-      const id = "com.dailyflow.test-provider";
-      registerCourseCompletedProvider(id, async () => 3);
-      expect(getCourseCompletedProvider()).not.toBeNull();
-      unregisterCourseCompletedProvider(id);
-      expect(getCourseCompletedProvider()).toBeNull();
-    });
-
     it("deactivate 未加载/未知 id 为安全 no-op（不抛错）", async () => {
       const { deactivate } = await import("./registry");
       await expect(deactivate("com.dailyflow.unknown")).resolves.toBeUndefined();

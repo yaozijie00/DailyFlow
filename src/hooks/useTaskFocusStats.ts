@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { taskService } from "../stores/taskStore";
-import { usePomodoroStore } from "../stores/pomodoroStore";
+import { useFocusStore } from "../features/focus/focusStore";
 
 export interface TaskFocusStats {
   totalSeconds: number;
@@ -15,7 +15,7 @@ const EMPTY: TaskFocusStats = { totalSeconds: 0, count: 0, completedCount: 0 };
  * 通过 Service 单次查询聚合，不在组件内做 SQL；依赖 focusVersion 在专注落库后自动刷新。
  */
 export function useTaskFocusStats(taskId: number | null): TaskFocusStats {
-  const focusVersion = usePomodoroStore((s) => s.focusVersion);
+  const focusVersion = useFocusStore((s) => s.focusVersion);
   const [stats, setStats] = useState<TaskFocusStats>(EMPTY);
 
   useEffect(() => {

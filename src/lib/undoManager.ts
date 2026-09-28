@@ -230,6 +230,7 @@ export const TASK_UNDOABLE_FIELDS = [
   "parentId",
   "courseId",
   "priority",
+  "phaseId",
 ] as const;
 
 export type TaskUndoableField = (typeof TASK_UNDOABLE_FIELDS)[number];

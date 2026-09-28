@@ -1,3 +1,4 @@
+import { StartFocusButton } from "../../features/focus/FocusController";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Check, Circle, GripVertical, StickyNote } from "lucide-react";
@@ -172,9 +173,9 @@ export default function TaskList() {
                 <button
                   key={f.key}
                   onClick={() => setStatusFilter(f.key)}
-                  className={`min-h-10 rounded-lg px-2.5 py-1 text-xs transition-colors ${
+                  className={`min-h-8 rounded-lg px-2.5 py-1 text-xs transition-colors ${
                     statusFilter === f.key
-                      ? "bg-accent text-on-accent"
+                      ? "bg-accent-soft font-medium text-accent-strong"
                       : "text-text-muted hover:bg-surface-hover"
                   }`}
                 >
@@ -186,7 +187,8 @@ export default function TaskList() {
               <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value)}
-                className="min-h-10 min-w-0 flex-1 rounded-lg border border-border-strong bg-surface px-2 py-1 text-xs text-text-secondary"
+                aria-label="按分类筛选"
+                className="min-h-8 min-w-0 flex-1 rounded-lg border border-border-strong bg-surface px-2 py-1 text-xs text-text-secondary"
               >
                 <option value="">全部分类</option>
                 {categories.map((c) => (
@@ -200,7 +202,7 @@ export default function TaskList() {
                 value={priorityFilter}
                 onChange={(e) => setPriorityFilter(e.target.value)}
                 aria-label="按优先级筛选"
-                className="min-h-10 min-w-0 flex-1 rounded-lg border border-border-strong bg-surface px-2 py-1 text-xs text-text-secondary"
+                className="min-h-8 min-w-0 flex-1 rounded-lg border border-border-strong bg-surface px-2 py-1 text-xs text-text-secondary"
               >
                 <option value="">全部优先级</option>
                 {TASK_PRIORITIES.map((p) => (
@@ -347,6 +349,7 @@ export default function TaskList() {
                         )}
                       </button>
                       <span className="flex shrink-0 items-center opacity-30 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                        {!done && !cancelled && <StartFocusButton taskId={task.id} title={task.title} compact />}
                         {/* 转为便签手柄（拖到便签区） */}
                         <span
                           onMouseDown={(e) => startTaskToNoteDrag(e, task.id)}

@@ -24,13 +24,11 @@ function ctx(partial: Partial<AchievementContext> = {}): AchievementContext {
     taskStreakDays: 0,
     nightFocusCount: 0,
     estimateAccurateStreak: 0,
-    courseTasksCompleted: 0,
     undoCountToday: 0,
     morningFocusCount: 0,
     weekendFocusCount: 0,
     maxDailyPomodoros: 0,
     highPriorityTasksCompleted: 0,
-    workflowRunsCompleted: 0,
     ...partial,
   };
 }
@@ -223,16 +221,4 @@ describe("ConditionEngine", () => {
     expect(isValidCondition({ type: "morning_sessions" })).toBe(false);
   });
 
-  it("A5：workflow_runs_completed 条件 校验/评估/进度", () => {
-    const c: Condition = { type: "workflow_runs_completed", target: 3 };
-    expect(isValidCondition(c)).toBe(true);
-    expect(isValidCondition({ type: "workflow_runs_completed" })).toBe(false);
-    expect(ConditionEngine.evaluate(c, ctx({ workflowRunsCompleted: 2 }))).toBe(false);
-    expect(ConditionEngine.evaluate(c, ctx({ workflowRunsCompleted: 3 }))).toBe(true);
-    const p = ConditionEngine.getProgress(c, ctx({ workflowRunsCompleted: 1 }));
-    expect(p.current).toBe(1);
-    expect(p.target).toBe(3);
-    expect(p.completed).toBe(false);
-    expect(p.unit).toBe("count");
-  });
 });

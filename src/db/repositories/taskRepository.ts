@@ -1,12 +1,16 @@
+import { readFocusSlices } from "../focusAnalytics";
 import { and, count, desc, eq, gte, like, lt, inArray, sql } from "drizzle-orm";
 import type { Db } from "../db";
-import { tasks, focusSessions } from "../schema";
+import { tasks } from "../schema";
 import type { TaskPriority } from "../../lib/taskPriority";
 import { DEFAULT_TASK_PRIORITY } from "../../lib/taskPriority";
 
 type StoredTask = typeof tasks.$inferSelect;
-/** Optional keeps source-compatible fixtures/extensions while old databases migrate. */
-export type Task = Omit<StoredTask, "repeatSourceId"> & { repeatSourceId?: number | null };
+/** Optional migration fields keep source-compatible fixtures/extensions while old databases migrate. */
+export type Task = Omit<StoredTask, "repeatSourceId" | "phaseId"> & {
+  repeatSourceId?: number | null;
+  phaseId?: number | null;
+};
 
 export interface CreateTaskInput {
   title: string;
@@ -33,6 +37,8 @@ export interface CreateTaskInput {
   repeatSourceId?: number | null;
   /** 优先级（v2.3.x；缺省 = medium） */
   priority?: TaskPriority;
+  /** 长期计划阶段（固定一层，可空） */
+  phaseId?: number | null;
 }
 
 export type UpdateTaskInput = Partial<CreateTaskInput> & { sortOrder?: number };
@@ -64,6 +70,7 @@ export class TaskRepository {
         repeatRule: input.repeatRule ?? "",
         repeatSourceId: input.repeatSourceId ?? null,
         priority: input.priority ?? DEFAULT_TASK_PRIORITY,
+        phaseId: input.phaseId ?? null,
       })
       .returning()
       .all();
@@ -302,20 +309,10 @@ export class TaskRepository {
       else if (r.status === "TODO") cur.todo += 1;
       by.set(r.projectId, cur);
     }
-    const sessRows = await this.db
-      .select({
-        projectId: tasks.projectId,
-        seconds: sql<number>`coalesce(sum(${focusSessions.actualDuration}), 0)`,
-      })
-      .from(focusSessions)
-      .leftJoin(tasks, eq(focusSessions.taskId, tasks.id))
-      .where(sql`${tasks.projectId} is not null`)
-      .groupBy(tasks.projectId)
-      .all();
-    for (const s of sessRows) {
-      if (s.projectId == null) continue;
-      const cur = by.get(s.projectId);
-      if (cur) cur.seconds += Number(s.seconds);
+    for (const row of await readFocusSlices(this.db)) {
+      if (row.projectId == null) continue;
+      const current = by.get(row.projectId) ?? { todo: 0, completed: 0, seconds: 0 };
+      current.seconds += row.seconds; by.set(row.projectId, current);
     }
     return [...by.entries()].map(([projectId, v]) => ({ projectId, ...v }));
   }

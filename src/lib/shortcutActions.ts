@@ -1,6 +1,6 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { useAppStore } from "../stores/appStore";
-import { usePomodoroStore } from "../stores/pomodoroStore";
+import { useFocusStore } from "../features/focus/focusStore";
 import { useTaskStore } from "../stores/taskStore";
 import { useStatisticsStore } from "../stores/statisticsStore";
 import { performUndo, performRedo } from "./undoActions";
@@ -20,10 +20,10 @@ export function dispatchShortcut(action: ShortcutAction): void {
       useTaskStore.getState().openCreate();
       break;
     case "pomodoro_toggle": {
-      const p = usePomodoroStore.getState();
-      if (p.snapshot.state === "RUNNING") p.pause();
-      else if (p.snapshot.state === "PAUSED") p.resume();
-      else app.pushToast("info", "请先在「专注」页选择任务开始番茄钟");
+      const p = useFocusStore.getState();
+      if (p.active?.status === "running") void p.perform({ action: "pause" });
+      else if (p.active?.status === "paused") void p.perform({ action: "resume" });
+      else app.pushToast("info", "请先在「专注」页选择任务开始推进");
       break;
     }
     case "complete_task": {

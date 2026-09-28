@@ -6,7 +6,7 @@ interface Sample {
   extensionId?: string;
 }
 
-const enabledExt = new Set(["com.dailyflow.course-schedule"]);
+const enabledExt = new Set(["com.example.enabled"]);
 const isEnabled = (id: string) => enabledExt.has(id);
 
 describe("filterByExtensionEnabled（成就随扩展启停展示）", () => {
@@ -18,14 +18,14 @@ describe("filterByExtensionEnabled（成就随扩展启停展示）", () => {
 
   it("启用扩展的成就展示", () => {
     const items: Sample[] = [
-      { id: "course-first", extensionId: "com.dailyflow.course-schedule" },
+      { id: "extension-first", extensionId: "com.example.enabled" },
     ];
-    expect(filterByExtensionEnabled(items, isEnabled).map((i) => i.id)).toEqual(["course-first"]);
+    expect(filterByExtensionEnabled(items, isEnabled).map((i) => i.id)).toEqual(["extension-first"]);
   });
 
   it("禁用扩展的成就（含已解锁）被隐藏", () => {
     const items: Sample[] = [
-      { id: "course-first", extensionId: "com.dailyflow.course-schedule", /* unlocked */ },
+      { id: "extension-first", extensionId: "com.example.enabled", /* unlocked */ },
     ];
     // 课程扩展禁用 → 成就列表消失（解锁与否均不显示）
     expect(filterByExtensionEnabled(items, () => false)).toHaveLength(0);
@@ -33,8 +33,8 @@ describe("filterByExtensionEnabled（成就随扩展启停展示）", () => {
 
   it("混合：Core + 启用扩展 + 禁用扩展 → 只保留前两者", () => {
     const items: Sample[] = [
-      { id: "a", extensionId: "com.dailyflow.course-schedule" }, // 启用
-      { id: "b", extensionId: "com.dailyflow.workflow" }, // 禁用
+      { id: "a", extensionId: "com.example.enabled" }, // 启用
+      { id: "b", extensionId: "com.example.disabled" }, // 禁用
       { id: "c" }, // Core
     ];
     const out = filterByExtensionEnabled(items, isEnabled).map((i) => i.id);

@@ -16,6 +16,7 @@ const mockState = vi.hoisted(() => ({
   update: vi.fn(),
   complete: vi.fn(),
   remove: vi.fn(),
+  convertToPlanning: vi.fn(),
 }));
 
 const taskMock = vi.hoisted(() => ({
@@ -56,6 +57,7 @@ describe("NoteList（便签区）", () => {
     mockState.complete.mockClear();
     mockState.remove.mockClear();
     mockState.load.mockClear();
+    mockState.convertToPlanning.mockReset();
     taskMock.createScheduledTask.mockReset();
     taskMock.createScheduledTask.mockResolvedValue(true);
     taskMock.convertToNote.mockReset();
@@ -72,6 +74,33 @@ describe("NoteList（便签区）", () => {
     render(<NoteList />);
     expect(screen.getByText("设计背包 UI")).toBeTruthy();
     expect(screen.getByText("整理素材")).toBeTruthy();
+  });
+
+  it("笔记与收集箱分开展示，可保存并放回收集箱", async () => {
+    mockState.notes = [makeNote(), makeNote({ id: 2, title: "参考笔记", status: "saved" })];
+    render(<NoteList />);
+    expect(screen.queryByText("参考笔记")).toBeNull();
+    fireEvent.change(screen.getByLabelText("整理：设计背包 UI"), { target: { value: "saved" } });
+    await vi.waitFor(() => expect(mockState.update).toHaveBeenCalledWith(1, { status: "saved" }));
+    fireEvent.click(screen.getByRole("button", { name: "笔记" }));
+    expect(screen.queryByText("设计背包 UI")).toBeNull();
+    expect(screen.getByText("参考笔记")).toBeTruthy();
+    expect(screen.queryByLabelText("安排到今日")).toBeNull();
+    fireEvent.change(screen.getByLabelText("整理：参考笔记"), { target: { value: "active" } });
+    await vi.waitFor(() => expect(mockState.update).toHaveBeenCalledWith(2, { status: "active" }));
+  });
+
+  it("快速整理调用所选目标，等待期间禁用菜单", async () => {
+    mockState.notes = [makeNote()];
+    let finish!: () => void;
+    mockState.convertToPlanning.mockImplementation(() => new Promise<void>((resolve) => { finish = resolve; }));
+    render(<NoteList />);
+    const select = screen.getByLabelText("整理：设计背包 UI") as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: "idea" } });
+    expect(mockState.convertToPlanning).toHaveBeenCalledWith(1, "idea");
+    expect(select.disabled).toBe(true);
+    finish();
+    await vi.waitFor(() => expect(select.disabled).toBe(false));
   });
 
   it("快速添加：输入回车创建", async () => {

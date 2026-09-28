@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAppStore } from "../../stores/appStore";
 import { useSettingsStore } from "../../stores/settingsStore";
-import { usePomodoroStore } from "../../stores/pomodoroStore";
+import { useFocusStore } from "../../features/focus/focusStore";
 import { hideToMini, hideToTray, exitApp } from "../../services/windowBehaviorService";
 import type { CloseBehavior } from "../../services/settingsService";
 
@@ -9,7 +9,7 @@ import type { CloseBehavior } from "../../services/settingsService";
  * 关闭行为对话框（V1.4.1 窗口行为）：
  * - first：首次点击窗口 X 时询问「退出 / 隐藏到系统托盘」，可勾选「记住我的选择」；
  *   取消 → 不保存、不执行，下次仍询问；
- * - exit-focus：已配置为退出且 Focus 运行中 → 额外确认「退出后本次专注将被结束」。
+ * - exit-focus：已配置为退出且 Focus 运行中 → 额外确认「退出前会保存并暂停本次专注」。
  * 视觉与全局 Modal 一致（Modern / Minimal / Calm）。
  */
 export default function CloseBehaviorDialog() {
@@ -23,13 +23,12 @@ export default function CloseBehaviorDialog() {
 
   const isFirst = closeDialog === "first";
   const focusRunning =
-    usePomodoroStore.getState().snapshot.state === "RUNNING" ||
-    usePomodoroStore.getState().snapshot.state === "PAUSED";
+    useFocusStore.getState().active != null;
 
   /** 首次对话框：确定后按选择执行；勾选「记住我的选择」则持久化。 */
   const confirmFirst = async () => {
     if (remember) {
-      await updateSettings({ closeBehavior: behavior, closeBehaviorConfigured: true });
+      if (await updateSettings({ closeBehavior: behavior, closeBehaviorConfigured: true }) === false) return;
     }
     closeCloseDialog();
     if (behavior === "tray") {
@@ -102,7 +101,7 @@ export default function CloseBehaviorDialog() {
           </>
         ) : (
           <p className="mt-2 text-sm text-text-secondary">
-            当前正在进行专注，退出后本次专注将被结束。
+            当前正在进行专注，退出前会保存并暂停本次专注。
           </p>
         )}
 

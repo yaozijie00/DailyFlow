@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Check, ChevronLeft, Pause, Play, Plus, X } from "lucide-react";
+import { Check, ChevronLeft, Plus, X } from "lucide-react";
 import { getDb } from "../db/db";
 import { TaskRepository, type Task } from "../db/repositories/taskRepository";
 import { TaskService } from "../services/taskService";
 import { FocusSessionRepository } from "../db/repositories/focusSessionRepository";
 import { todayString } from "../lib/date";
 import { taskPriorityMeta } from "../lib/taskPriority";
-import { usePomodoroStore } from "../stores/pomodoroStore";
+import FocusController, { FocusBridge } from "../features/focus/FocusController";
+import { useFocusStore } from "../features/focus/focusStore";
 import { ProgressRing } from "../components/mini/ProgressRing";
-import { formatTimer } from "../lib/format";
 
 /**
  * DailyFlow Mini 窗（V2.4 重设计）：
@@ -36,30 +36,18 @@ export default function MiniApp() {
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState("");
   const [adding, setAdding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  // 专注状态（与主窗同源 store；Module 级单例计时器不随窗口重建丢失）
-  const snapshot = usePomodoroStore((s) => s.snapshot);
-  const phase = usePomodoroStore((s) => s.phase);
-  const taskTitle = usePomodoroStore((s) => s.taskTitle);
-  const pause = usePomodoroStore((s) => s.pause);
-  const resume = usePomodoroStore((s) => s.resume);
-  const refresh = usePomodoroStore((s) => s.refresh);
-  const taskId = usePomodoroStore((s) => s.taskId);
-
-  // 每秒刷新倒计时显示
-  useEffect(() => {
-    refresh();
-    const id = window.setInterval(refresh, 1000);
-    return () => window.clearInterval(id);
-  }, [refresh]);
+  const focusVersion = useFocusStore((s) => s.focusVersion);
 
   const load = useCallback(async () => {
     try {
       const rows = await taskService.getTasksByDate(todayString());
       setTasks(rows);
+      setError(null);
     } catch {
-      setTasks([]);
+      setError("任务读取失败，请重试。");
     } finally {
       setLoading(false);
     }
@@ -67,29 +55,18 @@ export default function MiniApp() {
 
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, focusVersion]);
 
   const activeTasks = useMemo(() => tasks.filter((t) => t.status !== "COMPLETED"), [tasks]);
   const doneCount = tasks.length - activeTasks.length;
   const todayProgress = tasks.length === 0 ? 0 : doneCount / tasks.length;
 
-  const focusActive =
-    snapshot.state === "RUNNING" || snapshot.state === "PAUSED";
-  const focusPaused = snapshot.state === "PAUSED";
-  // 专注/休息标题：休息阶段 taskTitle 为空 → 显示「休息中」
-  const focusLabel =
-    phase === "focus"
-      ? (tasks.find((t) => t.id === taskId)?.title ?? taskTitle ?? "专注中")
-      : phase === "long_break"
-        ? "长休息"
-        : "短休息";
-  const focusProgress =
-    snapshot.durationMs > 0 ? (snapshot.durationMs - snapshot.remainingMs) / snapshot.durationMs : 0;
-
   const complete = async (id: number) => {
+    try {
     await taskService.completeTask(id); // 经 Core Task Service（可撤销语义与主窗一致）
     await load();
     void invoke("notify_tasks_changed").catch(() => undefined);
+    } catch { setError("未能完成任务，请重试。"); }
   };
 
   const addTask = async () => {
@@ -102,7 +79,7 @@ export default function MiniApp() {
       await load();
       void invoke("notify_tasks_changed").catch(() => undefined);
     } catch {
-      // 失败保留输入，用户可重试
+      setError("添加失败，输入已保留，请重试。");
     } finally {
       setAdding(false);
       inputRef.current?.focus();
@@ -115,6 +92,7 @@ export default function MiniApp() {
 
   return (
     <div className="flex h-screen flex-col bg-transparent text-text-primary">
+      {error && <div role="alert" className="flex shrink-0 items-center gap-2 bg-danger-soft px-3 py-2 text-caption text-danger"><span className="flex-1">{error}</span><button type="button" onClick={() => void load()} className="underline">重新读取</button></div>}
       {/* 迷你标题条（可拖拽：data-tauri-drag-region） */}
       <div
         data-tauri-drag-region
@@ -162,36 +140,7 @@ export default function MiniApp() {
 
       {/* 圆环卡：专注 + 今日进度 */}
       <div className="flex shrink-0 items-center justify-around gap-2 px-3 pt-3">
-        {/* 专注倒计时 */}
-        <div className="glass-surface flex w-[48%] flex-col items-center gap-1.5 rounded-xl border border-border-subtle px-2 py-3">
-          <ProgressRing progress={focusActive ? focusProgress : 0} size={92} stroke={7}>
-            <span className="text-lg font-semibold tabular-nums text-text-primary">
-              {focusActive ? formatTimer(snapshot.remainingMs) : "—"}
-            </span>
-            <span className="text-[10px] text-text-faint">{focusActive ? (focusPaused ? "已暂停" : "剩余") : "空闲"}</span>
-          </ProgressRing>
-          <span className="max-w-full truncate px-1 text-center text-xs font-medium text-text-secondary">
-            {focusLabel}
-          </span>
-          {focusActive ? (
-            <button
-              onClick={() => (focusPaused ? resume() : pause())}
-              aria-label={focusPaused ? "继续" : "暂停"}
-              className="flex items-center gap-1 rounded-md bg-accent px-3 py-1 text-[11px] font-medium text-on-accent transition-colors hover:bg-accent-hover"
-            >
-              {focusPaused ? <Play size={11} /> : <Pause size={11} />}
-              {focusPaused ? "继续" : "暂停"}
-            </button>
-          ) : (
-            <button
-              onClick={backToMain}
-              className="rounded-md border border-border-strong px-3 py-1 text-[11px] text-text-muted transition-colors hover:bg-surface-hover"
-              title="去主窗选择任务开始专注"
-            >
-              去专注
-            </button>
-          )}
-        </div>
+        <div className="min-w-0 w-[55%]"><FocusBridge notifications={false} /><FocusController mini /></div>
 
         {/* 今日进度 */}
         <div className="glass-surface flex w-[48%] flex-col items-center gap-1.5 rounded-xl border border-border-subtle px-2 py-3">

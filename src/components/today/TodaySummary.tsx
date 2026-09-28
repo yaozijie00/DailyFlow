@@ -17,26 +17,26 @@ export default function TodaySummary() {
   const remaining = Math.max(0, stats.totalTasks - stats.completedTasks);
 
   return (
-    <div className="grid w-full min-w-0 flex-1 grid-cols-3 divide-x divide-border-subtle rounded-md border border-border-subtle glass-surface px-1 py-2 shadow-card sm:w-auto sm:min-w-[360px] sm:max-w-[520px]">
-      <div className="px-3">
+    <div className="flex min-w-0 flex-wrap items-center gap-x-6 gap-y-2 text-caption">
+      <div className="flex items-baseline gap-2">
         <div className="text-[11px] text-text-muted">待完成</div>
-        <div className="mt-0.5 text-lg font-semibold tabular-nums text-text-primary">{remaining}</div>
+        <div className="text-body font-semibold tabular-nums text-text-primary">{remaining}</div>
       </div>
-      <div className="px-3">
+      <div className="flex items-baseline gap-2">
         <div className="flex items-center justify-between gap-2 text-[11px] text-text-muted">
           <span>计划进度</span>
           <span className="tabular-nums text-text-faint">{rate}%</span>
         </div>
-        <div className="mt-0.5 text-lg font-semibold tabular-nums text-text-primary">
+        <div className="text-body font-semibold tabular-nums text-text-primary">
           {stats.completedTasks}/{stats.totalTasks}
         </div>
-        <div className="mt-1 h-1 overflow-hidden rounded-full bg-surface-muted">
+        <div className="h-1 w-12 self-center overflow-hidden rounded-full bg-surface-muted" role="progressbar" aria-label="今日完成进度" aria-valuenow={rate} aria-valuemin={0} aria-valuemax={100}>
           <div className="h-full rounded-full bg-accent" style={{ width: `${rate}%` }} />
         </div>
       </div>
-      <div className="px-3">
+      <div className="flex items-baseline gap-2">
         <div className="text-[11px] text-text-muted">已专注</div>
-        <div className="mt-0.5 text-lg font-semibold tabular-nums text-text-primary">
+        <div className="text-body font-semibold tabular-nums text-text-primary">
           {formatDuration(stats.totalFocusSeconds) || "0分钟"}
         </div>
         <div className="text-[11px] tabular-nums text-text-faint">{stats.focusCount} 次专注</div>

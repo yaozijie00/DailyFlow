@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAppStore } from "../stores/appStore";
 import { useTaskStore } from "../stores/taskStore";
-import { usePomodoroStore } from "../stores/pomodoroStore";
+import { useFocusStore } from "../features/focus/focusStore";
 import { getDb } from "../db/db";
 import { TaskRepository } from "../db/repositories/taskRepository";
 import { FocusSessionRepository } from "../db/repositories/focusSessionRepository";
@@ -26,7 +26,7 @@ export function useTodayStats(): TodayStats | null {
   const dbStatus = useAppStore((s) => s.dbStatus);
   const tasks = useTaskStore((s) => s.tasks);
   const selectedDate = useTaskStore((s) => s.selectedDate);
-  const focusVersion = usePomodoroStore((s) => s.focusVersion);
+  const focusVersion = useFocusStore((s) => s.focusVersion);
   const [stats, setStats] = useState<TodayStats | null>(null);
   const [minuteTick, setMinuteTick] = useState(0);
 

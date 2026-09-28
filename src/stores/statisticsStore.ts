@@ -3,8 +3,6 @@ import { getDb } from "../db/db";
 import { TaskRepository } from "../db/repositories/taskRepository";
 import { FocusSessionRepository } from "../db/repositories/focusSessionRepository";
 import { CategoryRepository } from "../db/repositories/categoryRepository";
-import { WorkflowMetricsRepository } from "../db/repositories/workflowMetricsRepository";
-import type { WorkflowExecutionAggregate } from "../db/repositories/workflowMetricsRepository";
 import {
   StatisticsService,
   type RangeStatistics,
@@ -30,7 +28,6 @@ const statisticsService = new StatisticsService(
   new TaskRepository(getDb()),
   new FocusSessionRepository(getDb()),
   new CategoryRepository(getDb()),
-  new WorkflowMetricsRepository(getDb()),
 );
 
 /** 共享统计服务单例（复盘视图等只读查询复用）。 */
@@ -84,8 +81,6 @@ interface StatisticsState {
   hourlyStats: HourlyStatistic[];
   overview: OverviewStatistics | null;
   dailyTasks: DailyTasksByDate[];
-  /** A6：Workflow 执行指标（无数据为 null） */
-  workflowExecution: WorkflowExecutionAggregate | null;
   setTab: (t: StatsTab) => void;
   setRange: (r: RangePreset) => void;
   setCustomRange: (from: string, to: string) => void;
@@ -103,7 +98,6 @@ export const useStatisticsStore = create<StatisticsState>((set, get) => ({
   hourlyStats: [],
   overview: null,
   dailyTasks: [],
-  workflowExecution: null,
 
   setTab: (t) => {
     set({ tab: t });
@@ -125,7 +119,7 @@ export const useStatisticsStore = create<StatisticsState>((set, get) => ({
     const seq = ++statLoadSeq; // A1-P0Fix-④：丢弃过期响应（快速切换范围时旧查询不覆盖新范围）
     set({ loading: true });
     try {
-      const [rangeStats, categoryStats, hourlyStats, overview, dailyTasks, workflowExecution] =
+      const [rangeStats, categoryStats, hourlyStats, overview, dailyTasks] =
         await Promise.all([
           statisticsService.getRangeStatistics(from, to),
           statisticsService.getCategoryStatistics(from, to),
@@ -134,10 +128,9 @@ export const useStatisticsStore = create<StatisticsState>((set, get) => ({
             : Promise.resolve([] as HourlyStatistic[]),
           statisticsService.getOverview(from, to),
           statisticsService.getDailyTasks(from, to),
-          statisticsService.getWorkflowExecution(from, to),
         ]);
       if (seq !== statLoadSeq) return; // 已有更新的 load 发起 → 丢弃本次
-      set({ rangeStats, categoryStats, hourlyStats, overview, dailyTasks, workflowExecution, loading: false });
+      set({ rangeStats, categoryStats, hourlyStats, overview, dailyTasks, loading: false });
     } catch {
       if (seq === statLoadSeq) set({ loading: false });
     }

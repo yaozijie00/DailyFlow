@@ -27,6 +27,10 @@ export class TaskService {
     private readonly sessions: FocusSessionRepository,
   ) {}
 
+  async getTask(id: number): Promise<Task | null> {
+    return this.tasks.findById(id);
+  }
+
   async getTodayTasks(): Promise<Task[]> {
     return this.getTasksByDate(todayString());
   }
@@ -116,30 +120,33 @@ export class TaskService {
     await this.tasks.reorder(orderedIds);
   }
 
-  /** 删除任务：先清理其全部专注记录（统计数据不再包含该任务），再删除任务。 */
+  /** 删除任务保留真实投入；撤销只恢复链接，不重建或覆盖专注记录。 */
   async deleteTask(id: number): Promise<boolean> {
+    const existing = await this.tasks.findById(id);
+    if (!existing) return false;
+    const linked = await this.sessions.findByTaskId(id);
+    const removed = await this.tasks.delete(id);
+    if (!removed) return false;
     if (!undoManager.applying) {
-      const task = await this.tasks.findById(id);
+      const task = existing;
       if (task) {
         const t = { ...task };
-        const sessions = await this.sessions.findByTaskId(id);
+        const sessions = linked;
         const ss = sessions.map((s) => ({ ...s }));
         undoManager.push({
           type: "task.delete",
           label: "删除任务",
           undo: async () => {
             await this.tasks.insertRestored(t);
-            for (const s of ss) await this.sessions.insertRestored(s);
+            await this.sessions.reattach(t.id, ss.map((s) => s.id));
           },
           redo: async () => {
-            await this.sessions.deleteByTaskId(t.id);
             await this.tasks.delete(t.id);
           },
         });
       }
     }
-    await this.sessions.deleteByTaskId(id);
-    return this.tasks.delete(id);
+    return true;
   }
 
   /**
@@ -279,6 +286,7 @@ export class TaskService {
         notes: before.notes,
         goalId: before.goalId,
         projectId: before.projectId,
+        phaseId: before.phaseId,
         parentId: before.parentId,
         courseId: before.courseId,
         repeatRule: before.repeatRule,

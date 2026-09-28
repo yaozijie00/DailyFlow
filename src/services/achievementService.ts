@@ -5,7 +5,6 @@ import { AchievementProgressRepository } from "../db/repositories/achievementPro
 import { dateStringOf } from "../lib/date";
 import { todayUndoCount } from "../lib/undoManager";
 import { taskPriorityMeta } from "../lib/taskPriority";
-import { getCourseCompletedProvider, getWorkflowRunCompletedProvider } from "../extensions/registry";
 import {
   ConditionEngine,
   type AchievementContext,
@@ -200,13 +199,6 @@ export class AchievementService {
           completedAt: t.completedAt ?? t.updatedAt,
         })),
     );
-    // 课程成就数据源：经 Extension Host Provider（课程 Extension 启用时注册），
-    // Core 不再读取 tasks.course_id（该列已降级为兼容过渡列）
-    const courseProvider = getCourseCompletedProvider();
-    const courseTasksCompleted = courseProvider ? await courseProvider() : 0;
-    // A5：WorkflowRun 完成数据源经 Workflow Extension 注册（禁用则不计数）
-    const workflowProvider = getWorkflowRunCompletedProvider();
-    const workflowRunsCompleted = workflowProvider ? await workflowProvider() : 0;
     const highPriorityTasksCompleted = allTasks.filter(
       (t) => t.status === "COMPLETED" && taskPriorityMeta(t.priority).value === "high",
     ).length;
@@ -228,8 +220,6 @@ export class AchievementService {
       taskStreakDays,
       nightFocusCount,
       estimateAccurateStreak,
-      courseTasksCompleted,
-      workflowRunsCompleted,
       undoCountToday: todayUndoCount(),
       morningFocusCount,
       weekendFocusCount,

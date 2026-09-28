@@ -33,12 +33,11 @@ vi.mock("../stores/taskStore", () => ({
     }),
   },
 }));
-vi.mock("../stores/pomodoroStore", () => ({
-  usePomodoroStore: {
+vi.mock("../features/focus/focusStore", () => ({
+  useFocusStore: {
     getState: () => ({
-      snapshot: { state: pomodoroState.value },
-      pause: mocks.pause,
-      resume: mocks.resume,
+      active: { status: pomodoroState.value.toLowerCase() },
+      perform: ({ action }: { action: string }) => action === "pause" ? mocks.pause() : mocks.resume(),
     }),
   },
 }));

@@ -39,8 +39,8 @@ interface SettingsState {
   shortcuts: ShortcutMap;
   loaded: boolean;
   load: () => Promise<void>;
-  update: (partial: Partial<AppSettings>) => Promise<void>;
-  saveShortcuts: (map: ShortcutMap) => Promise<void>;
+  update: (partial: Partial<AppSettings>) => Promise<boolean>;
+  saveShortcuts: (map: ShortcutMap) => Promise<boolean>;
 }
 
 /** 应用设置 Store：启动时从 SQLite 加载，修改后立即持久化并更新内存。 */
@@ -74,8 +74,10 @@ export const useSettingsStore = create<SettingsState>((set) => ({
         syncTheme(settings.themeMode);
         ensureSystemWatcher();
       }
+      return true;
     } catch {
-      useAppStore.getState().pushToast("error", "保存设置失败");
+      useAppStore.getState().pushToast("error", "保存设置失败，请重试");
+      return false;
     }
   },
 
@@ -83,8 +85,10 @@ export const useSettingsStore = create<SettingsState>((set) => ({
     try {
       await settingsService.saveShortcuts(map);
       set({ shortcuts: map });
+      return true;
     } catch {
-      useAppStore.getState().pushToast("error", "保存快捷键失败");
+      useAppStore.getState().pushToast("error", "保存快捷键失败，请重试");
+      return false;
     }
   },
 }));

@@ -9,6 +9,7 @@ import {
 import { NoteService } from "../services/noteService";
 import { useAppStore } from "./appStore";
 import { undoManager } from "../lib/undoManager";
+import { convertNoteToPlanning, type NotePlanningTarget } from "../lib/noteConvertPlanning";
 
 const noteService = new NoteService(new NoteRepository(getDb()));
 
@@ -28,12 +29,24 @@ interface NoteState {
   remove: (id: number) => Promise<void>;
   /** 一键清理全部「已安排」便签（批量、一次撤销） */
   clearArranged: () => Promise<void>;
+  convertToPlanning: (id: number, target: NotePlanningTarget) => Promise<void>;
 }
 
 export const useNoteStore = create<NoteState>((set, get) => ({
   notes: [],
   completedNotes: [],
   loading: false,
+
+  convertToPlanning: async (id, target) => {
+    try {
+      const key = await convertNoteToPlanning(getDb(), id, target);
+      await get().load();
+      if (key) useAppStore.getState().pushToast("success", "已转换，原便签已保留（可撤销）");
+    } catch {
+      await get().load();
+      useAppStore.getState().pushToast("error", "转换失败，请检查收集箱后重试");
+    }
+  },
 
   load: async () => {
     set({ loading: true });

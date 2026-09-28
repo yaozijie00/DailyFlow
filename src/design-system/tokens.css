@@ -1,0 +1,92 @@
+/* V3.3 · Calm / Precision / Flow. Keep semantic theme colors in index.css. */
+@theme {
+  --font-sans: "Segoe UI Variable", "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  --text-page: 1.5rem;
+  --text-section: 1rem;
+  --text-body: 0.875rem;
+  --text-secondary: 0.8125rem;
+  --text-caption: 0.75rem;
+  --text-micro: 0.6875rem;
+  --radius-control: 0.5rem;
+  --radius-panel: 0.75rem;
+  --radius-floating: 0.75rem;
+  --color-on-inverse: var(--color-bg-app);
+}
+
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --motion-micro: 100ms;
+  --motion-standard: 180ms;
+  --motion-structural: 280ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --z-base: 0;
+  --z-sticky: 10;
+  --z-popover: 40;
+  --z-dialog: 80;
+  --z-command: 90;
+  --z-toast: 100;
+  --control-height: 36px;
+  --control-height-sm: 32px;
+  --row-height: 40px;
+  --surface-page: var(--color-bg-app);
+  --surface-panel: var(--color-surface);
+  --surface-interactive: var(--color-surface-hover);
+  --surface-floating: var(--color-bg-elevated);
+  --border-width: 1px;
+}
+
+[data-layout-mode="compact"] {
+  --control-height: 32px;
+  --row-height: 36px;
+}
+
+@layer base {
+  html, body, #root { height: 100%; min-width: 0; }
+  body { margin: 0; }
+  button, input, select, textarea { font: inherit; }
+  button, input, select, textarea, [role="tab"] {
+    transition-duration: var(--motion-micro);
+    transition-timing-function: var(--ease-standard);
+  }
+  :where(input, select, textarea) { accent-color: var(--color-accent); }
+  :where(button):not(:disabled):active { filter: brightness(0.96); }
+  :where(input, select, textarea)[aria-invalid="true"] {
+    border-color: var(--color-danger);
+    outline-color: var(--color-danger);
+  }
+  :where(input, select, textarea):disabled { background: var(--color-surface-muted); }
+}
+
+@layer components {
+  .df-control { min-height: var(--control-height); }
+  .df-scroll-area {
+    min-height: 0;
+    min-width: 0;
+    overflow: auto;
+    scrollbar-gutter: stable;
+  }
+  .df-divider { border: 0; border-top: var(--border-width) solid var(--color-border-subtle); }
+  .df-skeleton {
+    background: var(--color-surface-muted);
+    border-radius: var(--radius-control);
+    animation: df-pulse 1.4s ease-in-out infinite alternate;
+  }
+}
+@keyframes df-pulse { to { opacity: 0.5; } }
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --motion-micro: 0ms; --motion-standard: 0ms; --motion-structural: 0ms; }
+}

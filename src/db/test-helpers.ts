@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/sqlite-proxy";
 import * as schema from "./schema";
-import { runMigrations } from "./migrate";
+import { runMigrations, type RunMigrationsOptions } from "./migrate";
 import type { Db } from "./db";
 
 /**
@@ -16,6 +16,7 @@ import type { Db } from "./db";
  */
 export async function createTestDb(
   filePath?: string,
+  migrationOptions?: RunMigrationsOptions,
 ): Promise<{ db: Db; close: () => void }> {
   const sqlite = new Database(filePath ?? ":memory:");
   sqlite.pragma("foreign_keys = ON");
@@ -40,7 +41,7 @@ export async function createTestDb(
     { schema },
   ) as Db;
 
-  await runMigrations(db);
+  await runMigrations(db, migrationOptions);
 
   return {
     db,

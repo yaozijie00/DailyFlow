@@ -6,6 +6,18 @@ import type { Task } from "../../db/repositories/taskRepository";
 
 afterEach(cleanup);
 
+it("opens a searched task outside today's list without rescheduling it", async () => {
+  mockState.tasks = [];
+  mockState.selectedTaskId = 777;
+  mockState.updateTask.mockClear();
+  focusStatsMock.getTask.mockResolvedValueOnce(makeTask({ id: 777, title: "未来事项", scheduledDate: "" }));
+  focusStatsMock.getTaskFocusStats.mockResolvedValue({ totalSeconds: 0, count: 0, completedCount: 0 });
+  render(<TaskDetail />);
+  expect(await screen.findByText("未来事项")).toBeTruthy();
+  expect(focusStatsMock.getTask).toHaveBeenCalledWith(777);
+  expect(mockState.updateTask).not.toHaveBeenCalled();
+});
+
 const mockState = vi.hoisted(() => ({
   selectedTaskId: null as number | null,
   tasks: [] as Task[],
@@ -22,6 +34,7 @@ const mockState = vi.hoisted(() => ({
 
 const focusStatsMock = vi.hoisted(() => ({
   getTaskFocusStats: vi.fn(),
+  getTask: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("../../stores/taskStore", () => ({
@@ -30,9 +43,6 @@ vi.mock("../../stores/taskStore", () => ({
 }));
 vi.mock("../../stores/goalStore", () => ({
   useGoalStore: (selector: (s: unknown) => unknown) => selector(mockState),
-}));
-vi.mock("../../stores/pomodoroStore", () => ({
-  usePomodoroStore: (selector: (s: unknown) => unknown) => selector({ focusVersion: 0 }),
 }));
 vi.mock("../../stores/projectStore", () => ({
   useProjectStore: (selector: (s: unknown) => unknown) =>

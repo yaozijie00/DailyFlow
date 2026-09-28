@@ -21,6 +21,7 @@ import NoteList from "../components/notes/NoteList";
 import CalendarPopover from "../components/today/CalendarPopover";
 import { useNoteStore } from "../stores/noteStore";
 import { shouldOverlayTodayDetail } from "../lib/layoutBreakpoints";
+import { useSearchNavigationStore } from "../stores/searchNavigationStore";
 
 // 布局固定尺寸（与 className 保持一致）
 const TASK_LIST_WIDTH = 288; // w-72（含右侧 pr-4 间距，取整避免时间轴过挤）
@@ -57,7 +58,13 @@ export default function Today() {
   const setSelectedDate = useTaskStore((s) => s.setSelectedDate);
   // 详情按需展开，把首屏宽度优先留给任务与时间轴。
   const [showDetail, setShowDetail] = useState(false);
-  const [showInbox, setShowInbox] = useState(settings.todayShowNotes);
+  const [inboxOverride, setInboxOverride] = useState<boolean | null>(null);
+  const [shortWindow, setShortWindow] = useState(() => window.innerHeight < 680);
+  const showInbox = inboxOverride ?? (settings.todayShowNotes && !shortWindow);
+  const noteRequest = useSearchNavigationStore((s) => s.noteRequest);
+  useEffect(() => {
+    if (noteRequest) setInboxOverride(true);
+  }, [noteRequest]);
   const loadedDateRef = useRef(todayString());
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -80,10 +87,10 @@ export default function Today() {
     const containerW = containerRef.current?.getBoundingClientRect().width ?? 10_000;
     // 仅当详情未开、提醒卡单独占右列时让出 260px；详情打开时提醒在详情列内，不额外占宽
     const railOverhead = showRail && !showDetail && !railNarrow ? REMINDER_RAIL_WIDTH : 0;
-    return Math.min(
+    return Math.max(DETAIL_MIN, Math.min(
       DETAIL_MAX,
       containerW - TASK_LIST_WIDTH - DIVIDER_WIDTH - TIMELINE_FLOOR - railOverhead,
-    );
+    ));
   }
 
   /** 夹取宽度：常规下 [DETAIL_MIN, max]；窗口过小时优先保时间轴（压到 max）。 */
@@ -178,8 +185,14 @@ export default function Today() {
   }, [load, loadNotes, dbStatus]);
 
   useEffect(() => {
-    setShowInbox(settings.todayShowNotes);
+    setInboxOverride(null);
   }, [settings.todayShowNotes]);
+
+  useEffect(() => {
+    const onResize = () => setShortWindow(window.innerHeight < 680);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   // 查看「今天」时加载昨日未完成（逾期结转横幅）；切到历史日期则清空
   useEffect(() => {
@@ -232,7 +245,7 @@ export default function Today() {
   }
 
   return (
-    <div className="flex h-full flex-col gap-5">
+    <div className="flex h-full min-h-[32rem] flex-col gap-4 [&>header]:mb-0">
       <PageHeader
         title={
           <CalendarPopover
@@ -251,7 +264,7 @@ export default function Today() {
         actions={
           <>
             <button
-              onClick={() => setShowInbox((value) => !value)}
+              onClick={() => setInboxOverride(!showInbox)}
               aria-expanded={showInbox}
               aria-controls="today-inbox"
               className={`flex min-h-11 items-center gap-1.5 rounded-lg border px-3 text-xs transition-colors ${
@@ -333,19 +346,19 @@ export default function Today() {
         ))}
 
       {/* 主区：任务 | 时间轴 | 右列（详情/提醒；窄窗详情=浮层不占宽，次级面板按需） */}
-      <div className="relative flex min-h-0 flex-1" ref={containerRef}>
+      <div className="relative flex min-h-[15rem] flex-1" ref={containerRef}>
         {/* 左：任务列表 + 便签（持久区域；窄窗略收窄让时间轴更宽） */}
         <aside
-          className={`flex shrink-0 flex-col pr-4 transition-[width] duration-200 ${
+          className={`flex min-h-0 shrink-0 flex-col pr-4 transition-[width] duration-200 ${
             detailOverlay ? "w-64" : "w-72"
           }`}
         >
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="df-scroll-area flex-1">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-sm font-medium text-text-secondary">今日任务</h2>
               <button
                 onClick={() => openCreate()}
-                className="flex min-h-10 items-center gap-1 rounded-lg bg-accent px-3 py-1 text-xs text-on-accent hover:bg-accent-hover"
+                className="flex min-h-8 items-center gap-1 rounded-lg bg-accent px-3 py-1 text-xs text-on-accent hover:bg-accent-hover"
               >
                 <Plus size={14} /> 新建
               </button>
@@ -385,7 +398,18 @@ export default function Today() {
                   onMouseDown={startResize}
                   onDoubleClick={resetWidth}
                   role="separator"
+                  tabIndex={0}
                   aria-orientation="vertical"
+                  aria-valuemin={DETAIL_MIN}
+                  aria-valuemax={Math.max(DETAIL_MIN, maxAllowedWidth())}
+                  aria-valuenow={Math.round(detailWidth)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Home") { event.preventDefault(); resetWidth(); return; }
+                    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+                    event.preventDefault();
+                    const width = clampWidth(detailWidth + (event.key === "ArrowLeft" ? 1 : -1) * (event.shiftKey ? 40 : 16));
+                    setDetailWidth(width); saveWidth(width);
+                  }}
                   aria-label="调整详情宽度"
                   title="拖动调整宽度，双击恢复默认"
                   className="group flex w-3 shrink-0 cursor-col-resize items-center justify-center"

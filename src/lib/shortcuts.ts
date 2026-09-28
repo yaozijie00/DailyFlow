@@ -32,7 +32,7 @@ export const SHORTCUT_ACTIONS: ShortcutAction[] = [
 export const SHORTCUT_ACTION_LABELS: Record<ShortcutAction, string> = {
   open_dailyflow: "显示 DailyFlow 窗口",
   create_task: "新建任务（打开弹窗）",
-  pomodoro_toggle: "暂停/继续番茄钟",
+  pomodoro_toggle: "暂停/继续专注",
   complete_task: "完成选中任务",
   open_today: "打开今日",
   open_focus: "打开专注",
@@ -84,7 +84,9 @@ export function isEditableTarget(target: EventTarget | null): boolean {
     target.tagName === "SELECT" ||
     // 用 contentEditable 字符串（"true"/"false"/"inherit"）而非 isContentEditable，
     // 保证浏览器与 jsdom 测试环境行为一致
-    target.contentEditable === "true"
+    target.contentEditable === "true" ||
+    target.isContentEditable ||
+    target.closest('[contenteditable="true"], [contenteditable=""]') != null
   );
 }
 

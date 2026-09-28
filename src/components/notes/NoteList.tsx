@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { StickyNote, Check, X, Plus, RotateCcw, CalendarPlus } from "lucide-react";
 import { useNoteStore } from "../../stores/noteStore";
 import { useTaskStore } from "../../stores/taskStore";
@@ -15,17 +15,22 @@ import {
 import { undoManager } from "../../lib/undoManager";
 import { todayString } from "../../lib/date";
 import type { Note } from "../../db/repositories/noteRepository";
+import type { NotePlanningTarget } from "../../lib/noteConvertPlanning";
+import { useSearchNavigationStore } from "../../stores/searchNavigationStore";
 
 /** 便签项：hover 显示操作；双击文字进入编辑；按住拖动到任务列表/时间轴。 */
 function NoteItem({ note, onArrange }: { note: Note; onArrange: (id: number) => void }) {
   const update = useNoteStore((s) => s.update);
   const complete = useNoteStore((s) => s.complete);
   const remove = useNoteStore((s) => s.remove);
+  const convertToPlanning = useNoteStore((s) => s.convertToPlanning);
   const { start: startWindowDrag } = useWindowDrag();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(note.title);
+  const [busy, setBusy] = useState(false);
 
   const arranged = note.status === "arranged";
+  const saved = note.status === "saved";
 
   const saveEdit = () => {
     const t = draft.trim();
@@ -35,7 +40,7 @@ function NoteItem({ note, onArrange }: { note: Note; onArrange: (id: number) => 
 
   /** 鼠标拖拽（与任务行 → 时间轴一致）：位移超过阈值开始，松手按落点投放区转换。 */
   function beginNoteDrag(e: React.MouseEvent) {
-    if (arranged || editing || e.button !== 0) return;
+    if (arranged || saved || busy || editing || e.button !== 0) return;
     e.preventDefault(); // 阻止拖拽过程中选中文字
     const startX = e.clientX;
     const startY = e.clientY;
@@ -69,13 +74,15 @@ function NoteItem({ note, onArrange }: { note: Note; onArrange: (id: number) => 
 
   return (
     <li
+      data-note-id={note.id}
+      tabIndex={-1}
       onMouseDown={beginNoteDrag}
       className={`group flex cursor-grab items-start gap-1.5 rounded-md border px-2 py-1.5 transition-colors ${
         arranged
           ? "border-dashed border-border-subtle bg-surface-muted opacity-70"
           : "border-border-subtle bg-surface hover:border-border-strong"
       }`}
-      title={arranged ? "已安排到今日（不可再次拖拽）" : "按住拖动到今日任务列表或时间轴"}
+      title={arranged ? "已安排到今日（不可再次拖拽）" : saved ? "已保存笔记；双击编辑" : "按住拖动到今日任务列表或时间轴"}
     >
       <StickyNote
         size={14}
@@ -109,7 +116,7 @@ function NoteItem({ note, onArrange }: { note: Note; onArrange: (id: number) => 
           {note.title}
         </button>
       )}
-      {!arranged && (
+      {!arranged && !saved && (
         <button
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => {
@@ -123,7 +130,35 @@ function NoteItem({ note, onArrange }: { note: Note; onArrange: (id: number) => 
           <CalendarPlus size={14} />
         </button>
       )}
-      <span className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
+      {!arranged && (
+        <select
+          aria-label={`整理：${note.title}`}
+          value=""
+          disabled={busy}
+          onMouseDown={(e) => e.stopPropagation()}
+          onChange={(e) => {
+            const action = e.target.value;
+            if (!action || busy) return;
+            setBusy(true);
+            void (async () => {
+              try {
+                if (action === "saved" || action === "active") await update(note.id, { status: action });
+                else await convertToPlanning(note.id, action as NotePlanningTarget);
+              } finally { setBusy(false); }
+            })();
+          }}
+          className="max-w-16 rounded border border-border-subtle bg-surface py-0.5 text-[11px] text-text-muted"
+        >
+          <option value="">整理</option>
+          {saved ? <option value="active">放回收集箱</option> : <>
+            <option value="saved">保存为笔记</option>
+            <option value="plan">转为计划</option>
+            <option value="project">转为项目</option>
+            <option value="idea">转为想法</option>
+          </>}
+        </select>
+      )}
+      <span onMouseDown={(e) => e.stopPropagation()} className="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100">
         {arranged && (
           <button
             onClick={() => void update(note.id, { status: "active" })}
@@ -174,9 +209,27 @@ export default function NoteList() {
   const [draft, setDraft] = useState("");
   const [showArranged, setShowArranged] = useState(false);
   const [taskOver, setTaskOver] = useState(false);
+  const [view, setView] = useState<"active" | "saved">("active");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const noteRequest = useSearchNavigationStore((s) => s.noteRequest);
+  const clearNoteRequest = useSearchNavigationStore((s) => s.clearNoteRequest);
 
-  const activeNotes = notes.filter((n) => n.status !== "arranged");
-  const arrangedNotes = notes.filter((n) => n.status === "arranged");
+  useEffect(() => {
+    if (!noteRequest) return;
+    const note = notes.find((entry) => entry.id === noteRequest.id);
+    if (!note) return;
+    const targetView = note.status === "saved" ? "saved" : "active";
+    if (view !== targetView) { setView(targetView); return; }
+    if (note.status === "arranged" && !showArranged) { setShowArranged(true); return; }
+    const row = containerRef.current?.querySelector<HTMLElement>(`[data-note-id="${note.id}"]`);
+    if (!row) return;
+    row.scrollIntoView?.({ block: "nearest" });
+    row.focus({ preventScroll: true });
+    clearNoteRequest(noteRequest.token);
+  }, [noteRequest, notes, view, showArranged, clearNoteRequest]);
+
+  const activeNotes = notes.filter((n) => n.status === view);
+  const arrangedNotes = notes.filter((n) => view === "active" && n.status === "arranged");
 
   useEffect(() => {
     if (dbStatus === "ready") {
@@ -187,6 +240,7 @@ export default function NoteList() {
   // 任务 → 便签 反向拖拽：注册 drop 回调 + 悬停高亮
   useEffect(() => {
     taskToNoteDropCallbacks.notelist = (taskId) => {
+      setView("active");
       void convertToNote(taskId);
     };
     return () => {
@@ -209,7 +263,7 @@ export default function NoteList() {
 
   const submit = async () => {
     if (!canSubmit) return;
-    await create({ title: draft.trim() });
+    await create({ title: draft.trim(), ...(view === "saved" ? { status: "saved" as const } : {}) });
     setDraft("");
   };
 
@@ -234,6 +288,7 @@ export default function NoteList() {
 
   return (
     <div
+      ref={containerRef}
       data-note-drop="notelist"
       className={`rounded-md border-t border-border-subtle pt-2 transition-shadow ${
         taskOver ? "shadow-[inset_0_0_0_2px_#f59e0b66]" : ""
@@ -241,8 +296,10 @@ export default function NoteList() {
     >
       <div className="mb-1.5 flex items-center gap-1 text-xs text-text-muted">
         <StickyNote size={12} className="text-amber-500" />
-        <span className="font-medium">收集箱</span>
-        <span className="truncate text-text-faint">暂时没安排时间，但不能忘记</span>
+        <button aria-pressed={view === "active"} onClick={() => setView("active")} className={view === "active" ? "font-medium text-accent" : "text-text-faint"}>收集箱</button>
+        <span className="text-text-faint">/</span>
+        <button aria-pressed={view === "saved"} onClick={() => setView("saved")} className={view === "saved" ? "font-medium text-accent" : "text-text-faint"}>笔记</button>
+        <span className="truncate text-text-faint">{view === "active" ? "暂时没安排时间，但不能忘记" : "长期保存的参考与记录"}</span>
       </div>
 
       <div className="mb-1.5 flex items-center gap-1.5">
@@ -265,9 +322,9 @@ export default function NoteList() {
         </button>
       </div>
 
-      {notes.length === 0 ? (
+      {activeNotes.length === 0 && arrangedNotes.length === 0 ? (
         <p className="rounded-md border border-dashed border-border-strong p-4 text-center text-xs text-text-faint">
-          还没有便签，把想法记下来
+          {view === "active" ? "还没有便签，把想法记下来" : "还没有保存的笔记"}
         </p>
       ) : (
         <>

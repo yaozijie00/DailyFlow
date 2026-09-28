@@ -239,6 +239,7 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         categoryId: parent.categoryId,
         goalId: parent.goalId,
         projectId: parent.projectId,
+        phaseId: parent.phaseId,
         parentId: parent.id,
         priority: taskPriorityMeta(parent.priority).value,
       });

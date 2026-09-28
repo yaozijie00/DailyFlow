@@ -23,7 +23,7 @@ interface GoalState {
   completedGoals: Goal[];
   loading: boolean;
   load: () => Promise<void>;
-  create: (input: CreateGoalInput) => Promise<void>;
+  create: (input: CreateGoalInput) => Promise<boolean>;
   update: (id: number, input: UpdateGoalInput) => Promise<void>;
   complete: (id: number) => Promise<void>;
   /** 把已完成目标恢复为进行中（误完成/误点可修正，可撤销） */
@@ -54,8 +54,10 @@ export const useGoalStore = create<GoalState>((set, get) => ({
     try {
       await goalService.create(input);
       await get().load();
+      return true;
     } catch {
       useAppStore.getState().pushToast("error", "创建长期目标失败");
+      return false;
     }
   },
 

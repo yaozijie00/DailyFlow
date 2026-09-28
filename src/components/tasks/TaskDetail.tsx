@@ -1,6 +1,7 @@
+import { StartFocusButton } from "../../features/focus/FocusController";
 import { useEffect, useState } from "react";
 import { Check, Pencil, Trash2, CornerDownRight } from "lucide-react";
-import { useTaskStore } from "../../stores/taskStore";
+import { taskService, useTaskStore } from "../../stores/taskStore";
 import { useGoalStore } from "../../stores/goalStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useTaskFocusStats } from "../../hooks/useTaskFocusStats";
@@ -10,6 +11,9 @@ import { TASK_STATUS_LABEL } from "../../lib/taskLabels";
 import { postponeTargets } from "../../lib/postpone";
 import { todayString } from "../../lib/date";
 import { ExtensionErrorBoundary, useEnabledTaskActions } from "../../extensions/host";
+
+import type { Task } from "../../db/repositories/taskRepository";
+import { useDataVersion } from "../../lib/dataVersion";
 
 export default function TaskDetail() {
   const selectedTaskId = useTaskStore((s) => s.selectedTaskId);
@@ -32,7 +36,22 @@ export default function TaskDetail() {
   const [notesDraft, setNotesDraft] = useState("");
   const [childDraft, setChildDraft] = useState("");
 
-  const task = tasks.find((t) => t.id === selectedTaskId);
+  const listedTask = tasks.find((t) => t.id === selectedTaskId);
+  const [remoteTask, setRemoteTask] = useState<Task | null>(null);
+  const [readState, setReadState] = useState<"loading" | "ready" | "error">("ready");
+  const [retry, setRetry] = useState(0);
+  const taskVersion = useDataVersion("task");
+  useEffect(() => {
+    let active = true;
+    setRemoteTask(null);
+    if (selectedTaskId == null || listedTask) { setReadState("ready"); return; }
+    setReadState("loading");
+    void taskService.getTask(selectedTaskId).then((found) => {
+      if (active) { setRemoteTask(found); setReadState("ready"); }
+    }).catch(() => { if (active) setReadState("error"); });
+    return () => { active = false; };
+  }, [selectedTaskId, listedTask, taskVersion, retry]);
+  const task = listedTask ?? (remoteTask?.id === selectedTaskId ? remoteTask : null);
   const focusStats = useTaskFocusStats(task?.id ?? null);
 
   // Editor drafts belong to one task; never carry A's draft into B after selection changes.
@@ -45,7 +64,7 @@ export default function TaskDetail() {
   if (!task) {
     return (
       <div className="rounded-md border border-dashed border-border-strong bg-surface/60 p-6 text-center text-sm text-text-faint">
-        点击左侧任务或时间轴任务块查看详情
+        {selectedTaskId == null ? "点击左侧任务或时间轴任务块查看详情" : readState === "loading" ? "正在读取任务…" : readState === "error" ? <>任务读取失败 <button onClick={() => setRetry((n) => n + 1)}>重试</button></> : "任务已不存在"}
       </div>
     );
   }
@@ -90,6 +109,7 @@ export default function TaskDetail() {
             {TASK_STATUS_LABEL[task.status] ?? task.status}
           </span>
         </div>
+        {!completed && !cancelled && <StartFocusButton taskId={task.id} />}
         {!completed && !cancelled && (
           <button
             onClick={() => completeTask(task.id)}
@@ -305,7 +325,8 @@ export default function TaskDetail() {
       </details>
 
       {/* 延期（Postpone）：改 scheduledDate，可撤销 */}
-      {!completed && !cancelled && (
+      {!completed && !cancelled && <StartFocusButton taskId={task.id} />}
+        {!completed && !cancelled && (
         <div className="mb-4 border-t border-border-subtle pt-3">
           <div className="mb-1.5 flex items-baseline justify-between">
             <span className="text-sm text-text-muted">延期到</span>
@@ -357,6 +378,7 @@ export default function TaskDetail() {
             <Component task={{ id: task.id, title: task.title, status: task.status }} />
           </ExtensionErrorBoundary>
         ))}
+        {!completed && !cancelled && <StartFocusButton taskId={task.id} />}
         {!completed && !cancelled && (
           <button
             onClick={() => cancelTask(task.id)}

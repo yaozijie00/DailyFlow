@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { sql } from "drizzle-orm";
 import { createTestDb } from "./test-helpers";
 import { getAppliedMigrationNames, runMigrations } from "./migrate";
@@ -22,6 +22,16 @@ describe("getAppliedMigrationNames", () => {
 });
 
 describe("runMigrations 幂等收敛（H1 重试安全）", () => {
+  it("已迁移数据库的发现查询不随历史文件数量增长", async () => {
+    const { db, close } = await createTestDb();
+    const all = vi.spyOn(db, "all");
+    const values = vi.spyOn(db, "values");
+    try {
+      await runMigrations(db);
+      const reads = all.mock.calls.length + values.mock.calls.length;
+      expect(reads).toBeLessThanOrEqual(2);
+    } finally { all.mockRestore(); values.mockRestore(); close(); }
+  });
   it("中途失败：已执行语句保留、迁移名不记录，可安全重试", async () => {
     const { db, close } = await createTestDb();
     const bad = {

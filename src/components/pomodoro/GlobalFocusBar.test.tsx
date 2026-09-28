@@ -1,162 +1,126 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import GlobalFocusBar from "./GlobalFocusBar";
-import { usePomodoroStore } from "../../stores/pomodoroStore";
+import { useFocusStore } from "../../features/focus/focusStore";
+import type { FocusRecord, FocusRequest } from "../../features/focus/types";
 import { useTaskStore } from "../../stores/taskStore";
 import { useAppStore } from "../../stores/appStore";
-import type { PomodoroSnapshot } from "../../lib/pomodoroTimer";
-import type { Task } from "../../db/repositories/taskRepository";
 
-afterEach(() => {
-  cleanup();
-  vi.restoreAllMocks();
-});
+const invokeMock = vi.hoisted(() => vi.fn());
+vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
+vi.mock("../../services/achievementRuntime", () => ({ evaluateAndNotify: vi.fn() }));
 
-function snap(partial: Partial<PomodoroSnapshot> = {}): PomodoroSnapshot {
+const now = 1_800_000_000_000;
+function record(partial: Partial<FocusRecord> = {}): FocusRecord {
   return {
-    state: "IDLE",
-    durationMs: 25 * 60_000,
-    elapsedMs: 0,
-    remainingMs: 25 * 60_000,
-    progress: 0,
-    startedAt: null,
-    pausedAt: null,
-    totalPausedDurationMs: 0,
-    completedAt: null,
-    cancelledAt: null,
-    ...partial,
+    id: 11, taskId: 7, taskTitle: "写代码", startedAt: now - 300_000,
+    endedAt: null, actualSeconds: 300, status: "running", runningSince: now,
+    pausedAt: null, goalSeconds: 1500, mode: "countdown", note: "", nextAction: "",
+    interruptionCount: 0, source: "timer", checkpointAt: now, revision: 1, ...partial,
   };
 }
 
-const task: Task = {
-  id: 7,
-  title: "写代码",
-  categoryId: null,
-  status: "TODO",
-  estimatedDuration: null,
-  plannedStart: null,
-  plannedEnd: null,
-  actualDuration: 0,
-  scheduledDate: "2026-08-27",
-  createdAt: 0,
-  updatedAt: 0,
-  completedAt: null,
-  notes: null,
-  sortOrder: 0,
-  goalId: null,
-  repeatRule: "",
-  projectId: null,
-  parentId: null,
-  courseId: null,
-  priority: "medium",
-};
-
 beforeEach(() => {
-  // 浮条每秒轮询 refresh 会读真实引擎快照，覆盖注入的测试状态 → mock 为 no-op
-  vi.spyOn(usePomodoroStore.getState(), "refresh").mockImplementation(() => {});
-  usePomodoroStore.setState({
-    taskId: null,
-    phase: "focus",
-    completedFocusCount: 0,
-    taskTitle: null,
-    showResult: false,
-    snapshot: snap(),
-  });
-  useTaskStore.setState({ tasks: [], categories: [] });
+  vi.spyOn(Date, "now").mockReturnValue(now);
+  useFocusStore.setState(useFocusStore.getInitialState(), true);
   useAppStore.setState({ currentPage: "today" });
+  vi.spyOn(useTaskStore.getState(), "load").mockResolvedValue(undefined);
+  invokeMock.mockReset();
+  invokeMock.mockImplementation(async (_command: string, { request }: { request: FocusRequest }) => ({
+    active: request.action === "finish" ? null : record({ status: "paused", runningSince: null, pausedAt: now, revision: 2 }),
+  }));
 });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe("GlobalFocusBar", () => {
-  it("未运行时（IDLE）不渲染", () => {
-    const { container } = render(<GlobalFocusBar />);
-    expect(container.firstChild).toBeNull();
+  it("错误面板刷新状态不会提交结束表单", async () => {
+    useFocusStore.setState({ active: record({ status: "paused", runningSince: null }), finishOpen: true, error: "保存失败" });
+    const perform = vi.spyOn(useFocusStore.getState(), "perform");
+    render(<GlobalFocusBar />);
+    fireEvent.click(screen.getByRole("button", { name: "刷新状态" }));
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("focus_execute", { request: { action: "read" } }));
+    expect(perform).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "结束本次专注" })).toBeTruthy();
   });
 
-  it("专注中显示任务名 / 剩余时间 / 状态 / 暂停与结束按钮", () => {
-    usePomodoroStore.setState({
-      taskId: 7,
-      phase: "focus",
-      snapshot: snap({ state: "RUNNING", elapsedMs: 5 * 60_000, remainingMs: 20 * 60_000 }),
-    });
-    useTaskStore.setState({ tasks: [task] });
+  it("专注条可键盘移动、复位，并保持在窗口内", () => {
+    useFocusStore.setState({ active: record() });
+    render(<GlobalFocusBar />);
+    const bar = screen.getByRole("complementary", { name: "当前专注" });
+    const handle = screen.getByRole("button", { name: "移动专注条" });
+    fireEvent.keyDown(handle, { key: "ArrowLeft" });
+    expect(bar.style.left).toBe("8px");
+    fireEvent.keyDown(handle, { key: "Home" });
+    expect(bar.style.left).toBe("");
+  });
+
+  it("没有活动专注时隐藏", () => {
+    render(<GlobalFocusBar />);
+    expect(screen.queryByRole("complementary", { name: "当前专注" })).toBeNull();
+  });
+
+  it("显示任务、已投入时间与控制按钮，不将目标剩余时间当作投入", () => {
+    useFocusStore.setState({ active: record() });
     render(<GlobalFocusBar />);
     expect(screen.getByText("写代码")).toBeTruthy();
-    expect(screen.getByText(/专注中/)).toBeTruthy();
-    expect(screen.getByText(/20:00/)).toBeTruthy();
-    expect(screen.getByLabelText("暂停")).toBeTruthy();
-    expect(screen.getByLabelText("结束专注")).toBeTruthy();
-    expect(screen.getByText("去专注")).toBeTruthy();
+    expect(screen.getByText("专注中")).toBeTruthy();
+    expect(screen.getByLabelText("本次已投入").textContent).toBe("05:00");
+    expect(screen.queryByText("20:00")).toBeNull();
+    expect(screen.getByRole("button", { name: "暂停" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "结束本次" })).toBeTruthy();
   });
 
-  it("已暂停显示继续按钮，且能跳转 Today", () => {
-    usePomodoroStore.setState({
-      taskId: 7,
-      phase: "focus",
-      snapshot: snap({ state: "PAUSED", elapsedMs: 5 * 60_000, remainingMs: 20 * 60_000 }),
-    });
-    useTaskStore.setState({ tasks: [task] });
-    render(<GlobalFocusBar />);
-    expect(screen.getByLabelText("继续")).toBeTruthy();
-    expect(screen.getByText(/已暂停/)).toBeTruthy();
-  });
+  it.each([ ["running", "暂停", "pause"], ["paused", "继续", "resume"] ] as const)(
+    "%s 状态调用 %s 操作且不跳转", (status, label, action) => {
+      useFocusStore.setState({ active: record({ status, runningSince: status === "running" ? now : null }) });
+      const perform = vi.spyOn(useFocusStore.getState(), "perform").mockResolvedValue(true);
+      render(<GlobalFocusBar />);
+      fireEvent.click(screen.getByRole("button", { name: label }));
+      expect(perform).toHaveBeenCalledWith({ action });
+      expect(useAppStore.getState().currentPage).toBe("today");
+    },
+  );
 
-  it("休息阶段显示休息中", () => {
-    usePomodoroStore.setState({
-      phase: "short_break",
-      snapshot: snap({ state: "RUNNING", remainingMs: 4 * 60_000 }),
-    });
-    render(<GlobalFocusBar />);
-    expect(screen.getByText("短休息")).toBeTruthy();
-    expect(screen.getByText(/休息中/)).toBeTruthy();
-  });
-
-  it("点击「去专注」跳转「专注」页（Bug 4：之前错误跳 Today）", () => {
-    usePomodoroStore.setState({
-      taskId: 7,
-      phase: "focus",
-      snapshot: snap({ state: "RUNNING", remainingMs: 20 * 60_000 }),
-    });
-    useTaskStore.setState({ tasks: [task] });
-    render(<GlobalFocusBar />);
-    fireEvent.click(screen.getByText("去专注"));
-    expect(useAppStore.getState().currentPage).toBe("focus");
-  });
-
-  it("点击主体（任务名/倒计时）跳转「专注」页", () => {
-    usePomodoroStore.setState({
-      taskId: 7,
-      phase: "focus",
-      snapshot: snap({ state: "RUNNING", remainingMs: 20 * 60_000 }),
-    });
-    useTaskStore.setState({ tasks: [task] });
+  it("点击任务跳转专注页，保持当前计时", () => {
+    const active = record();
+    useFocusStore.setState({ active });
+    const perform = vi.spyOn(useFocusStore.getState(), "perform");
     render(<GlobalFocusBar />);
     fireEvent.click(screen.getByText("写代码"));
     expect(useAppStore.getState().currentPage).toBe("focus");
+    expect(useFocusStore.getState().active).toBe(active);
+    expect(perform).not.toHaveBeenCalled();
   });
 
-  it("点击暂停/结束按钮不触发跳转", () => {
-    usePomodoroStore.setState({
-      taskId: 7,
-      phase: "focus",
-      snapshot: snap({ state: "RUNNING", remainingMs: 20 * 60_000 }),
-    });
-    useTaskStore.setState({ tasks: [task] });
+  it("结束先暂停，保存默认保留任务未完成", async () => {
+    useFocusStore.setState({ active: record() });
     render(<GlobalFocusBar />);
-    useAppStore.setState({ currentPage: "today" });
-    fireEvent.click(screen.getByLabelText("暂停"));
-    expect(useAppStore.getState().currentPage).toBe("today"); // 未被跳转
-    fireEvent.click(screen.getByLabelText("结束专注"));
+    fireEvent.click(screen.getByRole("button", { name: "结束本次" }));
+    await screen.findByRole("dialog", { name: "结束本次专注" });
+    expect(invokeMock).toHaveBeenCalledWith("focus_execute", { request: expect.objectContaining({ action: "pause" }) });
+    expect(useFocusStore.getState().active?.status).toBe("paused");
+    expect((screen.getByLabelText("同时完成任务") as HTMLInputElement).checked).toBe(false);
     expect(useAppStore.getState().currentPage).toBe("today");
+    fireEvent.click(screen.getByRole("button", { name: "完成 Session" }));
+    await waitFor(() => expect(useFocusStore.getState().active).toBeNull());
+    expect(invokeMock).toHaveBeenLastCalledWith("focus_execute", { request: expect.objectContaining({ action: "finish", completeTask: false }) });
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("会话完成后（COMPLETED）悬浮条隐藏", () => {
-    usePomodoroStore.setState({
-      taskId: 7,
-      phase: "focus",
-      snapshot: snap({ state: "COMPLETED", remainingMs: 0 }),
-    });
-    const { container } = render(<GlobalFocusBar />);
-    expect(container.firstChild).toBeNull();
+  it("保存失败保留备注和下一步，重试成功后关闭", async () => {
+    useFocusStore.setState({ active: record({ status: "paused", runningSince: null }), finishOpen: true });
+    invokeMock.mockRejectedValueOnce(new Error("磁盘写入失败"));
+    render(<GlobalFocusBar />);
+    fireEvent.change(screen.getByLabelText("本次备注（可选）"), { target: { value: "完成草稿" } });
+    fireEvent.change(screen.getByLabelText("下一步（可选）"), { target: { value: "补充测试" } });
+    fireEvent.click(screen.getByRole("button", { name: "完成 Session" }));
+    await screen.findByRole("alert");
+    expect((screen.getByLabelText("本次备注（可选）") as HTMLTextAreaElement).value).toBe("完成草稿");
+    expect((screen.getByLabelText("下一步（可选）") as HTMLInputElement).value).toBe("补充测试");
+    const failedRequest = useFocusStore.getState().failedRequest;
+    fireEvent.click(screen.getByRole("button", { name: "重试保存" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(invokeMock).toHaveBeenLastCalledWith("focus_execute", { request: failedRequest });
   });
 });

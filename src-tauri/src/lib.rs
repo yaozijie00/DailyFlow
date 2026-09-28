@@ -1,3 +1,4 @@
+mod focus;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -27,7 +28,7 @@ fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
-/// 调度一条「专注完成」系统通知：end_at_ms 时刻发送（前端按真实时间计算剩余）。
+/// 调度一条「达到专注目标」系统通知：end_at_ms 时刻发送（前端按真实时间计算剩余）。
 #[tauri::command]
 fn schedule_focus_end_notification(end_at_ms: u64, planned_minutes: u64) -> u64 {
     let id = FOCUS_NOTIFY_NEXT_ID.fetch_add(1, Ordering::Relaxed);
@@ -41,13 +42,13 @@ fn schedule_focus_end_notification(end_at_ms: u64, planned_minutes: u64) -> u64 
         std::thread::sleep(Duration::from_millis(wait));
         if !cancel.load(Ordering::SeqCst) {
             let body = if planned_minutes > 0 {
-                format!("{planned_minutes} 分钟专注已结束，休息一下吧。")
+                format!("已达到 {planned_minutes} 分钟目标，可以继续专注或结束本次。")
             } else {
-                "本次专注已结束，休息一下吧。".to_string()
+                "已达到本次目标，可以继续专注或结束本次。".to_string()
             };
             let _ = notify_rust::Notification::new()
                 .appname("DailyFlow")
-                .summary("专注完成")
+                .summary("达到专注目标")
                 .body(&body)
                 .show();
         }
@@ -109,15 +110,22 @@ async fn open_mini_window(app: tauri::AppHandle) -> Result<(), String> {
     // 表现为「创建新窗口」日志后无下文 + Mini 白屏/主窗消失。
     let url = "index.html";
     append_startup_log(&format!("open_mini_window: 创建新窗口 url={url}"));
-    let win =
+    let builder =
         WebviewWindowBuilder::new(&app, MINI_WINDOW_LABEL, tauri::WebviewUrl::App(url.into()))
             .title("DailyFlow Mini")
             .inner_size(360.0, 560.0)
             .resizable(false)
             .always_on_top(true)
             .skip_taskbar(true)
-            .decorations(false)
-            .build()
+            .decorations(false);
+    // WebView2 windows sharing one data directory must use identical browser arguments.
+    // In debug builds inherit the main window's opt-in QA configuration.
+    #[cfg(debug_assertions)]
+    let builder = match app.config().app.windows.iter().find(|w| w.label == "main").and_then(|w| w.additional_browser_args.as_ref()) {
+        Some(args) => builder.additional_browser_args(args),
+        None => builder,
+    };
+    let win = builder.build()
             .map_err(|e| {
                 append_startup_log(&format!("open_mini_window: 创建失败 {e}"));
                 e.to_string()
@@ -844,7 +852,7 @@ fn stage_and_swap_restore_files(
 /// 原子性：主库与伴生都先复制到 tmp、全部成功后才 rename 替换（stage_and_swap_restore_files），
 /// 杜绝「主库已替换、伴生失败」的半恢复状态。
 #[tauri::command]
-fn restore_backup(app: tauri::AppHandle, backup_name: String) -> Result<(), String> {
+async fn restore_backup(app: tauri::AppHandle, backup_name: String) -> Result<(), String> {
     if !is_safe_backup_name(&backup_name) {
         return Err("非法的备份文件名".into());
     }
@@ -859,6 +867,7 @@ fn restore_backup(app: tauri::AppHandle, backup_name: String) -> Result<(), Stri
         .is_file()
         .then(|| (data.join("course-schedule.db"), course_backup.clone()));
 
+    focus::with_database_restore(|| {
     stage_and_swap_restore_files(
         (&db_path, &src),
         course.as_ref().map(|(p, b)| (p.as_path(), b.as_path())),
@@ -872,6 +881,7 @@ fn restore_backup(app: tauri::AppHandle, backup_name: String) -> Result<(), Stri
         let _ = fs::remove_file(data.join("course-schedule.db-shm"));
     }
     Ok(())
+    }).await
 }
 
 /// 校验并创建目录；空串返回空（表示用默认值）。
@@ -944,418 +954,6 @@ fn set_storage_paths(
     )
     .map_err(|e| e.to_string())?;
     Ok(())
-}
-
-// ---------------- Workflow Extension 系统操作（P7/P5 收口） ----------------
-// 原则：所有路径必须绝对路径；错误分类返回（不 panic）；启动外部进程不阻塞等待。
-
-fn ensure_absolute_path(path: &str) -> Result<std::path::PathBuf, String> {
-    let p = std::path::PathBuf::from(path);
-    if !p.is_absolute() {
-        return Err(format!("路径必须是绝对路径：{path}"));
-    }
-    Ok(p)
-}
-
-/// 引号感知的命令行参数分词（P5 收口）：
-/// 支持用双引号包裹含空格的单参数（如 `--out "C:\My Folder\a.png"`），
-/// 双引号本身不保留；未闭合的引号视为普通字符段。
-fn split_args(input: &str) -> Vec<String> {
-    let mut out: Vec<String> = Vec::new();
-    let mut current = String::new();
-    let mut in_quotes = false;
-    let mut has_token = false;
-    for ch in input.chars() {
-        match ch {
-            '"' => {
-                in_quotes = !in_quotes;
-                has_token = true;
-            }
-            c if c.is_whitespace() && !in_quotes => {
-                if has_token {
-                    out.push(std::mem::take(&mut current));
-                    has_token = false;
-                }
-            }
-            c => {
-                current.push(c);
-                has_token = true;
-            }
-        }
-    }
-    if has_token {
-        out.push(current);
-    }
-    out
-}
-
-/// 用 Windows 默认关联打开文件/文件夹（ShellExecuteW "open"）：
-/// - 相比 cmd start：参数不经 cmd 解析（无 % 展开/引号边界问题）；
-/// - 能识别「无关联程序」（返回值 31 = SE_ERR_NOASSOC）等失败并返回可读错误。
-fn open_with_default(path: &str) -> Result<(), String> {
-    use windows_sys::Win32::UI::Shell::ShellExecuteW;
-    let p = ensure_absolute_path(path)?;
-    if !p.exists() {
-        return Err(format!("路径不存在：{path}"));
-    }
-    let wide_path: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
-    let wide_open: Vec<u16> = "open".encode_utf16().chain(std::iter::once(0)).collect();
-    // ShellExecuteW 失败时返回 <=32 的错误码；>32 表示成功
-    let result = unsafe {
-        ShellExecuteW(
-            std::ptr::null_mut(),
-            wide_open.as_ptr(),
-            wide_path.as_ptr(),
-            std::ptr::null(),
-            std::ptr::null(),
-            1, // SW_SHOWNORMAL
-        )
-    };
-    let code = result as i32;
-    if code > 32 {
-        Ok(())
-    } else if code == 31 {
-        Err(format!(
-            "没有程序可以打开该文件/文件夹（无默认关联）：{path}"
-        ))
-    } else {
-        Err(format!("打开失败（系统错误码 {code}）：{path}"))
-    }
-}
-
-/// 启动 Windows 外部程序（用户配置路径，禁止硬编码应用名）。
-#[tauri::command]
-fn workflow_launch_process(
-    executable: String,
-    arguments: Option<String>,
-    working_directory: Option<String>,
-) -> Result<(), String> {
-    let exe = ensure_absolute_path(&executable)?;
-    if !exe.is_file() {
-        return Err(format!("程序不存在：{executable}"));
-    }
-    let args: Vec<String> = arguments.map(|a| split_args(&a)).unwrap_or_default();
-    let mut cmd = std::process::Command::new(&exe);
-    cmd.args(&args);
-    if let Some(wd) = working_directory {
-        if !wd.trim().is_empty() {
-            let dir = ensure_absolute_path(&wd)?;
-            if !dir.is_dir() {
-                return Err(format!("工作目录不存在：{wd}"));
-            }
-            cmd.current_dir(dir);
-        }
-    }
-    cmd.spawn()
-        .map(|_| ())
-        .map_err(|e| format!("启动失败：{e}"))
-}
-
-/// 用系统默认关联打开文件（.psd → Photoshop 等由系统决定）。
-#[tauri::command]
-fn workflow_open_file(path: String) -> Result<(), String> {
-    open_with_default(&path)
-}
-
-/// 在 Windows Explorer 打开文件夹。
-#[tauri::command]
-fn workflow_open_folder(path: String) -> Result<(), String> {
-    open_with_default(&path)
-}
-
-/// 路径存在性预检（Engine/UI 校验用；只读）。
-#[tauri::command]
-fn workflow_path_exists(path: String) -> Result<bool, String> {
-    let p = ensure_absolute_path(&path)?;
-    Ok(p.exists())
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct WorkflowPathInspection {
-    path: String,
-    exists: bool,
-    kind: String,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "lowercase")]
-enum WorkflowConflictStrategy {
-    Fail,
-    Skip,
-    Overwrite,
-    Rename,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct WorkflowWriteTextInput {
-    path: String,
-    content: String,
-    conflict: WorkflowConflictStrategy,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct WorkflowCopyPathInput {
-    source: String,
-    target: String,
-    conflict: WorkflowConflictStrategy,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct WorkflowFileResult {
-    outcome: String,
-    actual_path: String,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct WorkflowExecuteProcessInput {
-    executable: String,
-    arguments: Vec<String>,
-    working_directory: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct WorkflowProcessResult {
-    exit_code: i32,
-    stdout: String,
-    stderr: String,
-}
-
-fn renamed_path(path: &Path) -> PathBuf {
-    let parent = path.parent().unwrap_or_else(|| Path::new(""));
-    let stem = path
-        .file_stem()
-        .and_then(|value| value.to_str())
-        .unwrap_or("item");
-    let extension = path.extension().and_then(|value| value.to_str());
-    for index in 1..=10_000 {
-        let name = match extension {
-            Some(extension) => format!("{stem} ({index}).{extension}"),
-            None => format!("{stem} ({index})"),
-        };
-        let candidate = parent.join(name);
-        if !candidate.exists() {
-            return candidate;
-        }
-    }
-    parent.join(format!("{stem}-{}", now_ms()))
-}
-
-fn prepare_workflow_target(
-    target: &Path,
-    strategy: &WorkflowConflictStrategy,
-) -> Result<(PathBuf, &'static str, bool), String> {
-    if !target.exists() {
-        return Ok((target.to_path_buf(), "created", true));
-    }
-    match strategy {
-        WorkflowConflictStrategy::Fail => {
-            Err(format!("目标已存在，冲突策略为 fail：{}", target.display()))
-        }
-        WorkflowConflictStrategy::Skip => Ok((target.to_path_buf(), "skipped", false)),
-        WorkflowConflictStrategy::Overwrite => {
-            if target.is_dir() {
-                fs::remove_dir_all(target)
-                    .map_err(|error| format!("无法覆盖目录 {}：{error}", target.display()))?;
-            } else {
-                fs::remove_file(target)
-                    .map_err(|error| format!("无法覆盖文件 {}：{error}", target.display()))?;
-            }
-            Ok((target.to_path_buf(), "overwritten", true))
-        }
-        WorkflowConflictStrategy::Rename => Ok((renamed_path(target), "renamed", true)),
-    }
-}
-
-fn copy_workflow_path(source: &Path, target: &Path) -> Result<(), String> {
-    if source.is_file() {
-        if let Some(parent) = target.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|error| format!("无法创建目录 {}：{error}", parent.display()))?;
-        }
-        fs::copy(source, target).map_err(|error| {
-            format!(
-                "复制文件失败 {} → {}：{error}",
-                source.display(),
-                target.display()
-            )
-        })?;
-        return Ok(());
-    }
-    if !source.is_dir() {
-        return Err(format!("复制来源不存在：{}", source.display()));
-    }
-    fs::create_dir_all(target)
-        .map_err(|error| format!("无法创建目录 {}：{error}", target.display()))?;
-    for entry in fs::read_dir(source)
-        .map_err(|error| format!("无法读取目录 {}：{error}", source.display()))?
-    {
-        let entry = entry.map_err(|error| error.to_string())?;
-        copy_workflow_path(&entry.path(), &target.join(entry.file_name()))?;
-    }
-    Ok(())
-}
-
-#[tauri::command]
-fn workflow_inspect_paths(paths: Vec<String>) -> Result<Vec<WorkflowPathInspection>, String> {
-    paths
-        .into_iter()
-        .map(|path| {
-            let resolved = ensure_absolute_path(&path)?;
-            let kind = if resolved.is_file() {
-                "file"
-            } else if resolved.is_dir() {
-                "directory"
-            } else {
-                "missing"
-            };
-            Ok(WorkflowPathInspection {
-                path: resolved.to_string_lossy().to_string(),
-                exists: resolved.exists(),
-                kind: kind.to_string(),
-            })
-        })
-        .collect()
-}
-
-#[tauri::command]
-fn workflow_create_directories(paths: Vec<String>) -> Result<Vec<String>, String> {
-    let mut created = Vec::with_capacity(paths.len());
-    for path in paths {
-        let resolved = ensure_absolute_path(&path)?;
-        fs::create_dir_all(&resolved)
-            .map_err(|error| format!("无法创建目录 {}：{error}", resolved.display()))?;
-        created.push(resolved.to_string_lossy().to_string());
-    }
-    Ok(created)
-}
-
-#[tauri::command]
-fn workflow_write_text_file(input: WorkflowWriteTextInput) -> Result<WorkflowFileResult, String> {
-    let target = ensure_absolute_path(&input.path)?;
-    let (actual, outcome, should_write) = prepare_workflow_target(&target, &input.conflict)?;
-    if should_write {
-        if let Some(parent) = actual.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|error| format!("无法创建目录 {}：{error}", parent.display()))?;
-        }
-        fs::write(&actual, input.content.as_bytes())
-            .map_err(|error| format!("无法写入文件 {}：{error}", actual.display()))?;
-    }
-    Ok(WorkflowFileResult {
-        outcome: outcome.to_string(),
-        actual_path: actual.to_string_lossy().to_string(),
-    })
-}
-
-#[tauri::command]
-fn workflow_copy_path(input: WorkflowCopyPathInput) -> Result<WorkflowFileResult, String> {
-    let source = ensure_absolute_path(&input.source)?;
-    if !source.exists() {
-        return Err(format!("复制来源不存在：{}", source.display()));
-    }
-    let target = ensure_absolute_path(&input.target)?;
-    let (actual, outcome, should_copy) = prepare_workflow_target(&target, &input.conflict)?;
-    if should_copy {
-        copy_workflow_path(&source, &actual)?;
-    }
-    Ok(WorkflowFileResult {
-        outcome: outcome.to_string(),
-        actual_path: actual.to_string_lossy().to_string(),
-    })
-}
-
-#[tauri::command]
-fn workflow_execute_process(
-    input: WorkflowExecuteProcessInput,
-) -> Result<WorkflowProcessResult, String> {
-    const OUTPUT_LIMIT: usize = 64 * 1024;
-    let executable = ensure_absolute_path(&input.executable)?;
-    if !executable.is_file() {
-        return Err(format!("程序不存在：{}", executable.display()));
-    }
-    let mut command = std::process::Command::new(executable);
-    command.args(input.arguments);
-    if let Some(directory) = input.working_directory {
-        if !directory.trim().is_empty() {
-            let resolved = ensure_absolute_path(&directory)?;
-            if !resolved.is_dir() {
-                return Err(format!("工作目录不存在：{}", resolved.display()));
-            }
-            command.current_dir(resolved);
-        }
-    }
-    let output = command
-        .output()
-        .map_err(|error| format!("执行程序失败：{error}"))?;
-    let truncate = |bytes: &[u8]| {
-        let end = bytes.len().min(OUTPUT_LIMIT);
-        String::from_utf8_lossy(&bytes[..end]).to_string()
-    };
-    Ok(WorkflowProcessResult {
-        exit_code: output.status.code().unwrap_or(-1),
-        stdout: truncate(&output.stdout),
-        stderr: truncate(&output.stderr),
-    })
-}
-
-#[tauri::command]
-fn workflow_launch_process_v2(input: WorkflowExecuteProcessInput) -> Result<(), String> {
-    let executable = ensure_absolute_path(&input.executable)?;
-    if !executable.is_file() {
-        return Err(format!("程序不存在：{}", executable.display()));
-    }
-    let mut command = std::process::Command::new(executable);
-    command.args(input.arguments);
-    if let Some(directory) = input.working_directory {
-        if !directory.trim().is_empty() {
-            let resolved = ensure_absolute_path(&directory)?;
-            if !resolved.is_dir() {
-                return Err(format!("工作目录不存在：{}", resolved.display()));
-            }
-            command.current_dir(resolved);
-        }
-    }
-    command
-        .spawn()
-        .map(|_| ())
-        .map_err(|error| format!("启动程序失败：{error}"))
-}
-
-#[tauri::command]
-fn workflow_open_url(url: String) -> Result<(), String> {
-    use windows_sys::Win32::UI::Shell::ShellExecuteW;
-    let normalized = url.trim();
-    if !(normalized.starts_with("https://") || normalized.starts_with("http://"))
-        || normalized.contains(['\r', '\n'])
-    {
-        return Err("网址必须使用 http:// 或 https://".to_string());
-    }
-    let wide_url: Vec<u16> = normalized
-        .encode_utf16()
-        .chain(std::iter::once(0))
-        .collect();
-    let wide_open: Vec<u16> = "open".encode_utf16().chain(std::iter::once(0)).collect();
-    let result = unsafe {
-        ShellExecuteW(
-            std::ptr::null_mut(),
-            wide_open.as_ptr(),
-            wide_url.as_ptr(),
-            std::ptr::null(),
-            std::ptr::null(),
-            1,
-        )
-    };
-    if result as i32 > 32 {
-        Ok(())
-    } else {
-        Err(format!("打开网址失败（系统错误码 {}）", result as i32))
-    }
 }
 
 /// 启动失败时弹出可读提示（避免「白屏挂起」无从排查）。
@@ -1480,7 +1078,7 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![
+        .invoke_handler(tauri::generate_handler![focus::focus_execute,
             data_dir,
             db_relative_path,
             course_db_path,
@@ -1503,17 +1101,6 @@ pub fn run() {
             window_minimize,
             window_maximize_toggle,
             notify_tasks_changed,
-            workflow_launch_process,
-            workflow_open_file,
-            workflow_open_folder,
-            workflow_path_exists,
-            workflow_inspect_paths,
-            workflow_create_directories,
-            workflow_write_text_file,
-            workflow_copy_path,
-            workflow_execute_process,
-            workflow_launch_process_v2,
-            workflow_open_url
         ])
         .run(tauri::generate_context!());
 
@@ -1542,188 +1129,6 @@ mod tests {
         let from = std::path::Path::new("C:\\Users\\me\\AppData\\Roaming\\com.dailyflow.desktop");
         let to = std::path::Path::new("D:\\Data\\dailyflow.db");
         assert!(super::relative_path(from, to).is_none());
-    }
-
-    // ---- Workflow 系统操作（P7）：校验不 spawn，错误路径可控 ----
-
-    #[test]
-    fn workflow_rejects_relative_path() {
-        assert!(super::ensure_absolute_path("notepad.exe").is_err());
-        assert!(super::ensure_absolute_path(".\\x.txt").is_err());
-    }
-
-    #[test]
-    fn workflow_accepts_absolute_path() {
-        let p = super::ensure_absolute_path("C:\\Windows\\notepad.exe").unwrap();
-        assert!(p.is_absolute());
-    }
-
-    #[test]
-    fn workflow_path_exists_on_temp_file() {
-        let dir = std::env::temp_dir().join(format!("wf_test_{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let f = dir.join("probe.tmp");
-        std::fs::write(&f, b"x").unwrap();
-        assert!(super::workflow_path_exists(f.to_string_lossy().to_string()).unwrap());
-        let missing = dir.join("nope.tmp");
-        assert!(!super::workflow_path_exists(missing.to_string_lossy().to_string()).unwrap());
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn workflow_path_exists_rejects_relative() {
-        assert!(super::workflow_path_exists("relative/path".to_string()).is_err());
-    }
-
-    #[test]
-    fn workflow_launch_rejects_missing_executable() {
-        let missing = std::env::temp_dir()
-            .join("definitely_not_an_exe_xyz.exe")
-            .to_string_lossy()
-            .to_string();
-        assert!(super::workflow_launch_process(missing, None, None).is_err());
-    }
-
-    #[test]
-    fn workflow_open_file_rejects_missing_path() {
-        let missing = std::env::temp_dir()
-            .join("definitely_missing_file.psd")
-            .to_string_lossy()
-            .to_string();
-        assert!(super::workflow_open_file(missing).is_err());
-    }
-
-    // ---- Phase 5 收口测试：参数分词 / working_directory / open_folder ----
-
-    #[test]
-    fn split_args_keeps_quoted_spaces_together() {
-        // 无引号：按空白切
-        assert_eq!(
-            super::split_args("--background --no-splash"),
-            vec!["--background", "--no-splash"]
-        );
-        // 引号包裹的空格参数作为一个整体
-        assert_eq!(
-            super::split_args("--out \"C:\\My Folder\\a b.png\" -v"),
-            vec!["--out", "C:\\My Folder\\a b.png", "-v"]
-        );
-        // 空串 → 无参数
-        assert!(super::split_args("").is_empty());
-        // 连续空白不产生空参数
-        assert_eq!(super::split_args("  a   b  "), vec!["a", "b"]);
-    }
-
-    #[test]
-    fn workflow_launch_rejects_missing_working_directory() {
-        let exe = std::env::temp_dir()
-            .join("some_tool.exe")
-            .to_string_lossy()
-            .to_string();
-        // executable 不存在 → 先报程序不存在（错误路径确定性验证）
-        let r1 = super::workflow_launch_process(exe.clone(), None, None);
-        assert!(r1.is_err());
-        assert!(r1.unwrap_err().contains("程序不存在"));
-
-        // 用真实存在的可执行文件 + 不存在的工作目录 → 报工作目录错误
-        // （Windows 下 cmd.exe 恒存在，避免 spawn 成功掩盖校验）
-        let cmd_exe = std::env::var("WINDIR")
-            .map(|w| format!("{w}\\System32\\cmd.exe"))
-            .unwrap_or_else(|_| "C:\\Windows\\System32\\cmd.exe".to_string());
-        let missing_wd = std::env::temp_dir()
-            .join("definitely_no_such_wd_xyz")
-            .to_string_lossy()
-            .to_string();
-        let r2 = super::workflow_launch_process(cmd_exe, None, Some(missing_wd));
-        assert!(r2.is_err());
-        assert!(r2.unwrap_err().contains("工作目录不存在"));
-    }
-
-    #[test]
-    fn workflow_open_folder_rejects_missing_path() {
-        let missing = std::env::temp_dir()
-            .join("definitely_missing_folder_xyz")
-            .to_string_lossy()
-            .to_string();
-        let r = super::workflow_open_folder(missing);
-        assert!(r.is_err());
-        assert!(r.unwrap_err().contains("路径不存在"));
-    }
-
-    #[test]
-    fn workflow_create_directories_builds_nested_tree() {
-        let root = std::env::temp_dir().join(format!(
-            "wf_dirs_{}_{}",
-            std::process::id(),
-            super::now_ms()
-        ));
-        let nested = root.join("assets").join("source");
-        let result = super::workflow_create_directories(vec![nested.to_string_lossy().to_string()]);
-        assert!(result.is_ok());
-        assert!(nested.is_dir());
-        let _ = std::fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn workflow_write_text_file_obeys_conflict_strategies() {
-        let root = std::env::temp_dir().join(format!(
-            "wf_write_{}_{}",
-            std::process::id(),
-            super::now_ms()
-        ));
-        std::fs::create_dir_all(&root).unwrap();
-        let file = root.join("README.md");
-        let create = super::workflow_write_text_file(super::WorkflowWriteTextInput {
-            path: file.to_string_lossy().to_string(),
-            content: "first".to_string(),
-            conflict: super::WorkflowConflictStrategy::Fail,
-        })
-        .unwrap();
-        assert_eq!(create.outcome, "created");
-        assert_eq!(std::fs::read_to_string(&file).unwrap(), "first");
-
-        let fail = super::workflow_write_text_file(super::WorkflowWriteTextInput {
-            path: file.to_string_lossy().to_string(),
-            content: "second".to_string(),
-            conflict: super::WorkflowConflictStrategy::Fail,
-        });
-        assert!(fail.is_err());
-
-        let renamed = super::workflow_write_text_file(super::WorkflowWriteTextInput {
-            path: file.to_string_lossy().to_string(),
-            content: "renamed".to_string(),
-            conflict: super::WorkflowConflictStrategy::Rename,
-        })
-        .unwrap();
-        assert_eq!(renamed.outcome, "renamed");
-        assert_ne!(renamed.actual_path, file.to_string_lossy());
-        assert_eq!(
-            std::fs::read_to_string(renamed.actual_path).unwrap(),
-            "renamed"
-        );
-
-        let overwrite = super::workflow_write_text_file(super::WorkflowWriteTextInput {
-            path: file.to_string_lossy().to_string(),
-            content: "overwritten".to_string(),
-            conflict: super::WorkflowConflictStrategy::Overwrite,
-        })
-        .unwrap();
-        assert_eq!(overwrite.outcome, "overwritten");
-        assert_eq!(std::fs::read_to_string(&file).unwrap(), "overwritten");
-        let _ = std::fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn workflow_execute_process_rejects_missing_executable() {
-        let result = super::workflow_execute_process(super::WorkflowExecuteProcessInput {
-            executable: std::env::temp_dir()
-                .join("dailyflow_missing_process.exe")
-                .to_string_lossy()
-                .to_string(),
-            arguments: vec!["--safe".to_string()],
-            working_directory: None,
-        });
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("程序不存在"));
     }
 
     // ---- A1-P0Fix-①：默认数据目录迁移 ----

@@ -4,8 +4,6 @@ import { useSettingsStore } from "../../stores/settingsStore";
 interface Draft {
   focusMinutes: number;
   shortBreak: number;
-  longBreak: number;
-  interval: number;
 }
 
 export default function PomodoroSection() {
@@ -14,36 +12,39 @@ export default function PomodoroSection() {
   const [draft, setDraft] = useState<Draft>({
     focusMinutes: settings.pomodoroDurationMinutes,
     shortBreak: settings.shortBreakMinutes,
-    longBreak: settings.longBreakMinutes,
-    interval: settings.longBreakInterval,
   });
   const [saved, setSaved] = useState(false);
+  const [busy, setBusy] = useState(false), [error, setError] = useState("");
 
   const fields: { key: keyof Draft; label: string; min: number; max: number; unit: string }[] = [
-    { key: "focusMinutes", label: "专注时长", min: 1, max: 180, unit: "分钟" },
-    { key: "shortBreak", label: "短休息", min: 1, max: 30, unit: "分钟" },
-    { key: "longBreak", label: "长休息", min: 1, max: 60, unit: "分钟" },
-    { key: "interval", label: "长休息间隔", min: 2, max: 10, unit: "个番茄" },
+    { key: "focusMinutes", label: "番茄节奏默认目标", min: 1, max: 180, unit: "分钟" },
+    { key: "shortBreak", label: "默认休息", min: 1, max: 30, unit: "分钟" },
   ];
 
   const handleSave = async () => {
-    await update({
+    if (busy) return;
+    setBusy(true); setError(""); setSaved(false);
+    try {
+    const ok = await update({
       pomodoroDurationMinutes: draft.focusMinutes,
       shortBreakMinutes: draft.shortBreak,
-      longBreakMinutes: draft.longBreak,
-      longBreakInterval: draft.interval,
     });
+    if (!ok) { setError("保存失败，输入已保留，请重试。"); return; }
     setSaved(true);
     window.setTimeout(() => setSaved(false), 2000);
+    } catch { setError("保存失败，输入已保留，请重试。"); }
+    finally { setBusy(false); }
   };
 
   return (
-    <div className="space-y-4 rounded-md border border-border-subtle glass-surface p-5">
+    <form className="space-y-4 p-5" onSubmit={(event) => { event.preventDefault(); void handleSave(); }}>
       {fields.map((f) => (
         <div key={f.key} className="flex items-center justify-between gap-4">
-          <label className="text-sm text-text-secondary">{f.label}</label>
+          <label htmlFor={`focus-setting-${f.key}`} className="text-sm text-text-secondary">{f.label}</label>
           <div className="flex items-center gap-2">
             <input
+              id={`focus-setting-${f.key}`}
+              required
               type="number"
               min={f.min}
               max={f.max}
@@ -56,17 +57,18 @@ export default function PomodoroSection() {
         </div>
       ))}
       <p className="text-xs text-text-faint">
-        休息循环（短休息 / 长休息 / 长休息间隔）已接入计时流程。
+        默认使用自由计时。目标到达后可继续；休息由你选择，不计入任务投入。
       </p>
       <div className="flex items-center gap-3 pt-1">
         <button
-          onClick={handleSave}
+          disabled={busy}
           className="rounded-md bg-accent px-4 py-2 text-sm text-on-accent hover:bg-accent-hover"
         >
           保存
         </button>
         {saved && <span className="text-sm text-green-600">已保存</span>}
+        {error && <span role="alert" className="text-sm text-red-600">{error}</span>}
       </div>
-    </div>
+    </form>
   );
 }

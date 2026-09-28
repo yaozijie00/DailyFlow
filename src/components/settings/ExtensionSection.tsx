@@ -1,6 +1,5 @@
 import { useExtensionStore } from "../../stores/extensionStore";
 import { useExtensionRows, type ExtensionRow } from "../../extensions/host";
-import { EXTENSION_API_VERSION } from "../../extensions/types";
 
 const CAPABILITY_LABELS = {
   "ui.page": "独立页面",
@@ -97,12 +96,11 @@ export default function ExtensionSection() {
       <div className="rounded-md border border-border-subtle glass-surface p-5">
         <div className="text-sm text-text-secondary">已安装的扩展</div>
         <p className="mt-0.5 text-xs text-text-faint">
-          禁用只会隐藏对应功能入口，不删除任何数据；重新启用即可恢复。宿主 API 版本 v
-          {EXTENSION_API_VERSION}（Extension 需声明兼容版本才会被加载）。
+          在这里管理已加入的功能。禁用会停止扩展并隐藏入口，保留本地数据。
         </p>
       </div>
       {rows.length === 0 ? (
-        <p className="text-sm text-text-faint">没有已安装的扩展。</p>
+        <p className="text-sm text-text-faint">当前使用 DailyFlow 本体，暂未安装扩展。之后添加的扩展会显示在这里。</p>
       ) : (
         rows.map((r) => <Row key={r.id} row={r} />)
       )}

@@ -1,5 +1,5 @@
 import type { CSSProperties, KeyboardEvent, MouseEvent } from "react";
-import { Check, StickyNote, X } from "lucide-react";
+import { Check, StickyNote, Timer, X } from "lucide-react";
 import { blockInfoLevel, formatTimeRange } from "../../lib/timeline";
 
 export type TimelineTaskVisualState = "normal" | "running" | "completed" | "cancelled";
@@ -14,6 +14,7 @@ export interface TimelineTaskBlockView {
   height: number;
   startMs: number;
   endMs: number;
+  actualSeconds?: number;
   color: string;
   selected: boolean;
   isPreviewing: boolean;
@@ -54,9 +55,11 @@ export default function TimelineTaskBlock({
   const ariaLabel = `${view.title}，${STATE_LABEL[view.state]}，${timeLabel}`;
 
   function handleKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.target !== event.currentTarget || event.nativeEvent.isComposing) return;
     if (event.key !== "Enter" && event.key !== " ") return;
     event.preventDefault();
-    onOpen();
+    if (event.shiftKey && view.state !== "completed" && view.state !== "cancelled") onFocus();
+    else onOpen();
   }
 
   return (
@@ -121,6 +124,7 @@ export default function TimelineTaskBlock({
           >
             {view.title}
           </span>
+          {view.state !== "completed" && view.state !== "cancelled" && <button type="button" title="开始专注 · Shift+Enter" aria-label={`开始专注 ${view.title}`} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onFocus(); }} className="ml-auto flex h-7 w-7 shrink-0 items-center justify-center rounded opacity-0 hover:bg-surface-hover focus:opacity-100 group-hover:opacity-100"><Timer size={13} /></button>}
           <button
             type="button"
             onMouseDown={(event) => event.stopPropagation()}
@@ -138,6 +142,7 @@ export default function TimelineTaskBlock({
         {info.showTime && (
           <div className="mt-0.5 truncate text-[10px] leading-tight tabular-nums text-text-secondary">
             {timeLabel}
+            {view.actualSeconds != null && view.actualSeconds > 0 && view.height >= 64 && <span> · 任务累计 {Math.round(view.actualSeconds / 60)}m</span>}
           </div>
         )}
         {info.showNotes && view.notes && (

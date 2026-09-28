@@ -41,9 +41,18 @@ describe("SettingsService", () => {
       weekStart: "monday",
       defaultLayoutMode: "standard",
       themeMode: "system",
+      longTermWeeklyCapacityMinutes: 20 * 60,
     });
     const s = await service.getSettings();
     expect(s).toEqual(DEFAULT_SETTINGS);
+  });
+
+  it("长期计划周容量默认 20h，可持久化并限制在合理范围", async () => {
+    expect((await service.getSettings()).longTermWeeklyCapacityMinutes).toBe(1200);
+    await service.update({ longTermWeeklyCapacityMinutes: 1500 });
+    expect((await service.getSettings()).longTermWeeklyCapacityMinutes).toBe(1500);
+    await service.update({ longTermWeeklyCapacityMinutes: -1 });
+    expect((await service.getSettings()).longTermWeeklyCapacityMinutes).toBe(0);
   });
 
   it("扩展设置：默认页/今日显示/周起始日 保存与回退", async () => {
@@ -154,6 +163,7 @@ describe("SettingsService", () => {
       weekStart: "monday",
       defaultLayoutMode: "standard",
       themeMode: "system",
+      longTermWeeklyCapacityMinutes: 1200,
     });
   });
 

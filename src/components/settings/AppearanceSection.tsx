@@ -36,7 +36,7 @@ export default function AppearanceSection() {
 
   // A3：默认视图模式（改动即保存并同步当前会话）
   const handleLayoutChange = async (m: LayoutMode) => {
-    await update({ defaultLayoutMode: m });
+    if (!await update({ defaultLayoutMode: m })) return;
     setCurrent(m);
     setLayoutMsg(true);
     window.setTimeout(() => setLayoutMsg(false), 2000);
@@ -48,12 +48,14 @@ export default function AppearanceSection() {
   };
 
   const handleSave = async () => {
-    await update({
+    setSaved(false);
+    const ok = await update({
       timelineStartMinutes: draft.startHour * 60,
       timelineEndMinutes: draft.endHour * 60,
       timelineSnapMinutes: draft.snapMinutes,
       timelinePxPerMinute: draft.pxPerMinute,
     });
+    if (!ok) return;
     setSaved(true);
     window.setTimeout(() => setSaved(false), 2000);
   };

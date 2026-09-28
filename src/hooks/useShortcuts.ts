@@ -13,8 +13,10 @@ export function useShortcuts() {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.repeat) return;
+      if (e.repeat || e.isComposing || e.defaultPrevented) return;
       if (isEditableTarget(e.target)) return;
+      if (document.querySelector('[role="dialog"][aria-modal="true"]')) return;
+      if (e.target instanceof Element && e.target.closest('[data-shortcut-scope="local"]')) return;
       const combo = eventToCombo(e);
       // Ctrl+Y 作为重做别名（兼容 Ctrl+Shift+Z；不占用可配置项）
       if (combo === "Ctrl+Y") {

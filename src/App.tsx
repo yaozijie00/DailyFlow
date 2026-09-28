@@ -5,7 +5,8 @@ import CloseBehaviorDialog from "./components/settings/CloseBehaviorDialog";
 import { useAppStore, type CorePage } from "./stores/appStore";
 import { useSettingsStore } from "./stores/settingsStore";
 import { useExtensionStore } from "./stores/extensionStore";
-import { usePomodoroStore } from "./stores/pomodoroStore";
+import { FocusBridge } from "./features/focus/FocusController";
+import { useFocusStore } from "./features/focus/focusStore";
 import { useGoalStore } from "./stores/goalStore";
 import { getExtensionPageFor, ExtensionErrorBoundary } from "./extensions/host";
 import { createCoreContext } from "./extensions/context";
@@ -15,6 +16,7 @@ import { initWindowBehavior } from "./services/windowBehaviorService";
 import { measureStartupPhase } from "./services/startupDiagnostics";
 import { undoManager } from "./lib/undoManager";
 import { useLayoutModeStore } from "./lib/layoutMode";
+import { motionTiming } from "./design-system/motion";
 
 const pages = {
   today: lazy(() => import("./pages/Today")),
@@ -91,7 +93,7 @@ function App() {
       ).catch(() => {});
       // 恢复进行中的专注（若存在未结束的 focus_session）
       void measureStartupPhase("focus-restore", "专注恢复", () =>
-        usePomodoroStore.getState().restoreActiveFocus(),
+        useFocusStore.getState().sync(),
       ).catch(() => {});
     }
   }, [dbStatus]);
@@ -99,6 +101,7 @@ function App() {
   return (
     <MotionConfig reducedMotion="user">
       <Layout>
+        {dbStatus === "ready" && <FocusBridge />}
         <Suspense fallback={<PageLoading />}>
           {ActivePage ? (
             isExtensionPage ? (
@@ -113,7 +116,7 @@ function App() {
               </PageTransition>
             )
           ) : (
-            <div className="text-sm text-text-faint">页面不存在</div>
+            <section className="p-8 text-sm text-text-secondary"><h1 className="mb-2 text-lg font-semibold">此页面暂不可用</h1><p>扩展可能已移除或尚未启用。你的任务和投入记录仍保存在本机。</p><button className="mt-4 rounded px-4 py-2 focus-visible:outline-2" onClick={() => useAppStore.getState().setPage("today")}>回到今日</button></section>
           )}
         </Suspense>
         <CloseBehaviorDialog />
@@ -134,10 +137,10 @@ function PageLoading() {
 function PageTransition({ children }: { children: React.ReactNode }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 6 }}
-      animate={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.18, ease: "easeOut" }}
+      transition={{ duration: motionTiming.micro, ease: "easeOut" }}
       className="flex h-full min-h-0 flex-col"
     >
       {children}

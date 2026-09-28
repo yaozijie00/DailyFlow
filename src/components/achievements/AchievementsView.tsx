@@ -7,7 +7,7 @@ import {
   type AchievementFilter,
 } from "../../stores/achievementStore";
 import type { AchievementProgressView } from "../../services/achievementService";
-import { usePomodoroStore } from "../../stores/pomodoroStore";
+import { useFocusStore } from "../../features/focus/focusStore";
 import { useDataVersion } from "../../lib/dataVersion";
 import { Dialog } from "../ui/Dialog";
 import { EmptyState } from "../ui/EmptyState";
@@ -125,7 +125,7 @@ export default function AchievementsView() {
   const [group, setGroup] = useState("");
   // A1-P0Fix-④：任务/专注数据变化后重新评估成就进度（后台专注完成也能即时反映）
   const taskVersion = useDataVersion("task");
-  const focusVersionSignal = usePomodoroStore((s) => s.focusVersion);
+  const focusVersionSignal = useFocusStore((s) => s.focusVersion);
 
   useEffect(() => {
     if (dbStatus === "ready") {

@@ -75,7 +75,7 @@ describe("TaskService", () => {
     expect(tasks).toHaveLength(0);
   });
 
-  it("删除任务时清理其专注记录（统计数据不再包含该任务）", async () => {
+  it("删除任务保留专注历史并清除任务链接", async () => {
     const task = await service.createTask({ title: "写代码" });
     await sessions.create({
       taskId: task.id,
@@ -91,8 +91,9 @@ describe("TaskService", () => {
       actualDuration: 600,
       completed: false,
     });
-    await service.deleteTask(task.id);
-    expect(await sessions.findByTaskId(task.id)).toHaveLength(0);
+      await service.deleteTask(task.id);
+      expect(await sessions.findByTaskId(task.id)).toHaveLength(0);
+      expect(await sessions.listAll()).toHaveLength(2);
   });
 
   it("completes a task with completedAt timestamp", async () => {

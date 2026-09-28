@@ -1,11 +1,17 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useTaskStore } from "../../stores/taskStore";
+import { taskService, useTaskStore } from "../../stores/taskStore";
 import { useGoalStore } from "../../stores/goalStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { formatTimeRange } from "../../lib/timeline";
 import { REPEAT_RULES } from "../../lib/repeat";
 import { TASK_PRIORITIES, taskPriorityMeta, type TaskPriority } from "../../lib/taskPriority";
 import { Dialog } from "../ui/Dialog";
+import { LongTermPlanRepository, type PhaseWithProgress } from "../../db/repositories/longTermPlanRepository";
+import { getDb } from "../../db/db";
+
+import type { Task } from "../../db/repositories/taskRepository";
+
+const longTermPlans = new LongTermPlanRepository(getDb());
 
 export default function TaskFormModal() {
   const isCreateOpen = useTaskStore((s) => s.isCreateOpen);
@@ -20,8 +26,20 @@ export default function TaskFormModal() {
   const closeCreate = useTaskStore((s) => s.closeCreate);
   const closeEdit = useTaskStore((s) => s.closeEdit);
 
-  const editingTask =
-    editingTaskId != null ? tasks.find((t) => t.id === editingTaskId) : undefined;
+  const listedTask = editingTaskId != null ? tasks.find((t) => t.id === editingTaskId) : undefined;
+  const [remoteTask, setRemoteTask] = useState<Task | null>(null);
+  const [readError, setReadError] = useState("");
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    let current = true;
+    setRemoteTask(null); setReadError("");
+    if (editingTaskId == null || listedTask) return;
+    void taskService.getTask(editingTaskId).then((task) => {
+      if (current) { setRemoteTask(task); if (!task) setReadError("任务已不存在"); }
+    }).catch(() => { if (current) setReadError("读取失败，请重试"); });
+    return () => { current = false; };
+  }, [editingTaskId, listedTask, retry]);
+  const editingTask = listedTask ?? (remoteTask?.id === editingTaskId ? remoteTask : null);
   const open = isCreateOpen || editingTaskId != null;
 
   const hasDraft =
@@ -31,6 +49,8 @@ export default function TaskFormModal() {
   const [categoryId, setCategoryId] = useState("");
   const [goalId, setGoalId] = useState("");
   const [projectId, setProjectId] = useState("");
+  const [phaseId, setPhaseId] = useState("");
+  const [phaseOptions, setPhaseOptions] = useState<PhaseWithProgress[]>([]);
   const [estimatedMinutes, setEstimatedMinutes] = useState("");
   const [notes, setNotes] = useState("");
   const [repeatRule, setRepeatRule] = useState("");
@@ -49,6 +69,7 @@ export default function TaskFormModal() {
       setCategoryId(editingTask.categoryId != null ? String(editingTask.categoryId) : "");
       setGoalId(editingTask.goalId != null ? String(editingTask.goalId) : "");
       setProjectId(editingTask.projectId != null ? String(editingTask.projectId) : "");
+      setPhaseId(editingTask.phaseId != null ? String(editingTask.phaseId) : "");
       // 用十进制分钟展示，避免子分钟精度丢失（如 90 秒 → "1.5"）
       setEstimatedMinutes(
         editingTask.estimatedDuration != null
@@ -63,6 +84,7 @@ export default function TaskFormModal() {
       setCategoryId("");
       setGoalId("");
       setProjectId("");
+      setPhaseId("");
       setEstimatedMinutes(
         String((createDraft.plannedEnd! - createDraft.plannedStart!) / 60000),
       );
@@ -74,6 +96,7 @@ export default function TaskFormModal() {
       setCategoryId("");
       setGoalId("");
       setProjectId("");
+      setPhaseId("");
       setEstimatedMinutes("");
       setNotes("");
       setRepeatRule("");
@@ -81,7 +104,25 @@ export default function TaskFormModal() {
     }
   }, [editingTaskId, isCreateOpen, editingTask, createDraft, hasDraft]);
 
+  useEffect(() => {
+    let current = true;
+    if (!open || goalId === "") {
+      setPhaseOptions([]);
+      return () => { current = false; };
+    }
+    void longTermPlans.listPhases(Number(goalId)).then((items) => {
+      if (current) setPhaseOptions(items);
+    }).catch(() => {
+      if (current) setPhaseOptions([]);
+    });
+    return () => { current = false; };
+  }, [goalId, open]);
+
   if (!open) return null;
+  if (editingTaskId != null && !editingTask) return <Dialog open onClose={closeEdit} title="编辑任务">
+    <p role={readError ? "alert" : "status"}>{readError || "正在读取任务…"}</p>
+    {readError && <button onClick={() => setRetry((n) => n + 1)}>重试</button>}
+  </Dialog>;
 
   const close = () => {
     if (editingTask) closeEdit();
@@ -99,6 +140,7 @@ export default function TaskFormModal() {
       categoryId: categoryId === "" ? null : Number(categoryId),
       goalId: goalId === "" ? null : Number(goalId),
       projectId: projectId === "" ? null : Number(projectId),
+      phaseId: phaseId === "" ? null : Number(phaseId),
       estimatedDuration:
         estimated == null || Number.isNaN(estimated) || estimated < 0
           ? null
@@ -190,6 +232,7 @@ export default function TaskFormModal() {
               onChange={(e) => {
                 setGoalId(e.target.value);
                 setProjectId(""); // 目标变更后项目需重新选择
+                setPhaseId("");
               }}
               className="w-full rounded-md border border-border-strong bg-surface px-3 py-2 text-sm text-text-primary outline-none transition-colors focus:border-accent"
             >
@@ -201,6 +244,21 @@ export default function TaskFormModal() {
               ))}
             </select>
           </div>
+          {goalId !== "" && (
+            <div>
+              <label className="mb-1 block text-sm text-text-secondary">阶段（可选）</label>
+              <select
+                value={phaseId}
+                onChange={(e) => setPhaseId(e.target.value)}
+                className="w-full rounded-md border border-border-strong bg-surface px-3 py-2 text-sm text-text-primary outline-none transition-colors focus:border-accent"
+              >
+                <option value="">未分阶段</option>
+                {phaseOptions.map((phase) => (
+                  <option key={phase.id} value={phase.id}>{phase.title}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <label className="mb-1 block text-sm text-text-secondary">项目（可选）</label>
             <select

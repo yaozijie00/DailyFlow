@@ -22,9 +22,9 @@ describe("validateDefinition", () => {
   it("extensionId（归属扩展）解析保留；空串视为无归属", () => {
     const d = validateDefinition({
       ...valid,
-      extensionId: "com.dailyflow.course-schedule",
+      extensionId: "com.example.extension",
     });
-    expect(d?.extensionId).toBe("com.dailyflow.course-schedule");
+    expect(d?.extensionId).toBe("com.example.extension");
     const d2 = validateDefinition({ ...valid, extensionId: "   " });
     expect(d2?.extensionId).toBeUndefined();
   });

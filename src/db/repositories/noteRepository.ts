@@ -4,7 +4,7 @@ import { notes } from "../schema";
 
 export type Note = typeof notes.$inferSelect;
 
-export type NoteStatus = "active" | "arranged" | "completed";
+export type NoteStatus = "active" | "saved" | "arranged" | "completed";
 
 export interface CreateNoteInput {
   title: string;
@@ -57,7 +57,7 @@ export class NoteRepository {
     return this.db
       .select()
       .from(notes)
-      .where(inArray(notes.status, ["active", "arranged"]))
+      .where(inArray(notes.status, ["active", "saved", "arranged"]))
       .orderBy(notes.sortOrder, notes.id)
       .all();
   }
@@ -114,7 +114,7 @@ export class NoteRepository {
     return this.db
       .select()
       .from(notes)
-      .where(and(inArray(notes.status, ["active", "arranged"]), like(notes.title, q)))
+      .where(and(inArray(notes.status, ["active", "saved", "arranged"]), like(notes.title, q)))
       .orderBy(desc(notes.id))
       .limit(limit)
       .all();

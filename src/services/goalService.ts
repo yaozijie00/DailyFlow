@@ -27,6 +27,13 @@ export const GOAL_UNDOABLE_FIELDS = [
   "manualProgress",
   "status",
   "completedAt",
+  "weeklyTargetMinutes",
+  "progressMode",
+  "estimatedCompletionDate",
+  "currentPhaseId",
+  "nextAction",
+  "weeklyRhythmJson",
+  "pausedAt",
 ] as const;
 
 type GoalUndoableField = (typeof GOAL_UNDOABLE_FIELDS)[number];
@@ -75,6 +82,7 @@ export class GoalService {
     const goal = await this.goals.create(input);
     if (!undoManager.applying) {
       const snapshot = { ...goal };
+      const children = await this.goals.snapshotChildren(goal.id);
       undoManager.push({
         type: "goal.create",
         label: "创建长期任务",
@@ -85,6 +93,7 @@ export class GoalService {
         redo: async () => {
           // 重做创建：以显式 id 还原同一行
           await this.goals.insertRestored(snapshot);
+          await this.goals.restoreChildren(children);
         },
       });
     }
@@ -128,24 +137,27 @@ export class GoalService {
     });
   }
 
-  /** 删除目标：捕获目标行 + 受影响任务 id，撤销时整体还原。 */
+  /** 删除目标：捕获阶段、历史和任务/项目关联，撤销时整体还原。 */
   async delete(id: number): Promise<boolean> {
     if (!undoManager.applying) {
       const goal = await this.goals.findById(id);
       if (goal) {
         const g = { ...goal };
-        const taskIds = await this.goals.taskIdsByGoal(id);
+        const children = await this.goals.snapshotChildren(id);
+        const deleted = await this.goals.delete(id);
+        if (!deleted) return false;
         undoManager.push({
           type: "goal.delete",
           label: "删除长期任务",
           undo: async () => {
             await this.goals.insertRestored(g);
-            if (taskIds.length > 0) await this.goals.relinkTasks(taskIds, g.id);
+            await this.goals.restoreChildren(children);
           },
           redo: async () => {
             await this.goals.delete(g.id);
           },
         });
+        return true;
       }
     }
     return this.goals.delete(id);

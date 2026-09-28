@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useAppStore, type Page } from "../stores/appStore";
 import { useSettingsStore } from "../stores/settingsStore";
-import { usePomodoroStore } from "../stores/pomodoroStore";
+import { useFocusStore } from "../features/focus/focusStore";
 import { useTaskStore } from "../stores/taskStore";
 import type { CloseBehavior } from "./settingsService";
 
@@ -31,8 +31,7 @@ export function resolveCloseAction(
 }
 
 function focusRunning(): boolean {
-  const s = usePomodoroStore.getState().snapshot.state;
-  return s === "RUNNING" || s === "PAUSED";
+  return useFocusStore.getState().active != null;
 }
 
 function handleCloseRequest(): void {
@@ -58,11 +57,11 @@ function handleCloseRequest(): void {
 }
 
 function handleTrayToggleFocus(): void {
-  const p = usePomodoroStore.getState();
-  const s = p.snapshot.state;
-  if (s === "RUNNING") p.pause();
-  else if (s === "PAUSED") p.resume();
-  else useAppStore.getState().pushToast("info", "请先在「专注」页选择任务开始番茄钟");
+  const p = useFocusStore.getState();
+  const s = p.active?.status;
+  if (s === "running") void p.perform({ action: "pause" });
+  else if (s === "paused") void p.perform({ action: "resume" });
+  else useAppStore.getState().pushToast("info", "请先在「专注」页选择任务开始推进");
 }
 
 const TRAY_PAGES: Page[] = ["today", "focus", "goals", "statistics", "settings"];
@@ -128,5 +127,5 @@ export function hideToMini(): void {
 
 /** 真正退出应用（供关闭行为对话框调用）。 */
 export function exitApp(): void {
-  void invoke("exit_app");
+  void (async () => { const state = useFocusStore.getState(); if (state.active?.status === "running" && !await state.perform({ action: "pause" })) return; await invoke("exit_app"); })();
 }

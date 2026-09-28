@@ -3,6 +3,7 @@ import { Zap, CalendarDays, Clock } from "lucide-react";
 import { useTaskStore } from "../../stores/taskStore";
 import { parseQuickCapture } from "../../lib/quickCapture";
 import { todayString } from "../../lib/date";
+import { useOverlayFocus } from "../../hooks/useOverlayFocus";
 
 function fmtClock(ms: number): string {
   const d = new Date(ms);
@@ -20,6 +21,10 @@ export default function QuickCapture() {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const pendingRef = useRef(false);
+  const [pending, setPending] = useState(false);
+  useOverlayFocus(open, panelRef);
 
   const parsed = useMemo(() => {
     if (q.trim() === "") return null;
@@ -28,7 +33,9 @@ export default function QuickCapture() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.isComposing || e.repeat || e.defaultPrevented || pendingRef.current) return;
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "i") {
+        if (!open && document.querySelector('[role="dialog"][aria-modal="true"]')) return;
         e.preventDefault();
         setOpen((o) => !o);
         setQ("");
@@ -50,13 +57,17 @@ export default function QuickCapture() {
   if (!open) return null;
 
   const close = () => {
+    if (pendingRef.current) return;
     setOpen(false);
     setQ("");
   };
 
   const submit = async () => {
     const r = parsed;
-    if (!r) return;
+    if (!r || pendingRef.current) return;
+    pendingRef.current = true;
+    setPending(true);
+    try {
     const ok = await useTaskStore.getState().createScheduledTask({
       title: r.title,
       scheduledDate: r.scheduledDate,
@@ -65,7 +76,8 @@ export default function QuickCapture() {
       estimatedDuration: r.estimatedDuration,
       categoryId: r.categoryId,
     });
-    if (ok) close();
+    if (ok) { setOpen(false); setQ(""); }
+    } finally { pendingRef.current = false; setPending(false); }
   };
 
   const catName =
@@ -79,6 +91,11 @@ export default function QuickCapture() {
       onClick={close}
     >
       <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="快速添加"
+        aria-busy={pending}
         className="w-[560px] max-w-[92vw] overflow-hidden rounded-lg bg-bg-elevated shadow-popover"
         onClick={(e) => e.stopPropagation()}
       >
@@ -86,10 +103,12 @@ export default function QuickCapture() {
           <Zap size={15} className="shrink-0 text-warning" />
           <input
             ref={inputRef}
+            aria-label="快速添加任务"
+            disabled={pending}
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") void submit();
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) void submit();
             }}
             placeholder="快速捕获：明天 14:00 1.5h #开发 写设计文档（回车创建）"
             className="w-full bg-transparent py-3 text-sm text-text-primary outline-none placeholder:text-text-faint"

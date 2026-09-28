@@ -752,17 +752,20 @@ checksum = "52560adf09603e58c9a7ee1fe1dcb95a16927b17c127f0ac02d6e768a0e25bc1"
 
 [[package]]
 name = "dailyflow"
-version = "3.2.0"
+version = "3.3.0"
 dependencies = [
  "chrono",
  "notify-rust",
  "serde",
  "serde_json",
+ "sqlx-core",
+ "sqlx-sqlite",
  "tauri",
  "tauri-build",
  "tauri-plugin-notification",
  "tauri-plugin-single-instance",
  "tauri-plugin-sql",
+ "tokio",
  "webview2-com",
  "webview2-com-sys",
  "windows-core 0.61.2",

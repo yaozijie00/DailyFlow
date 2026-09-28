@@ -1,4 +1,5 @@
 import type { ButtonHTMLAttributes } from "react";
+import { LoaderCircle } from "lucide-react";
 
 export type ButtonVariant = "primary" | "secondary" | "danger" | "ghost";
 export type ButtonSize = "sm" | "md";
@@ -6,6 +7,7 @@ export type ButtonSize = "sm" | "md";
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: ButtonSize;
+  loading?: boolean;
 }
 
 const BASE =
@@ -19,8 +21,8 @@ const VARIANTS: Record<ButtonVariant, string> = {
 };
 
 const SIZES: Record<ButtonSize, string> = {
-  sm: "px-2.5 py-1.5 text-xs",
-  md: "px-3.5 py-2 text-sm",
+  sm: "min-h-[var(--control-height-sm)] px-3 py-1 text-caption",
+  md: "df-control px-4 py-2 text-body",
 };
 
 export function Button({
@@ -28,13 +30,21 @@ export function Button({
   size = "md",
   className = "",
   type = "button",
+  loading = false,
+  disabled,
+  children,
   ...rest
 }: ButtonProps) {
   return (
     <button
       type={type}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
       className={`${BASE} ${VARIANTS[variant]} ${SIZES[size]} ${className}`}
       {...rest}
-    />
+    >
+      {loading && <LoaderCircle size={14} className="animate-spin" aria-hidden="true" />}
+      {children}
+    </button>
   );
 }

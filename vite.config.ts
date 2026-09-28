@@ -35,7 +35,6 @@ export default defineConfig(async () => ({
       output: {
         manualChunks(id) {
           if (!id.includes("node_modules")) return undefined;
-          if (id.includes("@xyflow")) return "vendor-flow";
           if (id.includes("recharts") || id.includes("d3-")) return "vendor-charts";
           if (id.includes("motion")) return "vendor-motion";
           if (id.includes("@tauri-apps")) return "vendor-tauri";

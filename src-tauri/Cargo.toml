@@ -1,6 +1,6 @@
 [package]
 name = "dailyflow"
-version = "3.2.0"
+version = "3.3.0"
 description = "DailyFlow - 个人本地时间管理工具"
 authors = ["you"]
 edition = "2021"
@@ -33,3 +33,7 @@ notify-rust = "4"
 webview2-com-sys = "0.38"
 webview2-com = "0.38"
 windows-core = "0.61"
+
+sqlx-core = { version = "0.8.6", features = ["_rt-tokio"] }
+sqlx-sqlite = "0.8.6"
+tokio = { version = "1", features = ["sync", "time"] }

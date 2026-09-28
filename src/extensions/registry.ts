@@ -354,52 +354,6 @@ export function getExtensionDiagnostics(): ExtensionDiagnostic[] {
   return [...diagnostics];
 }
 
-/* ---- 课程成就数据 Provider：Core 成就引擎经 Host 查询（不直接依赖课程扩展） ---- */
-
-const courseCompletedProviders = new Map<string, () => Promise<number>>();
-
-/** 课程 Extension 注册「累计完成课程任务数」数据源（启用时注册）。 */
-export function registerCourseCompletedProvider(
-  id: string,
-  fn: () => Promise<number>,
-): void {
-  courseCompletedProviders.set(id, fn);
-}
-
-/** 停用课程扩展时反注册其成就数据源（禁用期间成就不再计入）。 */
-export function unregisterCourseCompletedProvider(id: string): void {
-  courseCompletedProviders.delete(id);
-}
-
-/** Core 成就引擎取首个已注册的课程成就数据源；无则返回 null（= 0）。 */
-export function getCourseCompletedProvider(): (() => Promise<number>) | null {
-  for (const fn of courseCompletedProviders.values()) return fn;
-  return null;
-}
-
-/* ---- WorkflowRun 完成数据 Provider：Core 成就引擎查询 Workflow 扩展（A5） ---- */
-
-const workflowRunProviders = new Map<string, () => Promise<number>>();
-
-/** Workflow 扩展注册「累计完成的 WorkflowRun 数」数据源（启用时注册）。 */
-export function registerWorkflowRunCompletedProvider(
-  id: string,
-  fn: () => Promise<number>,
-): void {
-  workflowRunProviders.set(id, fn);
-}
-
-/** 停用 Workflow 扩展时注销其成就数据源。 */
-export function unregisterWorkflowRunCompletedProvider(id: string): void {
-  workflowRunProviders.delete(id);
-}
-
-/** Core 成就引擎取 WorkflowRun 完成数；无注册源返回 null（= 0）。 */
-export function getWorkflowRunCompletedProvider(): (() => Promise<number>) | null {
-  for (const fn of workflowRunProviders.values()) return fn;
-  return null;
-}
-
 /* ---- 独立库备份参与者：拥有独立 SQLite 文件的扩展在备份/恢复时参与 ---- */
 
 /**

@@ -50,6 +50,8 @@ export interface AppSettings {
   defaultLayoutMode: LayoutMode;
   /** 界面主题（V2.4）：system=跟随系统 | light | dark | glass（毛玻璃） */
   themeMode: ThemeMode;
+  /** 所有长期计划合计的每周可投入容量（分钟） */
+  longTermWeeklyCapacityMinutes: number;
 }
 
 /** 视图模式（A3）：改变信息密度/布局/内容优先级，非颜色主题。 */
@@ -77,6 +79,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   weekStart: "monday",
   defaultLayoutMode: "standard",
   themeMode: "system",
+  longTermWeeklyCapacityMinutes: 20 * 60,
 };
 
 /** 合法的视图模式白名单。 */
@@ -113,6 +116,7 @@ const KEY_TODAY_SHOW_NOTES = "today_show_notes";
 const KEY_WEEK_START = "week_start";
 const KEY_LAYOUT_MODE = "layout_mode";
 const KEY_THEME_MODE = "theme_mode";
+const KEY_LONG_TERM_WEEKLY_CAPACITY = "long_term_weekly_capacity_minutes";
 
 function pad2(n: number): string {
   return String(n).padStart(2, "0");
@@ -143,6 +147,12 @@ function parseFloatSafe(value: string | undefined, fallback: number): number {
   if (value == null) return fallback;
   const n = Number(value);
   return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+function parseNonNegativeInt(value: string | undefined, fallback: number): number {
+  if (value == null) return fallback;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? Math.round(n) : fallback;
 }
 
 function clamp(n: number, min: number, max: number): number {
@@ -207,6 +217,10 @@ export class SettingsService {
       themeMode: isThemeMode(stored[KEY_THEME_MODE])
         ? stored[KEY_THEME_MODE]
         : DEFAULT_SETTINGS.themeMode,
+      longTermWeeklyCapacityMinutes: parseNonNegativeInt(
+        stored[KEY_LONG_TERM_WEEKLY_CAPACITY],
+        DEFAULT_SETTINGS.longTermWeeklyCapacityMinutes,
+      ),
     };
   }
 
@@ -282,6 +296,12 @@ export class SettingsService {
     }
     if (partial.themeMode !== undefined && isThemeMode(partial.themeMode)) {
       writes.push([KEY_THEME_MODE, partial.themeMode]);
+    }
+    if (partial.longTermWeeklyCapacityMinutes !== undefined) {
+      writes.push([
+        KEY_LONG_TERM_WEEKLY_CAPACITY,
+        String(clamp(Math.round(partial.longTermWeeklyCapacityMinutes), 0, 7 * 24 * 60)),
+      ]);
     }
     for (const [k, v] of writes) {
       await this.repo.set(k, v);
