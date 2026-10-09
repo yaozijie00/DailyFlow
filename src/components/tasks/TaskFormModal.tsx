@@ -9,6 +9,8 @@ import { Dialog } from "../ui/Dialog";
 import { LongTermPlanRepository, type PhaseWithProgress } from "../../db/repositories/longTermPlanRepository";
 import { getDb } from "../../db/db";
 
+import { TaskTitleField, TaskNotesField } from "./TaskTextFields";
+
 import type { Task } from "../../db/repositories/taskRepository";
 
 const longTermPlans = new LongTermPlanRepository(getDb());
@@ -175,16 +177,7 @@ export default function TaskFormModal() {
             </div>
           )}
 
-          <div>
-            <label className="mb-1 block text-sm text-text-secondary">任务名称</label>
-            <input
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              autoFocus
-              placeholder="输入任务名称"
-              className="w-full rounded-md border border-border-strong bg-surface px-3 py-2 text-sm text-text-primary outline-none transition-colors focus:border-accent"
-            />
-          </div>
+          <TaskTitleField value={title} onChange={setTitle} />
           <div>
             <label className="mb-1 block text-sm text-text-secondary">优先级</label>
             <div className="flex gap-2">
@@ -317,16 +310,7 @@ export default function TaskFormModal() {
               完成后自动生成下一次任务（每天/工作日/每周/每月）
             </p>
           </div>
-          <div>
-            <label className="mb-1 block text-sm text-text-secondary">备注</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="补充信息（可选）"
-              rows={3}
-              className="w-full resize-none rounded-md border border-border-strong bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-faint outline-none transition-colors focus:border-accent"
-            />
-          </div>
+          <TaskNotesField value={notes} onChange={setNotes} />
           <div className="flex justify-end gap-2 pt-2">
             <button
               type="button"

@@ -11,7 +11,7 @@ vi.mock("../services/settingsService", async (original) => ({
   },
 }));
 vi.mock("./appStore", () => ({ useAppStore: { getState: () => ({ pushToast: mocks.toast }) } }));
-vi.mock("../lib/theme", () => ({ applyTheme: vi.fn(), parseThemeMode: vi.fn(), systemPrefersDark: () => false, watchSystemTheme: () => vi.fn() }));
+vi.mock("../lib/theme", () => ({ applyTheme: vi.fn(), applyAppearance: vi.fn(), isAppearanceStyle: (v: string) => ["classic","paper","forest","graphite"].includes(v), parseThemeMode: vi.fn(), systemPrefersDark: () => false, watchSystemTheme: () => vi.fn() }));
 import { useSettingsStore } from "./settingsStore";
 import { DEFAULT_SETTINGS } from "../services/settingsService";
 import { DEFAULT_SHORTCUTS } from "../lib/shortcuts";

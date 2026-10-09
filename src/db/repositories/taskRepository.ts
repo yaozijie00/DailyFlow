@@ -1,13 +1,15 @@
 import { readFocusSlices } from "../focusAnalytics";
 import { and, count, desc, eq, gte, like, lt, inArray, sql } from "drizzle-orm";
 import type { Db } from "../db";
-import { tasks } from "../schema";
+import { tasks, longTermPhases } from "../schema";
 import type { TaskPriority } from "../../lib/taskPriority";
 import { DEFAULT_TASK_PRIORITY } from "../../lib/taskPriority";
+import { taskPlanningRanges, inboxLinks } from "../ganttSchema";
 
 type StoredTask = typeof tasks.$inferSelect;
 /** Optional migration fields keep source-compatible fixtures/extensions while old databases migrate. */
-export type Task = Omit<StoredTask, "repeatSourceId" | "phaseId"> & {
+export type Task = Omit<StoredTask, "repeatSourceId" | "phaseId" | "sourceNoteId"> & {
+  sourceNoteId?: number | null;
   repeatSourceId?: number | null;
   phaseId?: number | null;
 };
@@ -45,6 +47,25 @@ export type UpdateTaskInput = Partial<CreateTaskInput> & { sortOrder?: number };
 
 export class TaskRepository {
   constructor(private readonly db: Db) {}
+  async phases(goalId:number) { return this.db.select().from(longTermPhases).where(eq(longTermPhases.goalId,goalId)).orderBy(longTermPhases.sortOrder).all(); }
+  async snapshotVisuals(id: number) {
+    const [range,links] = await Promise.all([this.db.select().from(taskPlanningRanges).where(eq(taskPlanningRanges.taskId,id)).get(),this.db.select().from(inboxLinks).where(eq(inboxLinks.taskId,id)).all()]);
+    return { range:range ?? null,links };
+  }
+  async restoreVisuals(snapshot: Awaited<ReturnType<TaskRepository["snapshotVisuals"]>>) {
+    if (snapshot.range) await this.db.insert(taskPlanningRanges).values(snapshot.range).onConflictDoNothing().run();
+    for (const link of snapshot.links) await this.db.insert(inboxLinks).values(link).onConflictDoUpdate({ target:inboxLinks.noteId,set:{ taskId:link.taskId } }).run();
+  }
+
+  async children(parentId: number): Promise<Task[]> {
+    return this.db.select().from(tasks).where(eq(tasks.parentId, parentId)).orderBy(tasks.sortOrder, tasks.id).all();
+  }
+
+  async updateExpected(id: number, input: UpdateTaskInput, expectedVersion: number): Promise<Task | null> {
+    const [row] = await this.db.update(tasks).set({ ...input, updatedAt: Math.max(Date.now(), expectedVersion + 1) })
+      .where(and(eq(tasks.id, id), eq(tasks.updatedAt, expectedVersion))).returning().all();
+    return row ?? null;
+  }
 
   async create(input: CreateTaskInput): Promise<Task> {
     const now = Date.now();
@@ -173,7 +194,7 @@ export class TaskRepository {
   async update(id: number, input: UpdateTaskInput): Promise<Task | null> {
     const rows = await this.db
       .update(tasks)
-      .set({ ...input, updatedAt: Date.now() })
+      .set({ ...input, updatedAt: sql`max(${Date.now()},${tasks.updatedAt}+1)` })
       .where(eq(tasks.id, id))
       .returning()
       .all();
@@ -191,10 +212,10 @@ export class TaskRepository {
 
   /** 以原 id 重建任务行（撤销「删除任务」用；AUTOINCREMENT 接受显式 id）。 */
   async insertRestored(task: Task): Promise<void> {
-    await this.db.insert(tasks).values({ ...task, repeatSourceId: task.repeatSourceId ?? null }).run();
+    await this.db.insert(tasks).values({ ...task, sourceNoteId: null, repeatSourceId: task.repeatSourceId ?? null }).run();
   }
 
-  /** 统计某日任务总数与完成数（含已取消，与任务列表口径一致），单条 SQL 实时聚合。 */
+  /** 统计某日执行任务总数与完成数（排除汇总和取消项），单条 SQL 实时聚合。 */
   async countTodayStats(scheduledDate: string): Promise<{ total: number; completed: number }> {
     const rows = await this.db
       .select({
@@ -202,7 +223,7 @@ export class TaskRepository {
         completed: sql<number>`coalesce(sum(case when ${tasks.status} = 'COMPLETED' then 1 else 0 end), 0)`,
       })
       .from(tasks)
-      .where(eq(tasks.scheduledDate, scheduledDate))
+      .where(and(eq(tasks.scheduledDate,scheduledDate),sql`${tasks.status} != 'CANCELLED'`,sql`NOT EXISTS (SELECT 1 FROM tasks child WHERE child.parent_id=${tasks.id} AND child.status!='CANCELLED')`))
       .all();
     return {
       total: rows[0]?.total ?? 0,
@@ -248,6 +269,7 @@ export class TaskRepository {
           eq(tasks.status, "COMPLETED"),
           gte(tasks.completedAt, from),
           lt(tasks.completedAt, to),
+          sql`NOT EXISTS (SELECT 1 FROM tasks child WHERE child.parent_id=${tasks.id} AND child.status!='CANCELLED')`,
         ),
       )
       .all();
@@ -263,6 +285,7 @@ export class TaskRepository {
           eq(tasks.status, "COMPLETED"),
           gte(tasks.completedAt, from),
           lt(tasks.completedAt, to),
+          sql`NOT EXISTS (SELECT 1 FROM tasks child WHERE child.parent_id=${tasks.id} AND child.status!='CANCELLED')`,
         ),
       )
       .all();

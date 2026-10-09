@@ -1,5 +1,6 @@
 export type FocusMode = "stopwatch" | "countdown" | "pomodoro";
 export interface FocusRecord {
+  intention?: string;
   id: number; taskId: number | null; taskTitle: string; startedAt: number; endedAt: number | null;
   actualSeconds: number; status: "running" | "paused" | "recovery" | "finished";
   runningSince: number | null; pausedAt: number | null; goalSeconds: number | null;
@@ -7,6 +8,7 @@ export interface FocusRecord {
   source: "timer" | "manual" | "legacy"; checkpointAt: number; revision: number;
 }
 export interface FocusRequest {
+  intention?: string;
   action: "read" | "start" | "pause" | "resume" | "finish" | "switch" | "recover" | "interrupt" | "heartbeat" | "list" | "manual" | "edit" | "delete";
   operationId?: string; sessionId?: number; expectedVersion?: number; taskId?: number | null;
   goalSeconds?: number | null; mode?: FocusMode; note?: string; nextAction?: string;

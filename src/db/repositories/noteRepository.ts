@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, like } from "drizzle-orm";
 import type { Db } from "../db";
-import { notes } from "../schema";
+import { notes, tasks } from "../schema";
+import { inboxLinks, taskPlanningRanges } from "../ganttSchema";
 
 export type Note = typeof notes.$inferSelect;
 
@@ -19,6 +20,22 @@ export type UpdateNoteInput = Partial<CreateNoteInput> & {
 
 export class NoteRepository {
   constructor(private readonly db: Db) {}
+  async sourceLink(id:number) { return (await this.db.select().from(inboxLinks).where(eq(inboxLinks.noteId,id)).get()) ?? null; }
+  async restoreSourceLink(link: typeof inboxLinks.$inferSelect | null) { if (link) await this.db.insert(inboxLinks).values(link).onConflictDoNothing().run(); }
+  async conversionSnapshot(id:number) {
+    const link=await this.sourceLink(id);
+    const task=link?.taskId == null ? null : (await this.db.select().from(tasks).where(eq(tasks.id,link.taskId)).get()) ?? null;
+    const range=task ? (await this.db.select().from(taskPlanningRanges).where(eq(taskPlanningRanges.taskId,task.id)).get()) ?? null : null;
+    return { link,task,range };
+  }
+  async restoreConversion(snapshot: Awaited<ReturnType<NoteRepository["conversionSnapshot"]>>) {
+    if (!snapshot.task || !snapshot.link) { await this.restoreSourceLink(snapshot.link); return; }
+    await this.db.insert(tasks).values({ ...snapshot.task,sourceNoteId:snapshot.link.noteId }).run();
+    try {
+      if (snapshot.range) await this.db.insert(taskPlanningRanges).values(snapshot.range).run();
+      await this.db.update(inboxLinks).set(snapshot.link).where(eq(inboxLinks.noteId,snapshot.link.noteId)).run();
+    } catch (error) { await this.update(snapshot.link.noteId,{ status:"active" }); throw error; }
+  }
 
   async create(input: CreateNoteInput): Promise<Note> {
     const now = Date.now();

@@ -11,6 +11,7 @@ export interface DialogProps {
   footer?: ReactNode;
   /** 点击遮罩是否关闭（默认 true）。 */
   closeOnBackdrop?: boolean;
+  wide?: boolean;
 }
 
 /**
@@ -25,6 +26,7 @@ export function Dialog({
   children,
   footer,
   closeOnBackdrop = true,
+  wide = false,
 }: DialogProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
@@ -95,7 +97,7 @@ export function Dialog({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="mx-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-md flex-col rounded-[var(--radius-floating)] border border-border-subtle bg-bg-elevated p-6 shadow-popover outline-none"
+        className={`mx-auto flex max-h-[calc(100dvh-2rem)] w-full ${wide ? "max-w-5xl" : "max-w-md"} flex-col rounded-[var(--radius-floating)] border border-border-subtle bg-bg-elevated p-6 shadow-popover outline-none`}
       >
         <div className="mb-4 flex shrink-0 items-center justify-between">
           <h2 id={titleId} className="text-lg font-semibold text-text-primary">{title}</h2>

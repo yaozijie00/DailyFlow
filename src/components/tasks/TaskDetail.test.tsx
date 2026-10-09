@@ -1,173 +1,24 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { afterEach,beforeEach,expect,it,vi } from "vitest";
+import { cleanup,fireEvent,render,screen,waitFor } from "@testing-library/react";
 import TaskDetail from "./TaskDetail";
 import type { Task } from "../../db/repositories/taskRepository";
-
+const mocks=vi.hoisted(() => ({ tasks:[] as Task[], selectedTaskId:null as number|null, getTask:vi.fn(), getChildren:vi.fn(), updateTask:vi.fn(), load:vi.fn(), completeTask:vi.fn(),cancelTask:vi.fn(),deleteTask:vi.fn(),openEdit:vi.fn(),openTaskDetail:vi.fn(),toggleComplete:vi.fn() }));
+vi.mock("../../stores/taskStore",() => ({ useTaskStore:Object.assign((select:(s:unknown)=>unknown) => select(mocks),{ getState:()=>mocks }),taskService:mocks }));
+vi.mock("../../stores/goalStore",()=>({ useGoalStore:(select:(s:unknown)=>unknown)=>select({ goals:[] }) }));
+vi.mock("../../stores/projectStore",()=>({ useProjectStore:(select:(s:unknown)=>unknown)=>select({ projects:[] }) }));
+vi.mock("../../hooks/useTaskFocusStats",()=>({ useTaskFocusStats:()=>({ totalSeconds:900,count:2,completedCount:1 }) }));
+vi.mock("../../extensions/host",()=>({ useEnabledTaskActions:()=>[],ExtensionErrorBoundary:()=>null }));
+vi.mock("../../features/focus/FocusController",()=>({ StartFocusButton:()=> <button>开始专注</button> }));
+vi.mock("./TaskPlanningRange",()=>({ default:()=>null }));
+let nextId=100;
+function task(id:number,title="任务"):Task { return { id,title,status:"TODO",categoryId:null,estimatedDuration:1800,plannedStart:null,plannedEnd:null,actualDuration:0,scheduledDate:"",createdAt:1,updatedAt:1,completedAt:null,notes:"完成标准",sortOrder:0,goalId:null,projectId:null,parentId:null,courseId:null,priority:"medium",repeatRule:"" }; }
+beforeEach(()=>{ vi.clearAllMocks(); mocks.tasks=[task(nextId++)]; mocks.selectedTaskId=mocks.tasks[0].id; Object.assign(mocks,{ categories:[] }); mocks.getChildren.mockResolvedValue([]); mocks.load.mockResolvedValue(undefined); mocks.updateTask.mockImplementation(async (id,input) => ({ ...mocks.tasks.find((t)=>t.id===id),...input,updatedAt:2 })); });
 afterEach(cleanup);
-
-it("opens a searched task outside today's list without rescheduling it", async () => {
-  mockState.tasks = [];
-  mockState.selectedTaskId = 777;
-  mockState.updateTask.mockClear();
-  focusStatsMock.getTask.mockResolvedValueOnce(makeTask({ id: 777, title: "未来事项", scheduledDate: "" }));
-  focusStatsMock.getTaskFocusStats.mockResolvedValue({ totalSeconds: 0, count: 0, completedCount: 0 });
-  render(<TaskDetail />);
-  expect(await screen.findByText("未来事项")).toBeTruthy();
-  expect(focusStatsMock.getTask).toHaveBeenCalledWith(777);
-  expect(mockState.updateTask).not.toHaveBeenCalled();
-});
-
-const mockState = vi.hoisted(() => ({
-  selectedTaskId: null as number | null,
-  tasks: [] as Task[],
-  categories: [] as { id: number; name: string; sortOrder: number; color: string | null; createdAt: number }[],
-  goals: [] as { id: number; title: string }[],
-  completeTask: vi.fn(),
-  cancelTask: vi.fn(),
-  deleteTask: vi.fn(),
-  updateTask: vi.fn(),
-  selectTask: vi.fn(),
-  openTaskDetail: vi.fn(),
-  openEdit: vi.fn(),
-}));
-
-const focusStatsMock = vi.hoisted(() => ({
-  getTaskFocusStats: vi.fn(),
-  getTask: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock("../../stores/taskStore", () => ({
-  useTaskStore: (selector: (s: unknown) => unknown) => selector(mockState),
-  taskService: focusStatsMock,
-}));
-vi.mock("../../stores/goalStore", () => ({
-  useGoalStore: (selector: (s: unknown) => unknown) => selector(mockState),
-}));
-vi.mock("../../stores/projectStore", () => ({
-  useProjectStore: (selector: (s: unknown) => unknown) =>
-    selector({ projects: [] as { id: number; title: string }[] }),
-}));
-
-function makeTask(overrides: Partial<Task> = {}): Task {
-  return {
-    id: 1,
-    title: "写代码",
-    categoryId: null,
-    status: "TODO",
-    estimatedDuration: 1800,
-    plannedStart: new Date(2026, 7, 27, 9, 0).getTime(),
-    plannedEnd: new Date(2026, 7, 27, 10, 0).getTime(),
-    actualDuration: 600,
-    scheduledDate: "2026-08-27",
-    createdAt: new Date(2026, 7, 27, 9, 30).getTime(),
-    updatedAt: new Date(2026, 7, 27, 9, 30).getTime(),
-    completedAt: null,
-    notes: null,
-    sortOrder: 0,
-    goalId: null,
-    repeatRule: "",
-    projectId: null,
-    parentId: null,
-    courseId: null,
-    priority: "medium",
-    ...overrides,
-  };
-}
-
-describe("TaskDetail（右侧详情面板）", () => {
-  beforeEach(() => {
-    mockState.selectedTaskId = null;
-    mockState.tasks = [];
-    mockState.goals = [];
-    focusStatsMock.getTaskFocusStats.mockReset();
-    focusStatsMock.getTaskFocusStats.mockResolvedValue({ totalSeconds: 900, count: 2, completedCount: 1 });
-  });
-
-  it("无选中任务时显示占位提示", () => {
-    render(<TaskDetail />);
-    expect(screen.getByText(/点击左侧任务或时间轴任务块查看详情/)).toBeTruthy();
-  });
-
-  it("选中任务：显示标题与各元数据字段", async () => {
-    mockState.selectedTaskId = 1;
-    mockState.tasks = [makeTask()];
-    render(<TaskDetail />);
-    expect(screen.getByText("写代码")).toBeTruthy();
-    expect(screen.getByText(/09:00 - 10:00/)).toBeTruthy(); // 计划时间
-    expect(screen.getByText(/30分钟/)).toBeTruthy(); // 预计
-    expect(screen.getByText(/10分钟/)).toBeTruthy(); // 实际
-    expect(screen.getByText(/待办/)).toBeTruthy(); // 状态
-    expect(screen.getAllByText(/2026-08-27/).length).toBeGreaterThan(0); // 创建时间/当前日期
-    await screen.findByText(/15分钟/); // Focus 投入（异步）
-    expect(await screen.findByText(/2 次（完成 1 个番茄）/)).toBeTruthy();
-  });
-
-  it("延期快捷：「明天」改 scheduledDate 并清空选中", () => {
-    mockState.selectedTaskId = 1;
-    mockState.tasks = [makeTask()];
-    mockState.updateTask.mockResolvedValue(undefined);
-    render(<TaskDetail />);
-    fireEvent.click(screen.getByText(/明天/));
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const ymd = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, "0")}-${String(tomorrow.getDate()).padStart(2, "0")}`;
-    expect(mockState.updateTask).toHaveBeenCalledWith(1, { scheduledDate: ymd });
-    expect(mockState.selectTask).toHaveBeenCalledWith(null);
-  });
-
-  it("切换选中任务：详情更新为另一个任务", () => {
-    mockState.selectedTaskId = 2;
-    mockState.tasks = [makeTask({ id: 1, title: "任务一" }), makeTask({ id: 2, title: "任务二" })];
-    render(<TaskDetail />);
-    expect(screen.getByText("任务二")).toBeTruthy();
-    fireEvent.click(screen.getByText("完成任务"));
-    expect(mockState.completeTask).toHaveBeenCalledWith(2);
-  });
-
-  it("显示关联目标名称", () => {
-    mockState.selectedTaskId = 1;
-    mockState.tasks = [makeTask({ goalId: 7 })];
-    mockState.goals = [{ id: 7, title: "三个月内重构" }];
-    render(<TaskDetail />);
-    expect(screen.getByText("三个月内重构")).toBeTruthy();
-  });
-
-  it("操作按钮：取消 / 编辑 / 删除", () => {
-    mockState.selectedTaskId = 1;
-    mockState.tasks = [makeTask()];
-    render(<TaskDetail />);
-    fireEvent.click(screen.getByText("取消任务"));
-    expect(mockState.cancelTask).toHaveBeenCalledWith(1);
-    fireEvent.click(screen.getByText("编辑"));
-    expect(mockState.openEdit).toHaveBeenCalledWith(1);
-    fireEvent.click(screen.getByText("删除"));
-    expect(mockState.deleteTask).toHaveBeenCalledWith(1);
-  });
-
-  it("已完成任务：不显示完成/取消按钮，显示完成时间", () => {
-    mockState.selectedTaskId = 1;
-    mockState.tasks = [
-      makeTask({ status: "COMPLETED", completedAt: new Date(2026, 7, 27, 12, 0).getTime() }),
-    ];
-    render(<TaskDetail />);
-    expect(screen.queryByText("完成任务")).toBeNull();
-    expect(screen.queryByText("取消任务")).toBeNull();
-    expect(screen.getByText(/完成时间/)).toBeTruthy();
-  });
-});
-
-it('audit: switching tasks must not save the previous task draft into the next task', async () => {
-  mockState.updateTask.mockClear();
-  focusStatsMock.getTaskFocusStats.mockResolvedValue({totalSeconds:0,count:0,completedCount:0});
-  mockState.tasks=[makeTask({id:101,title:'Audit A',notes:'A original'}),makeTask({id:102,title:'Audit B',notes:'B original'})];
-  mockState.selectedTaskId=101;
-  const view=render(<TaskDetail/>);
-  fireEvent.click(screen.getAllByRole('button',{name:'编辑'})[0]);
-  fireEvent.change(screen.getByPlaceholderText('记录补充信息…'),{target:{value:'A draft'}});
-  mockState.selectedTaskId=102;
-  view.rerender(<TaskDetail/>);
-  const save=screen.queryByRole('button',{name:'保存'});
-  if(save) fireEvent.click(save);
-  expect(mockState.updateTask).not.toHaveBeenCalledWith(102,{notes:'A draft'});
-});
+it("loads an unplanned task by ID without changing its date",async()=>{ const row=task(777,"未来事项"); mocks.tasks=[]; mocks.selectedTaskId=777; mocks.getTask.mockResolvedValue(row); render(<TaskDetail/>); expect(await screen.findByText("未来事项")).toBeTruthy(); expect(mocks.updateTask).not.toHaveBeenCalled(); });
+it("shows a useful empty state",()=>{ mocks.selectedTaskId=null; render(<TaskDetail/>); expect(screen.getByText(/点击左侧任务/)).toBeTruthy(); });
+it("saves title, notes and date explicitly with the observed version",async()=>{ render(<TaskDetail/>); fireEvent.click(screen.getByRole("button",{ name:"编辑详情" })); fireEvent.change(screen.getByLabelText("任务名称"),{ target:{ value:"新标题" } }); fireEvent.change(screen.getByLabelText("说明与完成标准"),{ target:{ value:"第一稿" } }); fireEvent.change(screen.getByLabelText("日安排"),{ target:{ value:"2026-10-10" } }); expect(mocks.updateTask).not.toHaveBeenCalled(); fireEvent.click(screen.getByRole("button",{ name:"保存详情" })); await waitFor(()=>expect(mocks.updateTask).toHaveBeenCalledWith(mocks.selectedTaskId,expect.objectContaining({ title:"新标题",notes:"第一稿",scheduledDate:"2026-10-10",plannedStart:null,plannedEnd:null }),1)); });
+it("keeps a failed save as a draft",async()=>{ mocks.updateTask.mockRejectedValue(new Error("版本冲突，草稿保留")); render(<TaskDetail/>); fireEvent.click(screen.getByRole("button",{ name:"编辑详情" })); fireEvent.change(screen.getByLabelText("说明与完成标准"),{ target:{ value:"保留输入" } }); fireEvent.click(screen.getByRole("button",{ name:"保存详情" })); await screen.findByText(/版本冲突/); expect((screen.getByLabelText("说明与完成标准") as HTMLTextAreaElement).value).toBe("保留输入"); });
+it("keeps task drafts isolated when selection changes",()=>{ const first=mocks.tasks[0],second=task(nextId++,"第二项"); mocks.tasks.push(second); const view=render(<TaskDetail/>); fireEvent.click(screen.getByRole("button",{ name:"编辑详情" })); fireEvent.change(screen.getByLabelText("说明与完成标准"),{ target:{ value:"第一项草稿" } }); mocks.selectedTaskId=second.id; view.rerender(<TaskDetail/>); expect(screen.getByText("完成标准")).toBeTruthy(); mocks.selectedTaskId=first.id; view.rerender(<TaskDetail/>); expect((screen.getByLabelText("说明与完成标准") as HTMLTextAreaElement).value).toBe("第一项草稿"); expect(mocks.updateTask).not.toHaveBeenCalled(); });
+it("loads children outside today's list and directs focus to execution tasks",async()=>{ mocks.getChildren.mockResolvedValue([{ ...task(nextId++,"跨日子任务"),parentId:mocks.selectedTaskId }]); render(<TaskDetail/>); await screen.findByText("跨日子任务"); expect(screen.queryByRole("button",{ name:"开始专注" })).toBeNull(); fireEvent.click(screen.getByRole("button",{ name:"跨日子任务" })); expect(mocks.openTaskDetail).toHaveBeenCalled(); });
+it("expands the same editor while preserving the draft",()=>{ render(<TaskDetail/>); fireEvent.click(screen.getByRole("button",{ name:"编辑详情" })); fireEvent.change(screen.getByLabelText("说明与完成标准"),{ target:{ value:"展开后保留" } }); fireEvent.click(screen.getByRole("button",{ name:"展开详情" })); expect(screen.getByRole("dialog")).toBeTruthy(); expect((screen.getByLabelText("说明与完成标准") as HTMLTextAreaElement).value).toBe("展开后保留"); });

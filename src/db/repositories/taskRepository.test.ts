@@ -79,17 +79,23 @@ describe("TaskRepository", () => {
   });
 
   describe("countTodayStats", () => {
-    it("统计今日任务总数与完成数（含已取消，与列表口径一致）", async () => {
+    it("统计今日执行任务总数与完成数，排除取消项", async () => {
       await tasks.create({ title: "A", scheduledDate: "2026-08-27" });
       await tasks.create({ title: "B", scheduledDate: "2026-08-27", status: "COMPLETED" });
       await tasks.create({ title: "C", scheduledDate: "2026-08-27", status: "CANCELLED" });
       await tasks.create({ title: "D", scheduledDate: "2026-08-28" });
 
       const stats = await tasks.countTodayStats("2026-08-27");
-      expect(stats.total).toBe(3); // A、B、C
+      expect(stats.total).toBe(2); // A、B
       expect(stats.completed).toBe(1); // B
     });
 
+    it("跨日子任务不使父任务重复计入今日进度", async () => {
+      const parent=await tasks.create({ title:"汇总",scheduledDate:"2026-08-27" });
+      await tasks.create({ title:"执行",scheduledDate:"2026-08-28",parentId:parent.id });
+      expect(await tasks.countTodayStats("2026-08-27")).toEqual({ total:0,completed:0 });
+      expect(await tasks.countTodayStats("2026-08-28")).toEqual({ total:1,completed:0 });
+    });
     it("无任务时返回 0", async () => {
       const stats = await tasks.countTodayStats("2026-08-27");
       expect(stats).toEqual({ total: 0, completed: 0 });

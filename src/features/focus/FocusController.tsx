@@ -100,7 +100,7 @@ export function FocusFinishPanel() {
     if (event.key === "Escape") { event.stopPropagation(); void useFocusStore.getState().closeFinish(); }
   }}><form onSubmit={(event) => { event.preventDefault(); void useFocusStore.getState().perform({ action: "finish", note, nextAction: next, completeTask: complete }).then((ok) => { if (ok) { void useTaskStore.getState().load(); void evaluateAndNotify(); } }); }}>
     <h2>保存这次投入</h2><p>{active.taskTitle} · {focusTime(active.actualSeconds)}</p>
-    <button className="focus-primary" disabled={busy}>{busy ? "正在保存…" : "完成 Session"}</button>
+    <button className="focus-primary" disabled={busy}>{busy ? "正在保存…" : "保存投入"}</button>
     {active.taskId != null && <label className="focus-check"><input type="checkbox" checked={complete} onChange={(e) => setComplete(e.target.checked)} />同时完成任务</label>}
     <label>本次备注（可选）<textarea rows={2} value={note} onChange={(e) => useFocusStore.getState().setDraft("noteDraft", e.target.value)} /></label>
     <label>下一步（可选）<input value={next} onChange={(e) => useFocusStore.getState().setDraft("nextDraft", e.target.value)} /></label>

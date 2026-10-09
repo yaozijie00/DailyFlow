@@ -111,7 +111,7 @@ describe("GlobalFocusBar", () => {
     expect(useFocusStore.getState().active?.status).toBe("paused");
     expect((screen.getByLabelText("同时完成任务") as HTMLInputElement).checked).toBe(false);
     expect(useAppStore.getState().currentPage).toBe("today");
-    fireEvent.click(screen.getByRole("button", { name: "完成 Session" }));
+    fireEvent.click(screen.getByRole("button", { name: "保存投入" }));
     await waitFor(() => expect(useFocusStore.getState().active).toBeNull());
     expect(invokeMock).toHaveBeenLastCalledWith("focus_execute", { request: expect.objectContaining({ action: "finish", completeTask: false }) });
     expect(screen.queryByRole("dialog")).toBeNull();
@@ -123,7 +123,7 @@ describe("GlobalFocusBar", () => {
     render(<GlobalFocusBar />);
     fireEvent.change(screen.getByLabelText("本次备注（可选）"), { target: { value: "完成草稿" } });
     fireEvent.change(screen.getByLabelText("下一步（可选）"), { target: { value: "补充测试" } });
-    fireEvent.click(screen.getByRole("button", { name: "完成 Session" }));
+    fireEvent.click(screen.getByRole("button", { name: "保存投入" }));
     await screen.findByRole("alert");
     expect((screen.getByLabelText("本次备注（可选）") as HTMLTextAreaElement).value).toBe("完成草稿");
     expect((screen.getByLabelText("下一步（可选）") as HTMLInputElement).value).toBe("补充测试");

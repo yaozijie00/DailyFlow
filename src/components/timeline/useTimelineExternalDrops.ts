@@ -1,3 +1,4 @@
+import { arrangeInbox } from "../../lib/arrangeInbox";
 import { useEffect, useState, type RefObject } from "react";
 import type { Task, UpdateTaskInput } from "../../db/repositories/taskRepository";
 import type { Note } from "../../db/repositories/noteRepository";
@@ -8,7 +9,7 @@ import {
   noteDropZoneAt,
 } from "../../lib/noteConvert";
 import { dragRangeToTimes, type TimelineConfig } from "../../lib/timeline";
-import { undoManager } from "../../lib/undoManager";
+
 
 const NOTE_DEFAULT_MINUTES = 60;
 
@@ -41,8 +42,6 @@ export function useTimelineExternalDrops({
   config,
   pxPerMinute,
   updateTask,
-  createTask,
-  updateNote,
   endTaskDrag,
 }: UseTimelineExternalDropsOptions) {
   const [dropPreview, setDropPreview] = useState<ExternalDropPreview | null>(null);
@@ -140,19 +139,16 @@ export function useTimelineExternalDrops({
       const y = clientY - area.getBoundingClientRect().top;
       const startMs = dragRangeToTimes(y, y, config, pxPerMinute).startMs;
       const endMs = startMs + NOTE_DEFAULT_MINUTES * 60_000;
-      void undoManager.withBatchAsync(() =>
-        convertNoteToTask(noteId, notes, createTask, updateNote, {
+      void arrangeInbox(noteId, {
           scheduledDate: selectedDate,
           plannedStart: startMs,
           plannedEnd: endMs,
-        }),
-      );
+        });
     };
     return () => {
       delete noteDropCallbacks.timeline;
     };
-  }, [notes, createTask, updateNote, selectedDate, config, pxPerMinute, taskAreaRef]);
+  }, [notes, selectedDate, config, pxPerMinute, taskAreaRef]);
 
   return { dropPreview, notePreview };
 }
-

@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { expect, it } from "vitest";
 import { createTestDb } from "./test-helpers";
 import { runMigrations } from "./migrate";
@@ -14,7 +15,8 @@ it("现有用户升级后保留任务和投入，历史推断有标记，重复�
   try {
     const goals = new GoalRepository(data.db), tasks = new TaskRepository(data.db);
     const plan = await goals.create({ title: "升级前学习计划", weeklyTargetMinutes: 360 });
-    const task = await tasks.create({ title: "已有练习", scheduledDate: "2026-09-16", goalId: plan.id });
+    const [[id]] = await data.db.values(sql`INSERT INTO tasks(title,scheduled_date,goal_id,created_at,updated_at) VALUES ('已有练习','2026-09-16',${plan.id},1,1) RETURNING id`);
+    const task = { id:Number(id) };
     await new FocusSessionRepository(data.db).create({ taskId: task.id, plannedDuration: 1800, actualDuration: 1800, startedAt: new Date(2026, 8, 16).getTime(), endedAt: new Date(2026, 8, 16, 0, 30).getTime() });
     await runMigrations(data.db);
     const planning = new PlanningRepository(data.db);

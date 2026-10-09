@@ -1,0 +1,1 @@
+ALTER TABLE focus_details ADD COLUMN intention TEXT NOT NULL DEFAULT '';

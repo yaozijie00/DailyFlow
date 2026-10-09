@@ -13,6 +13,7 @@ import { normalizeLongTermPriority, progressFromEstimatedMinutes } from "../lib/
 import { addDays, weekOf } from "../lib/planningDates";
 import { TaskSchedulingService, isLocalDate } from "./taskSchedulingService";
 import { planningHealth, readPlanningActivity, type PlanningHealthReason } from "./planningHealth";
+import { executionLeaves, taskOwner } from "../lib/taskExecution";
 
 export interface PlanningItem {
   key: string; id: number; kind: "plan" | "project"; title: string; description: string;
@@ -48,15 +49,13 @@ export class PlanningWorkspaceService {
     const commitments = new Map(weeks.map((row) => [row.itemKey, row]));
     const taskGroups = new Map<string, Task[]>();
     for (const task of taskRows) {
-      const key = task.projectId != null ? `project:${task.projectId}` : `plan:${task.goalId}`;
+      const key = taskOwner(task)!;
       const group = taskGroups.get(key) ?? []; group.push(task); taskGroups.set(key, group);
     }
     const createItem = (kind: "plan" | "project", source: { id: number; title: string; sortOrder: number; createdAt: number }, plan: GoalWithProgress | null): PlanningItem => {
       const key = `${kind}:${source.id}`, meta = metadata.get(key) ?? null;
       const allTasks = taskGroups.get(key) ?? [];
-      const active = allTasks.filter((task) => task.status !== "CANCELLED");
-      const parents = new Set(active.flatMap((task) => task.parentId == null ? [] : [task.parentId]));
-      const leaves = active.filter((task) => !parents.has(task.id));
+      const leaves = executionLeaves(allTasks);
       const pending = leaves.filter((task) => task.status !== "COMPLETED");
       const text = plan?.nextAction?.trim() || null;
       const nextTask = pending.find((task) => task.id === meta?.nextTaskId)

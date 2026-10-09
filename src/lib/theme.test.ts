@@ -5,8 +5,19 @@ import {
   parseThemeMode,
   THEME_MODES,
   applyTheme,
+  applyAppearance,
+  APPEARANCE_STYLES,
   type ThemeMode,
 } from "./theme";
+it("keeps appearance independent of theme and restores preference after glass", () => {
+  for (const style of APPEARANCE_STYLES) {
+    applyTheme("dark",false); applyAppearance(style,"dark");
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
+    expect(document.documentElement.dataset.appearance).toBe(style);
+    applyAppearance(style,"glass"); expect(document.documentElement.dataset.appearance).toBe("classic");
+    applyAppearance(style,"light"); expect(document.documentElement.dataset.appearance).toBe(style);
+  }
+});
 
 describe("parseThemeMode", () => {
   it("合法值原样返回", () => {

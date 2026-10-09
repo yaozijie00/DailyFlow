@@ -59,6 +59,7 @@ export const tasks = sqliteTable("tasks", {
   priority: text("priority").notNull().default("medium"),
   /** 长期计划阶段（0025；删除阶段时置空） */
   phaseId: integer("phase_id").references(() => longTermPhases.id, { onDelete: "set null" }),
+  sourceNoteId: integer("source_note_id"),
 });
 
 export const focusSessions = sqliteTable("focus_sessions", {

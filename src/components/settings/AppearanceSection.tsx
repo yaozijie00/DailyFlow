@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useLayoutModeStore } from "../../lib/layoutMode";
 import type { LayoutMode } from "../../services/settingsService";
-import { THEME_MODES, type ThemeMode } from "../../lib/theme";
+import { APPEARANCE_STYLES, THEME_MODES, type ThemeMode } from "../../lib/theme";
 
 const HOURS = Array.from({ length: 25 }, (_, i) => i);
 const SNAP_OPTIONS = [5, 10, 15, 30, 60];
@@ -65,6 +65,17 @@ export default function AppearanceSection() {
 
   return (
     <div className="glass-surface space-y-4 rounded-md border border-border-subtle p-5">
+      <fieldset className="space-y-3">
+        <legend className="text-sm font-medium text-text-primary">外观风格</legend>
+        <p className="text-sm text-text-muted">风格改变色彩与表面，保留操作位置。亮暗与布局密度可分别设置。</p>
+        <div className="grid grid-cols-2 gap-2">
+          {APPEARANCE_STYLES.map((style) => <label key={style} className={`flex min-h-14 cursor-pointer items-center gap-3 rounded-lg border p-3 ${settings.appearanceStyle === style ? "border-accent bg-accent-soft" : "border-border-strong"}`}>
+            <input type="radio" name="appearance-style" checked={(settings.appearanceStyle ?? "classic") === style} onChange={() => void update({ appearanceStyle: style })} />
+            <span>{({ classic: "经典靛蓝", paper: "纸感", forest: "森林", graphite: "石墨" })[style]}</span>
+          </label>)}
+        </div>
+        {settings.themeMode === "glass" && <p className="text-sm text-text-muted">毛玻璃使用经典材质；切换到浅色、深色或跟随系统时恢复所选风格。</p>}
+      </fieldset>
       {/* 界面主题 */}
       <div>
         <div className="text-sm text-text-secondary">界面主题</div>

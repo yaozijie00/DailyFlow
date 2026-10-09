@@ -1,20 +1,20 @@
+import { arrangeInbox } from "../../lib/arrangeInbox";
 import { StartFocusButton } from "../../features/focus/FocusController";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Check, Circle, GripVertical, StickyNote } from "lucide-react";
 import { useTaskStore } from "../../stores/taskStore";
-import { useNoteStore } from "../../stores/noteStore";
 import { useSettingsStore } from "../../stores/settingsStore";
 import { useWindowDrag } from "../../hooks/useWindowDrag";
 import { useTaskToNoteDrag } from "../../hooks/useTaskToNoteDrag";
 import type { Task } from "../../db/repositories/taskRepository";
 import {
-  convertNoteToTask,
+
   noteDragSession,
   noteDropCallbacks,
   noteDropZoneAt,
 } from "../../lib/noteConvert";
-import { undoManager } from "../../lib/undoManager";
+
 import { formatDuration } from "../../lib/format";
 import { useLayoutModeStore } from "../../lib/layoutMode";
 import { NO_CATEGORY_COLOR } from "../../lib/categoryColors";
@@ -37,9 +37,6 @@ export default function TaskList() {
   const toggleComplete = useTaskStore((s) => s.toggleComplete);
   const openTaskDetail = useTaskStore((s) => s.openTaskDetail);
   const reorderTasks = useTaskStore((s) => s.reorderTasks);
-  const createTask = useTaskStore((s) => s.createTask);
-  const notes = useNoteStore((s) => s.notes);
-  const updateNote = useNoteStore((s) => s.update);
   const startTaskDrag = useTaskStore((s) => s.startTaskDrag);
   const endTaskDrag = useTaskStore((s) => s.endTaskDrag);
   const { start: startWindowDrag } = useWindowDrag();
@@ -122,12 +119,12 @@ export default function TaskList() {
   /** 注册投放回调：便签松手在列表上 → 转今日任务（无时间块），作为一次 Undo 复合操作。 */
   useEffect(() => {
     noteDropCallbacks.tasklist = (noteId) => {
-      void undoManager.withBatchAsync(() => convertNoteToTask(noteId, notes, createTask, updateNote));
+      void arrangeInbox(noteId, { scheduledDate: useTaskStore.getState().selectedDate });
     };
     return () => {
       delete noteDropCallbacks.tasklist;
     };
-  }, [notes, createTask, updateNote]);
+  }, []);
 
   const filteredTasks = useMemo(() => {
     let list = tasks;

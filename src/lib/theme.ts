@@ -3,6 +3,16 @@ export type ThemeMode = "system" | "light" | "dark" | "glass";
 
 export const THEME_MODES: ThemeMode[] = ["system", "light", "dark", "glass"];
 
+export const APPEARANCE_STYLES = ["classic", "paper", "forest", "graphite"] as const;
+export type AppearanceStyle = typeof APPEARANCE_STYLES[number];
+export function isAppearanceStyle(value: unknown): value is AppearanceStyle {
+  return typeof value === "string" && (APPEARANCE_STYLES as readonly string[]).includes(value);
+}
+export function applyAppearance(style: AppearanceStyle, mode: ThemeMode): void {
+  // Keep the existing glass material intact; the chosen style is retained for other modes.
+  document.documentElement.dataset.appearance = mode === "glass" ? "classic" : style;
+}
+
 export function isThemeMode(v: unknown): v is ThemeMode {
   return typeof v === "string" && (THEME_MODES as string[]).includes(v);
 }

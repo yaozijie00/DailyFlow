@@ -16,6 +16,9 @@ vi.mock("../services/achievementRuntime", () => ({ evaluateAndNotify: vi.fn() })
 vi.mock("../services/notificationService", () => ({
   scheduleFocusEndNotification: vi.fn(), cancelScheduledFocusEndNotification: vi.fn(),
 }));
+vi.mock("../stores/settingsStore", () => ({
+  useSettingsStore: { getState: () => ({ load: vi.fn().mockResolvedValue(undefined) }) },
+}));
 
 // 任务数据层：直接 mock repository 查询结果，避免真实 SQLite
 const taskRows = vi.hoisted(() => ({
@@ -35,6 +38,7 @@ vi.mock("../db/db", () => ({
 vi.mock("../db/repositories/taskRepository", () => ({
   TaskRepository: class {
     findByDate = vi.fn().mockImplementation(async () => taskRows.rows);
+    countTodayStats = vi.fn().mockImplementation(async () => ({ total:taskRows.rows.filter((t) => t.status!=="CANCELLED").length,completed:taskRows.rows.filter((t) => t.status==="COMPLETED").length }));
     findById = vi.fn().mockResolvedValue(null);
     create = vi.fn().mockImplementation(async (input: { title: string }) => ({
       id: 999,

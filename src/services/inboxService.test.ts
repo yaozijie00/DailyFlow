@@ -1,0 +1,27 @@
+import { afterEach,beforeEach,expect,it } from "vitest";
+import { eq,sql } from "drizzle-orm";
+import { createTestDb } from "../db/test-helpers";
+import { NoteRepository } from "../db/repositories/noteRepository";
+import { TaskRepository } from "../db/repositories/taskRepository";
+import { ProjectRepository } from "../db/repositories/projectRepository";
+import { InboxService } from "./inboxService";
+import { NoteService } from "./noteService";
+import { GanttService } from "./ganttService";
+import { undoManager } from "../lib/undoManager";
+import { UndoManager } from "../lib/undoManager";
+import { tasks } from "../db/schema";
+let data:Awaited<ReturnType<typeof createTestDb>>;
+beforeEach(async()=>{ data=await createTestDb(); });afterEach(()=>data.close());
+it("claims each source once even with concurrent service instances",async()=>{ const note=await new NoteRepository(data.db).create({ title:"完整原文\n第二行" }); const first=new InboxService(data.db,new UndoManager()),second=new InboxService(data.db,new UndoManager()); const results=await Promise.allSettled([first.arrange(note.id,{ scheduledDate:"" }),second.arrange(note.id,{ scheduledDate:"" })]); expect(results.filter((r)=>r.status==="fulfilled")).toHaveLength(1); expect(await new TaskRepository(data.db).findAll()).toMatchObject([{ title:note.title,scheduledDate:"" }]); expect((await new NoteRepository(data.db).findById(note.id))?.status).toBe("arranged"); expect(await first.links()).toHaveLength(1); });
+it("undo/redo restores the original source and uses the same task ID",async()=>{ const repo=new NoteRepository(data.db),note=await repo.create({ title:"整理" }),history=new UndoManager(),service=new InboxService(data.db,history); const project=await new ProjectRepository(data.db).create({ title:"项目" }); const task=await service.arrange(note.id,{ itemKey:`project:${project.id}`,scheduledDate:"2026-10-10" }); await history.undo(); expect(await new TaskRepository(data.db).findAll()).toEqual([]); expect((await repo.findById(note.id))?.status).toBe("active"); expect(await service.links()).toEqual([]); await history.redo(); expect(await new TaskRepository(data.db).findById(task.id)).toMatchObject({ projectId:project.id,scheduledDate:"2026-10-10" }); expect(await service.links()).toMatchObject([{ noteId:note.id,taskId:task.id }]); });
+it("rolls back the entire conversion when a link trigger fails",async()=>{ const repo=new NoteRepository(data.db),note=await repo.create({ title:"失败保持" }); await data.db.run(sql`CREATE TRIGGER fail_link BEFORE INSERT ON inbox_links BEGIN SELECT RAISE(ABORT,'disk simulation'); END`); const service=new InboxService(data.db,new UndoManager()); await expect(service.arrange(note.id)).rejects.toThrow(); expect(await new TaskRepository(data.db).findAll()).toEqual([]); expect((await repo.findById(note.id))?.status).toBe("active"); expect(await service.links()).toEqual([]); });
+it("reports partial batch results and keeps failed items intact",async()=>{ const repo=new NoteRepository(data.db),one=await repo.create({ title:"一" }),two=await repo.create({ title:"二",status:"saved" }),history=new UndoManager(),service=new InboxService(data.db,history); expect(await service.batch([one.id,two.id],{ scheduledDate:"" })).toMatchObject([{ id:one.id,ok:true },{ id:two.id,ok:false }]); expect(history.undoSize).toBe(1); await history.undo(); expect((await repo.findById(one.id))?.status).toBe("active"); expect((await repo.findById(two.id))?.status).toBe("saved"); });
+it("refuses to erase subsequent actual work when restoring a source",async()=>{ const repo=new NoteRepository(data.db),note=await repo.create({ title:"已有投入" }),history=new UndoManager(),service=new InboxService(data.db,history); const task=await service.arrange(note.id); await data.db.update(tasks).set({ actualDuration:60 }).where(eq(tasks.id,task.id)).run(); await expect(history.undo()).rejects.toThrow(); expect((await repo.findById(note.id))?.status).toBe("arranged"); expect(await service.links()).toHaveLength(1); expect(await new TaskRepository(data.db).findById(task.id)).toBeTruthy(); });
+it("restoring an arranged note removes its duplicate task and undo restores the ID, range and source link",async()=>{
+  undoManager.clear();const repo=new NoteRepository(data.db),note=await repo.create({ title:"恢复来源" }),service=new InboxService(data.db),task=await service.arrange(note.id),gantt=new GanttService(data.db);
+  await gantt.setRange(task.id,"2026-10-01","2026-10-03");
+  const noteService=new NoteService(repo);await noteService.update(note.id,{ status:"active" });
+  expect(await new TaskRepository(data.db).findById(task.id)).toBeNull();
+  await undoManager.undo();expect((await repo.findById(note.id))?.status).toBe("arranged");expect(await new TaskRepository(data.db).findById(task.id)).toBeTruthy();expect(await gantt.range(task.id)).toMatchObject({ endDay:"2026-10-03" });expect(await service.links()).toMatchObject([{ noteId:note.id,taskId:task.id }]);
+  await undoManager.redo();expect((await repo.findById(note.id))?.status).toBe("active");expect(await new TaskRepository(data.db).findById(task.id)).toBeNull();undoManager.clear();
+});

@@ -5,11 +5,11 @@ import type { FocusMode, FocusRecord, FocusRequest, FocusResponse } from "./type
 
 interface FocusState {
   active: FocusRecord | null; busy: boolean; error: string; focusVersion: number;
-  switchTaskId: number | null | undefined; switchMode: FocusMode; switchGoal: number | null;
+  switchTaskId: number | null | undefined; switchMode: FocusMode; switchGoal: number | null; switchIntention?: string;
   finishOpen: boolean; finishWasRunning: boolean; noteDraft: string; nextDraft: string;
   failedRequest: FocusRequest | null; lastFinished: FocusRecord | null;
   sync: () => Promise<void>; perform: (request: FocusRequest) => Promise<boolean>; retry: () => Promise<boolean>;
-  start: (taskId: number | null, mode?: FocusMode, goalSeconds?: number | null) => Promise<boolean>;
+  start: (taskId: number | null, mode?: FocusMode, goalSeconds?: number | null, intention?: string) => Promise<boolean>;
   confirmSwitch: () => Promise<boolean>; cancelSwitch: () => void;
   openFinish: () => Promise<void>; closeFinish: () => Promise<void>;
   setDraft: (field: "noteDraft" | "nextDraft", value: string) => void;
@@ -21,7 +21,7 @@ function applyActive(previous: FocusRecord | null, active: FocusRecord | null): 
     active,
     ...(previous?.id !== active?.id ? {
       finishOpen: false, finishWasRunning: false, noteDraft: "", nextDraft: "",
-      switchTaskId: undefined, switchMode: "stopwatch" as const, switchGoal: null,
+      switchTaskId: undefined, switchIntention: undefined, switchMode: "stopwatch" as const, switchGoal: null,
     } : {}),
   };
 }
@@ -64,15 +64,15 @@ export function createFocusStore(execute = executeFocus) {
       const request = get().failedRequest;
       return request ? get().perform(request) : false;
     },
-    start: async (taskId, mode = "stopwatch", goalSeconds = null) => {
+    start: async (taskId, mode = "stopwatch", goalSeconds = null, intention) => {
       if (get().active) {
         if (get().active?.taskId === taskId) return false;
-        set({ switchTaskId: taskId, switchMode: mode, switchGoal: goalSeconds }); return false;
+        set({ switchTaskId: taskId, switchMode: mode, switchGoal: goalSeconds, switchIntention: intention }); return false;
       }
-      return get().perform({ action: "start", taskId, mode, goalSeconds });
+      return get().perform({ action: "start", taskId, mode, goalSeconds, ...(intention ? { intention } : {}) });
     },
-    confirmSwitch: () => get().switchTaskId === undefined ? Promise.resolve(false) : get().perform({ action: "switch", taskId: get().switchTaskId, mode: get().switchMode, goalSeconds: get().switchGoal, note: get().noteDraft, nextAction: get().nextDraft }),
-    cancelSwitch: () => set({ switchTaskId: undefined }),
+    confirmSwitch: () => get().switchTaskId === undefined ? Promise.resolve(false) : get().perform({ action: "switch", taskId: get().switchTaskId, mode: get().switchMode, goalSeconds: get().switchGoal, intention: get().switchIntention, note: get().noteDraft, nextAction: get().nextDraft }),
+    cancelSwitch: () => set({ switchTaskId: undefined, switchIntention: undefined }),
     openFinish: async () => {
       const current = get().active;
       if (!current || current.status === "recovery" || get().busy || get().finishOpen) return;

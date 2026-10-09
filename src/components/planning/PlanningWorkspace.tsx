@@ -8,6 +8,7 @@ import { addDays, weekOf } from "../../lib/planningDates";
 import { PageHeader } from "../ui/PageHeader";
 import PlanningDetail from "./PlanningDetail";
 import PlanningReview from "./PlanningReview";
+import PlanningGantt from "./PlanningGantt";
 import { duration, Field, lifecycleLabels, Tabs, useAction } from "./planningUi";
 import "./planning.css";
 
@@ -21,7 +22,7 @@ export default function PlanningWorkspace({ service = planningWorkspaceService, 
   const capacity = useSettingsStore((s) => s.settings.longTermWeeklyCapacityMinutes);
   const updateSettings = useSettingsStore((s) => s.update);
   const goalVersion = useDataVersion("goal"), projectVersion = useDataVersion("project"), taskVersion = useDataVersion("task"), focusVersion = useDataVersion("focus");
-  const [tab, setTab] = useState<"工作台" | "全部事项" | "复盘">("工作台");
+  const [tab, setTab] = useState<"工作台" | "全部事项" | "甘特图" | "复盘">("工作台");
   const [week, setWeek] = useState(weekOf()), [items, setItems] = useState<PlanningItem[]>([]), [loading, setLoading] = useState(true), [loadError, setLoadError] = useState("");
   const [selected, setSelected] = useState<string | null>(null), [search, setSearch] = useState(""), [kind, setKind] = useState("all"), [state, setState] = useState("all");
   const [creating, setCreating] = useState(false), [title, setTitle] = useState(""), [newKind, setNewKind] = useState<"plan" | "project">("plan"), [idea, setIdea] = useState(false);
@@ -37,7 +38,7 @@ export default function PlanningWorkspace({ service = planningWorkspaceService, 
   const goalRequest = useSearchNavigationStore((s) => s.goalRequest);
   useEffect(() => {
     if (!goalRequest || loading) return;
-    const found = items.find((item) => item.kind === "plan" && item.id === goalRequest.id);
+    const found = items.find((item) => item.kind === (goalRequest.kind ?? "plan") && item.id === goalRequest.id);
     if (!found) return;
     setTab("全部事项"); setSearch(""); setKind("all"); setState("all"); setSelected(found.key);
     useSearchNavigationStore.getState().clearGoalRequest(goalRequest.token);
@@ -58,7 +59,7 @@ export default function PlanningWorkspace({ service = planningWorkspaceService, 
   const openItem = (key: string) => { setSelected(key); window.setTimeout(() => detailAnchor.current?.focus(), 0); };
   return <div className="df-page-wide pw-workspace">
     <PageHeader title="长期计划" description="让长期方向，落在这一周的行动里。" actions={<button className="pw-primary" onClick={() => setCreating(!creating)}>{creating ? "收起新建" : "新建事项"}</button>} />
-    <Tabs label="长期计划视图" value={tab} options={["工作台", "全部事项", "复盘"]} onChange={(value) => { setTab(value); if (value === "工作台" && ["completed", "archived"].includes(state)) setState("all"); }} />
+    <Tabs label="长期计划视图" value={tab} options={["工作台", "全部事项", "甘特图", "复盘"]} onChange={(value) => { setTab(value); if (value === "工作台" && ["completed", "archived"].includes(state)) setState("all"); }} />
     {action.message}
     {creating && <form className="pw-panel pw-create" onSubmit={create}>
       <Field label="事项名称"><input autoFocus required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="想推进什么？" /></Field>
@@ -68,7 +69,7 @@ export default function PlanningWorkspace({ service = planningWorkspaceService, 
     </form>}
     {dbStatus !== "ready" ? <p role="status">{dbStatus === "error" ? "数据库连接失败，请在设置中检查。" : "正在连接数据…"}</p> : <>
       {loadError && <p role="alert" className="pw-error">{loadError} <button onClick={() => void reload()}>重试加载</button></p>}
-      {tab === "复盘" ? <PlanningReview service={service} items={items} refreshKey={`${goalVersion}:${projectVersion}:${taskVersion}:${focusVersion}`} /> : <>
+      {tab === "甘特图" ? <PlanningGantt items={items} /> : tab === "复盘" ? <PlanningReview service={service} items={items} refreshKey={`${goalVersion}:${projectVersion}:${taskVersion}:${focusVersion}`} /> : <>
         <section className="pw-capacity" aria-label="本周长期投入">
           <div className="pw-toolbar"><div><h2>本周长期投入</h2><p className="pw-muted">已承诺 {duration(committed)} · 实际 {duration(actual)} · 容量 {duration(capacity)}</p></div>
             <div className="pw-inline"><button aria-label="上一周" onClick={() => setWeek(addDays(week, -7))}>←</button><span>{week} — {addDays(week, 6).slice(5)}</span><button aria-label="下一周" onClick={() => setWeek(addDays(week, 7))}>→</button>{week !== weekOf() && <button onClick={() => setWeek(weekOf())}>本周</button>}<button onClick={() => { setCapacityDraft(String(capacity / 60)); setEditingCapacity(!editingCapacity); }}>调整容量</button></div>

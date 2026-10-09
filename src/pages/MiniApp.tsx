@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Check, ChevronLeft, Plus, X } from "lucide-react";
 import { getDb } from "../db/db";
@@ -9,6 +9,7 @@ import { todayString } from "../lib/date";
 import { taskPriorityMeta } from "../lib/taskPriority";
 import FocusController, { FocusBridge } from "../features/focus/FocusController";
 import { useFocusStore } from "../features/focus/focusStore";
+import { useSettingsStore } from "../stores/settingsStore";
 import { ProgressRing } from "../components/mini/ProgressRing";
 
 /**
@@ -20,8 +21,9 @@ import { ProgressRing } from "../components/mini/ProgressRing";
  * - 今日任务精简列表（任务/时间/优先级/完成）。
  * 数据与操作全部经 Core Task Service / PomodoroStore，跨窗经 df:tasks-changed 同步。
  */
+const taskRepository = new TaskRepository(getDb());
 const taskService = new TaskService(
-  new TaskRepository(getDb()),
+  taskRepository,
   new FocusSessionRepository(getDb()),
 );
 
@@ -33,6 +35,7 @@ function timeLabel(t: Task): string {
 
 export default function MiniApp() {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [counts, setCounts] = useState({ total:0, completed:0 });
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState("");
   const [adding, setAdding] = useState(false);
@@ -43,8 +46,9 @@ export default function MiniApp() {
 
   const load = useCallback(async () => {
     try {
-      const rows = await taskService.getTasksByDate(todayString());
+      const [rows,stats] = await Promise.all([taskService.getTasksByDate(todayString()),taskRepository.countTodayStats(todayString())]);
       setTasks(rows);
+      setCounts(stats);
       setError(null);
     } catch {
       setError("任务读取失败，请重试。");
@@ -54,12 +58,11 @@ export default function MiniApp() {
   }, []);
 
   useEffect(() => {
+    void useSettingsStore.getState().load();
     void load();
   }, [load, focusVersion]);
 
-  const activeTasks = useMemo(() => tasks.filter((t) => t.status !== "COMPLETED"), [tasks]);
-  const doneCount = tasks.length - activeTasks.length;
-  const todayProgress = tasks.length === 0 ? 0 : doneCount / tasks.length;
+  const todayProgress = counts.total === 0 ? 0 : counts.completed / counts.total;
 
   const complete = async (id: number) => {
     try {
@@ -146,13 +149,13 @@ export default function MiniApp() {
         <div className="glass-surface flex w-[48%] flex-col items-center gap-1.5 rounded-xl border border-border-subtle px-2 py-3">
           <ProgressRing progress={todayProgress} size={92} stroke={7} color="var(--color-success)">
             <span className="text-lg font-semibold tabular-nums text-text-primary">
-              {doneCount}/{tasks.length}
+              {counts.completed}/{counts.total}
             </span>
             <span className="text-[10px] text-text-faint">今日完成</span>
           </ProgressRing>
           <span className="text-xs font-medium text-text-secondary">今日任务</span>
           <span className="text-[11px] text-text-faint">
-            {tasks.length === 0 ? "暂无任务" : `${Math.round(todayProgress * 100)}% 已完成`}
+            {counts.total === 0 ? "暂无执行任务" : `${Math.round(todayProgress * 100)}% 已完成`}
           </span>
         </div>
       </div>

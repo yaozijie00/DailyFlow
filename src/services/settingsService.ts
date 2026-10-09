@@ -4,7 +4,7 @@ import {
   SHORTCUT_ACTIONS,
   type ShortcutMap,
 } from "../lib/shortcuts";
-import { isThemeMode, type ThemeMode } from "../lib/theme";
+import { isThemeMode, isAppearanceStyle, type AppearanceStyle, type ThemeMode } from "../lib/theme";
 
 /** 可设为「启动默认页」的页面（导航级页面）。 */
 export type DefaultPageId = "today" | "focus" | "goals" | "statistics" | "settings";
@@ -50,6 +50,7 @@ export interface AppSettings {
   defaultLayoutMode: LayoutMode;
   /** 界面主题（V2.4）：system=跟随系统 | light | dark | glass（毛玻璃） */
   themeMode: ThemeMode;
+  appearanceStyle: AppearanceStyle;
   /** 所有长期计划合计的每周可投入容量（分钟） */
   longTermWeeklyCapacityMinutes: number;
 }
@@ -79,6 +80,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   weekStart: "monday",
   defaultLayoutMode: "standard",
   themeMode: "system",
+  appearanceStyle: "classic",
   longTermWeeklyCapacityMinutes: 20 * 60,
 };
 
@@ -217,6 +219,7 @@ export class SettingsService {
       themeMode: isThemeMode(stored[KEY_THEME_MODE])
         ? stored[KEY_THEME_MODE]
         : DEFAULT_SETTINGS.themeMode,
+      appearanceStyle: isAppearanceStyle(stored.appearance_style) ? stored.appearance_style : "classic",
       longTermWeeklyCapacityMinutes: parseNonNegativeInt(
         stored[KEY_LONG_TERM_WEEKLY_CAPACITY],
         DEFAULT_SETTINGS.longTermWeeklyCapacityMinutes,
@@ -296,6 +299,9 @@ export class SettingsService {
     }
     if (partial.themeMode !== undefined && isThemeMode(partial.themeMode)) {
       writes.push([KEY_THEME_MODE, partial.themeMode]);
+    }
+    if (partial.appearanceStyle !== undefined && isAppearanceStyle(partial.appearanceStyle)) {
+      writes.push(["appearance_style", partial.appearanceStyle]);
     }
     if (partial.longTermWeeklyCapacityMinutes !== undefined) {
       writes.push([

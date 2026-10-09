@@ -121,15 +121,21 @@ async fn open_mini_window(app: tauri::AppHandle) -> Result<(), String> {
     // WebView2 windows sharing one data directory must use identical browser arguments.
     // In debug builds inherit the main window's opt-in QA configuration.
     #[cfg(debug_assertions)]
-    let builder = match app.config().app.windows.iter().find(|w| w.label == "main").and_then(|w| w.additional_browser_args.as_ref()) {
+    let builder = match app
+        .config()
+        .app
+        .windows
+        .iter()
+        .find(|w| w.label == "main")
+        .and_then(|w| w.additional_browser_args.as_ref())
+    {
         Some(args) => builder.additional_browser_args(args),
         None => builder,
     };
-    let win = builder.build()
-            .map_err(|e| {
-                append_startup_log(&format!("open_mini_window: 创建失败 {e}"));
-                e.to_string()
-            })?;
+    let win = builder.build().map_err(|e| {
+        append_startup_log(&format!("open_mini_window: 创建失败 {e}"));
+        e.to_string()
+    })?;
     append_startup_log("open_mini_window: 创建成功，show()");
     win.show().map_err(|e| {
         append_startup_log(&format!("open_mini_window: show 失败 {e}"));
@@ -332,6 +338,16 @@ fn legacy_install_data_dir() -> Option<PathBuf> {
  *   迁移失败时保守回退旧位置（不丢数据，待下次成功）。
  */
 fn dailyflow_data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    #[cfg(debug_assertions)]
+    if let Ok(value) = std::env::var("DAILYFLOW_QA_DATA_DIR") {
+        let dir = PathBuf::from(value);
+        if !dir.is_absolute() {
+            return Err("QA 数据目录必须为绝对路径".into());
+        }
+        fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        recover_interrupted_restore(&dir)?;
+        return Ok(dir);
+    }
     let cfg = read_storage_paths(app);
     if !cfg.data_dir.trim().is_empty() {
         let dir = PathBuf::from(cfg.data_dir.trim());
@@ -868,20 +884,21 @@ async fn restore_backup(app: tauri::AppHandle, backup_name: String) -> Result<()
         .then(|| (data.join("course-schedule.db"), course_backup.clone()));
 
     focus::with_database_restore(|| {
-    stage_and_swap_restore_files(
-        (&db_path, &src),
-        course.as_ref().map(|(p, b)| (p.as_path(), b.as_path())),
-    )?;
+        stage_and_swap_restore_files(
+            (&db_path, &src),
+            course.as_ref().map(|(p, b)| (p.as_path(), b.as_path())),
+        )?;
 
-    // 替换成功后清理 WAL/SHM 残留（主库与伴生课程库）
-    let _ = fs::remove_file(data.join("dailyflow.db-wal"));
-    let _ = fs::remove_file(data.join("dailyflow.db-shm"));
-    if course.is_some() {
-        let _ = fs::remove_file(data.join("course-schedule.db-wal"));
-        let _ = fs::remove_file(data.join("course-schedule.db-shm"));
-    }
-    Ok(())
-    }).await
+        // 替换成功后清理 WAL/SHM 残留（主库与伴生课程库）
+        let _ = fs::remove_file(data.join("dailyflow.db-wal"));
+        let _ = fs::remove_file(data.join("dailyflow.db-shm"));
+        if course.is_some() {
+            let _ = fs::remove_file(data.join("course-schedule.db-wal"));
+            let _ = fs::remove_file(data.join("course-schedule.db-shm"));
+        }
+        Ok(())
+    })
+    .await
 }
 
 /// 校验并创建目录；空串返回空（表示用默认值）。
@@ -1078,7 +1095,8 @@ pub fn run() {
                 }
             }
         })
-        .invoke_handler(tauri::generate_handler![focus::focus_execute,
+        .invoke_handler(tauri::generate_handler![
+            focus::focus_execute,
             data_dir,
             db_relative_path,
             course_db_path,

@@ -68,9 +68,9 @@ describe("StatisticsService", () => {
     });
 
     const stats = await service.getTodayStats();
-    expect(stats.totalTasks).toBe(3); // A、B、C（含已取消，与列表一致）
+    expect(stats.totalTasks).toBe(2); // A、B（排除取消项）
     expect(stats.completedTasks).toBe(1); // B
-    expect(stats.completionRate).toBeCloseTo(1 / 3, 5);
+    expect(stats.completionRate).toBeCloseTo(1 / 2, 5);
     expect(stats.totalFocusSeconds).toBe(2400); // 900 + 1500
     expect(stats.focusCount).toBe(2);
   });

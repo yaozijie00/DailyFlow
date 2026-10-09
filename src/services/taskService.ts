@@ -30,6 +30,8 @@ export class TaskService {
   async getTask(id: number): Promise<Task | null> {
     return this.tasks.findById(id);
   }
+  async getChildren(id: number): Promise<Task[]> { return this.tasks.children(id); }
+  async getPhases(goalId:number) { return this.tasks.phases(goalId); }
 
   async getTodayTasks(): Promise<Task[]> {
     return this.getTasksByDate(todayString());
@@ -78,9 +80,14 @@ export class TaskService {
     return task;
   }
 
-  async updateTask(id: number, input: UpdateTaskInput): Promise<Task | null> {
+  async updateTask(id: number, input: UpdateTaskInput, expectedVersion?: number): Promise<Task | null> {
     const before = await this.tasks.findById(id);
-    const updated = await this.tasks.update(id, input);
+    if (input.phaseId != null) {
+      const goalId = input.goalId === undefined ? before?.goalId : input.goalId;
+      if (goalId == null || !(await this.tasks.phases(goalId)).some((phase) => phase.id === input.phaseId)) throw new Error("所选阶段不属于当前计划，请重新选择");
+    }
+    const updated = expectedVersion == null ? await this.tasks.update(id, input) : await this.tasks.updateExpected(id, input, expectedVersion);
+    if (expectedVersion != null && !updated) throw new Error("任务已在其他位置修改，草稿已保留。请重新读取后再保存。");
     if (updated) {
       // v1.6：仅当时间相关字段变化时才按时间重排（sort_order），
       // 否则（只改标题/备注/分类/预计等）保留原有顺序 → Timeline 块位置不跳动。
@@ -125,6 +132,7 @@ export class TaskService {
     const existing = await this.tasks.findById(id);
     if (!existing) return false;
     const linked = await this.sessions.findByTaskId(id);
+    const visuals = await this.tasks.snapshotVisuals(id);
     const removed = await this.tasks.delete(id);
     if (!removed) return false;
     if (!undoManager.applying) {
@@ -138,6 +146,7 @@ export class TaskService {
           label: "删除任务",
           undo: async () => {
             await this.tasks.insertRestored(t);
+            await this.tasks.restoreVisuals(visuals);
             await this.sessions.reattach(t.id, ss.map((s) => s.id));
           },
           redo: async () => {
@@ -154,6 +163,7 @@ export class TaskService {
    * 统计仍计入该任务的投入时间，不因「拖回便签」丢失专注历史。
    */
   async deleteTaskKeepSessions(id: number): Promise<boolean> {
+    const visuals = await this.tasks.snapshotVisuals(id);
     if (!undoManager.applying) {
       const task = await this.tasks.findById(id);
       if (task) {
@@ -163,6 +173,7 @@ export class TaskService {
           label: "转为便签",
           undo: async () => {
             await this.tasks.insertRestored(t);
+            await this.tasks.restoreVisuals(visuals);
           },
           redo: async () => {
             await this.tasks.delete(t.id);

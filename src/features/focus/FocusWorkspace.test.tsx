@@ -19,6 +19,13 @@ vi.mock("./historyEditor", async (load) => ({ ...await load<typeof import("./his
 const row: FocusRecord = { id: 4, taskId: null, taskTitle: "设计", startedAt: new Date(2026, 8, 19, 10, 0, 37, 125).getTime(), endedAt: 0, actualSeconds: 91.875, status: "finished", runningSince: null, pausedAt: null, goalSeconds: null, mode: "stopwatch", note: "", nextAction: "", interruptionCount: 0, source: "timer", checkpointAt: 0, revision: 3 };
 beforeEach(() => { mocks.active = null; mocks.rows = []; mocks.perform.mockReset().mockResolvedValue(true); mocks.overlaps.mockReset().mockResolvedValue([]); mocks.start.mockReset().mockResolvedValue(true); useBreakTimerStore.getState().cancel(); });
 afterEach(cleanup);
+it("starts no-task timing with an optional intention without creating a task", async () => {
+  render(<FocusWorkspace />);
+  fireEvent.click(screen.getByRole("button", { name:"无任务计时" }));
+  fireEvent.change(screen.getByLabelText("这次想做到（可选）"),{ target:{ value:" 阅读一节 " } });
+  fireEvent.click(screen.getByRole("button",{ name:"开始无任务计时" }));
+  await waitFor(() => expect(mocks.start).toHaveBeenCalledWith(null,"stopwatch",null,"阅读一节"));
+});
 
 it("gives the recommended task one primary start without duplicating it in the list", async () => {
   mocks.rows = [{ id: 10, title: "完成蓝图通信", scheduledDate: "", estimatedDuration: 5400 }];
@@ -94,10 +101,11 @@ it("uses configured short breaks and pomodoro goals and disables invalid starts"
   expect((screen.getByLabelText("休息分钟") as HTMLInputElement).value).toBe("8");
   rest.unmount();
   render(<FocusWorkspace />);
+  fireEvent.click(screen.getByRole("button", { name:"无任务计时" }));
   fireEvent.change(screen.getByLabelText("计时模式"), { target: { value: "pomodoro" } });
   expect((screen.getByLabelText("本次目标（分钟）") as HTMLInputElement).value).toBe("40");
   fireEvent.change(screen.getByLabelText("本次目标（分钟）"), { target: { value: "0" } });
-  const start = screen.getByRole("button", { name: "开始无关联专注" }) as HTMLButtonElement;
+  const start = screen.getByRole("button", { name: "开始无任务计时" }) as HTMLButtonElement;
   expect(start.disabled).toBe(true);
   fireEvent.click(start);
   expect(mocks.start).not.toHaveBeenCalled();

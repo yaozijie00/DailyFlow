@@ -6,6 +6,7 @@ import type { Note } from "../../db/repositories/noteRepository";
 import { todayString } from "../../lib/date";
 
 afterEach(cleanup);
+vi.mock("../../lib/arrangeInbox", () => ({ arrangeInbox: taskMock.arrange }));
 
 const mockState = vi.hoisted(() => ({
   notes: [] as Note[],
@@ -20,6 +21,7 @@ const mockState = vi.hoisted(() => ({
 }));
 
 const taskMock = vi.hoisted(() => ({
+  arrange: vi.fn(),
   createScheduledTask: vi.fn(),
   convertToNote: vi.fn(),
 }));
@@ -66,7 +68,7 @@ describe("NoteList（便签区）", () => {
   it("空状态提示", () => {
     render(<NoteList />);
     expect(screen.getByText(/还没有便签/)).toBeTruthy();
-    expect(screen.getByText(/暂时没安排时间/)).toBeTruthy();
+    expect(screen.getByRole("button", { name:"展开整理" })).toBeTruthy();
   });
 
   it("渲染便签列表", () => {
@@ -126,14 +128,7 @@ describe("NoteList（便签区）", () => {
     render(<NoteList />);
     fireEvent.click(screen.getByLabelText("安排到今日"));
     await vi.waitFor(() => {
-      expect(taskMock.createScheduledTask).toHaveBeenCalledWith({
-        title: "设计背包 UI",
-        categoryId: null,
-        scheduledDate: todayString(),
-        plannedStart: null,
-        plannedEnd: null,
-      });
-      expect(mockState.update).toHaveBeenCalledWith(1, { status: "arranged" });
+      expect(taskMock.arrange).toHaveBeenCalledWith(1, { scheduledDate: todayString() });
     });
   });
 

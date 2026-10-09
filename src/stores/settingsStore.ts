@@ -8,8 +8,10 @@ import {
 } from "../services/settingsService";
 import { useAppStore } from "./appStore";
 import { DEFAULT_SHORTCUTS, type ShortcutMap } from "../lib/shortcuts";
+import { emit, listen } from "@tauri-apps/api/event";
 import {
   applyTheme,
+  applyAppearance,
   parseThemeMode,
   systemPrefersDark,
   watchSystemTheme,
@@ -19,10 +21,18 @@ const settingsService = new SettingsService(new SettingsRepository(getDb()));
 
 /** 系统深浅跟随监听器（仅「跟随系统」模式需要实时响应）。 */
 let stopWatchSystem: (() => void) | null = null;
+let crossWindowReady = false;
+function ensureCrossWindowSettings() {
+  if (crossWindowReady || typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return;
+  crossWindowReady = true;
+  void listen("df:settings-changed", () => { void useSettingsStore.getState().load(); }).catch(() => { crossWindowReady = false; });
+  window.addEventListener("focus", () => { void useSettingsStore.getState().load(); });
+}
 
 /** 依据设置 theme_mode + 系统深浅，把主题类写到 <html>。 */
 function syncTheme(mode: string | null | undefined): void {
   applyTheme(parseThemeMode(mode ?? null), systemPrefersDark());
+  applyAppearance(useSettingsStore.getState().settings.appearanceStyle ?? "classic", parseThemeMode(mode));
 }
 
 /** 注册系统深浅变化监听（幂等）。 */
@@ -59,6 +69,7 @@ export const useSettingsStore = create<SettingsState>((set) => ({
       // 主题应用：持久化 theme_mode（默认跟随系统）写到 <html>；注册系统跟随监听
       syncTheme(settings.themeMode);
       ensureSystemWatcher();
+      ensureCrossWindowSettings();
     } catch {
       useAppStore.getState().pushToast("error", "加载设置失败");
     }
@@ -70,10 +81,11 @@ export const useSettingsStore = create<SettingsState>((set) => ({
       const settings = await settingsService.getSettings();
       set({ settings });
       // 主题改动即时生效（含切回 system 时重新跟随）
-      if (partial.themeMode !== undefined) {
+      if (partial.themeMode !== undefined || partial.appearanceStyle !== undefined) {
         syncTheme(settings.themeMode);
         ensureSystemWatcher();
       }
+      if (typeof window !== "undefined" && "__TAURI_INTERNALS__" in window) void emit("df:settings-changed").catch(() => {});
       return true;
     } catch {
       useAppStore.getState().pushToast("error", "保存设置失败，请重试");

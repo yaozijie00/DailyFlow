@@ -23,7 +23,7 @@ interface NoteState {
   completedNotes: Note[];
   loading: boolean;
   load: () => Promise<void>;
-  create: (input: CreateNoteInput) => Promise<void>;
+  create: (input: CreateNoteInput) => Promise<boolean>;
   update: (id: number, input: UpdateNoteInput) => Promise<void>;
   complete: (id: number) => Promise<void>;
   remove: (id: number) => Promise<void>;
@@ -66,8 +66,10 @@ export const useNoteStore = create<NoteState>((set, get) => ({
     try {
       await noteService.create(input);
       await get().load();
+      return true;
     } catch {
       useAppStore.getState().pushToast("error", "创建便签失败");
+      return false;
     }
   },
 

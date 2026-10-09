@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./design-system/tokens.css";
+@import "./design-system/appearance.css";
 
 /* Tailwind v4：dark 变体改为 class 驱动（html.dark），便于 JS 控制 */
 @custom-variant dark (&:where(.dark, .dark *));

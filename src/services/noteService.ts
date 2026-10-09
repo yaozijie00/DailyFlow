@@ -5,6 +5,7 @@ import {
   type UpdateNoteInput,
 } from "../db/repositories/noteRepository";
 import { undoManager } from "../lib/undoManager";
+import { bumpDataVersion } from "../lib/dataVersion";
 
 /** 便签可撤销字段（排除派生 sortOrder）。 */
 const NOTE_UNDOABLE_FIELDS = ["title", "categoryId", "status", "completedAt"] as const;
@@ -65,7 +66,9 @@ export class NoteService {
 
   async update(id: number, input: UpdateNoteInput): Promise<Note | null> {
     const before = await this.notes.findById(id);
+    const conversion = before?.status==="arranged" && input.status==="active" ? await this.notes.conversionSnapshot(id) : null;
     const updated = await this.notes.update(id, input);
+    if (updated) { bumpDataVersion("note"); if (conversion) { bumpDataVersion("task"); bumpDataVersion("goal"); bumpDataVersion("project"); } }
     if (updated && !undoManager.applying) {
       const a = { ...before } as Note;
       const b = { ...updated } as Note;
@@ -75,6 +78,7 @@ export class NoteService {
           type: "note.update",
           label: "编辑便签",
           undo: async () => {
+            if (conversion) await this.notes.restoreConversion(conversion);
             await this.notes.update(id, diffNote(b, a));
           },
           redo: async () => {
@@ -111,6 +115,7 @@ export class NoteService {
   }
 
   async delete(id: number): Promise<boolean> {
+    const sourceLink = await this.notes.sourceLink(id);
     const before = await this.notes.findById(id);
     const ok = await this.notes.delete(id);
     if (ok && before && !undoManager.applying) {
@@ -120,6 +125,7 @@ export class NoteService {
         label: "删除便签",
         undo: async () => {
           await this.notes.insertRestored(n);
+            await this.notes.restoreSourceLink(sourceLink);
         },
         redo: async () => {
           await this.notes.delete(n.id);

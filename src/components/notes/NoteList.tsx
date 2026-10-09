@@ -10,9 +10,9 @@ import {
   noteDropZoneAt,
   taskToNoteDrag,
   taskToNoteDropCallbacks,
-  convertNoteToTask,
 } from "../../lib/noteConvert";
-import { undoManager } from "../../lib/undoManager";
+import { arrangeInbox } from "../../lib/arrangeInbox";
+import InboxOrganizer from "./InboxOrganizer";
 import { todayString } from "../../lib/date";
 import type { Note } from "../../db/repositories/noteRepository";
 import type { NotePlanningTarget } from "../../lib/noteConvertPlanning";
@@ -203,11 +203,10 @@ export default function NoteList() {
   const create = useNoteStore((s) => s.create);
   const load = useNoteStore((s) => s.load);
   const clearArranged = useNoteStore((s) => s.clearArranged);
-  const update = useNoteStore((s) => s.update);
-  const createScheduledTask = useTaskStore((s) => s.createScheduledTask);
   const convertToNote = useTaskStore((s) => s.convertToNote);
   const [draft, setDraft] = useState("");
   const [showArranged, setShowArranged] = useState(false);
+  const [organizing, setOrganizing] = useState(false);
   const [taskOver, setTaskOver] = useState(false);
   const [view, setView] = useState<"active" | "saved">("active");
   const containerRef = useRef<HTMLDivElement>(null);
@@ -263,28 +262,12 @@ export default function NoteList() {
 
   const submit = async () => {
     if (!canSubmit) return;
-    await create({ title: draft.trim(), ...(view === "saved" ? { status: "saved" as const } : {}) });
+    const saved = await create({ title: draft.trim(), ...(view === "saved" ? { status: "saved" as const } : {}) });
+    if (saved === false) return;
     setDraft("");
   };
 
-  const arrangeToday = (noteId: number) => {
-    void undoManager.withBatchAsync(() =>
-      convertNoteToTask(
-        noteId,
-        notes,
-        ({ title, categoryId, plannedStart, plannedEnd }) =>
-          createScheduledTask({
-            title,
-            categoryId,
-            scheduledDate: todayString(),
-            plannedStart,
-            plannedEnd,
-          }),
-        update,
-        { scheduledDate: todayString() },
-      ),
-    );
-  };
+  const arrangeToday = (noteId: number) => { void arrangeInbox(noteId, { scheduledDate: todayString() }); };
 
   return (
     <div
@@ -294,12 +277,9 @@ export default function NoteList() {
         taskOver ? "shadow-[inset_0_0_0_2px_#f59e0b66]" : ""
       }`}
     >
-      <div className="mb-1.5 flex items-center gap-1 text-xs text-text-muted">
-        <StickyNote size={12} className="text-amber-500" />
-        <button aria-pressed={view === "active"} onClick={() => setView("active")} className={view === "active" ? "font-medium text-accent" : "text-text-faint"}>收集箱</button>
-        <span className="text-text-faint">/</span>
-        <button aria-pressed={view === "saved"} onClick={() => setView("saved")} className={view === "saved" ? "font-medium text-accent" : "text-text-faint"}>笔记</button>
-        <span className="truncate text-text-faint">{view === "active" ? "暂时没安排时间，但不能忘记" : "长期保存的参考与记录"}</span>
+      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-1 text-xs text-text-muted">
+        <div className="flex items-center gap-2"><StickyNote size={12} aria-hidden="true" /><button aria-pressed={view === "active"} onClick={() => setView("active")} className="whitespace-nowrap">收集箱 {notes.filter((n) => n.status === "active").length}</button><button aria-pressed={view === "saved"} onClick={() => setView("saved")} className="whitespace-nowrap">笔记</button></div>
+        <button onClick={() => setOrganizing(true)} className="min-h-8 whitespace-nowrap text-accent">展开整理</button>
       </div>
 
       <div className="mb-1.5 flex items-center gap-1.5">
@@ -307,7 +287,7 @@ export default function NoteList() {
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter") void submit();
+            if (e.key === "Enter" && !e.nativeEvent.isComposing) void submit();
           }}
           placeholder="记下想法，回车保存"
           className="min-w-0 flex-1 rounded-md border border-border-strong bg-surface px-2 py-1 text-xs text-text-primary placeholder:text-text-faint outline-none transition-colors focus:border-accent"
@@ -372,6 +352,7 @@ export default function NoteList() {
           )}
         </>
       )}
+      {organizing && <InboxOrganizer onClose={() => setOrganizing(false)} />}
     </div>
   );
 }

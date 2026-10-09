@@ -23,6 +23,7 @@ pub struct Request {
     goal_seconds: Option<i64>,
     mode: Option<String>,
     note: Option<String>,
+    intention: Option<String>,
     next_action: Option<String>,
     complete_task: Option<bool>,
     duration_seconds: Option<i64>,
@@ -45,6 +46,7 @@ pub struct Record {
     goal_seconds: Option<i64>,
     mode: String,
     note: String,
+    intention: String,
     next_action: String,
     interruption_count: i64,
     source: String,
@@ -58,7 +60,7 @@ pub struct Response {
     sessions: Option<Vec<Record>>,
 }
 type Result<T> = std::result::Result<T, String>;
-const SELECT: &str = "SELECT f.id,f.task_id,d.task_title,f.started_at,f.ended_at,d.elapsed_ms,d.status,d.running_since,d.paused_at,d.goal_seconds,d.mode,d.note,d.next_action,d.interruption_count,d.source,d.checkpoint_at,d.revision FROM focus_sessions f JOIN focus_details d ON d.session_id=f.id";
+const SELECT: &str = "SELECT f.id,f.task_id,d.task_title,f.started_at,f.ended_at,d.elapsed_ms,d.status,d.running_since,d.paused_at,d.goal_seconds,d.mode,d.note,d.intention,d.next_action,d.interruption_count,d.source,d.checkpoint_at,d.revision FROM focus_sessions f JOIN focus_details d ON d.session_id=f.id";
 fn err(e: impl std::fmt::Display) -> String {
     format!("专注记录未能保存，请重试：{e}")
 }
@@ -76,6 +78,7 @@ fn record(r: SqliteRow) -> Record {
         goal_seconds: r.get("goal_seconds"),
         mode: r.get("mode"),
         note: r.get("note"),
+        intention: r.get("intention"),
         next_action: r.get("next_action"),
         interruption_count: r.get("interruption_count"),
         source: r.get("source"),
@@ -160,7 +163,7 @@ async fn begin(db: &mut SqliteConnection, r: &Request, now: i64) -> Result<()> {
     if goal.is_some_and(|g| g <= 0 || g > 86400) {
         return Err("本次目标应在1秒到24小时之间".into());
     }
-    let mut title = "无关联专注".to_string();
+    let mut title = "无任务计时".to_string();
     let mut category: Option<i64> = None;
     if let Some(id) = r.task_id {
         let task = query("SELECT title,status,category_id FROM tasks WHERE id=?")
@@ -174,9 +177,18 @@ async fn begin(db: &mut SqliteConnection, r: &Request, now: i64) -> Result<()> {
         }
         title = task.get("title");
         category = task.get("category_id");
+        let children =
+            query("SELECT COUNT(*) AS n FROM tasks WHERE parent_id=? AND status!='CANCELLED'")
+                .bind(id)
+                .fetch_one(&mut *db)
+                .await
+                .map_err(err)?;
+        if children.get::<i64, _>("n") > 0 {
+            return Err("这是汇总任务，请选择一个执行子任务开始专注".into());
+        }
     }
     let id=query("INSERT INTO focus_sessions(task_id,category_id,planned_duration,actual_duration,started_at,created_at,completed) VALUES(?,?,?,0,?,?,0)").bind(r.task_id).bind(category).bind(goal.unwrap_or(0)).bind(now).bind(now).execute(&mut *db).await.map_err(err)?.last_insert_rowid();
-    query("INSERT INTO focus_details(session_id,task_title,status,mode,source,goal_seconds,running_since,checkpoint_at) VALUES(?,?,'running',?,'timer',?,?,?)").bind(id).bind(title).bind(mode).bind(goal).bind(now).bind(now).execute(db).await.map_err(err)?;
+    query("INSERT INTO focus_details(session_id,task_title,status,mode,source,goal_seconds,running_since,checkpoint_at,intention) VALUES(?,?,'running',?,'timer',?,?,?,?)").bind(id).bind(title).bind(mode).bind(goal).bind(now).bind(now).bind(r.intention.as_deref().unwrap_or("").trim()).execute(db).await.map_err(err)?;
     Ok(())
 }
 /// Repair the derived cache from saved records, retaining only the separately
@@ -459,6 +471,16 @@ async fn execute_timed(
                 a.id
             } else {
                 let title = if let Some(task) = r.task_id {
+                    let children = query(
+                        "SELECT COUNT(*) AS n FROM tasks WHERE parent_id=? AND status!='CANCELLED'",
+                    )
+                    .bind(task)
+                    .fetch_one(&mut *tx)
+                    .await
+                    .map_err(err)?;
+                    if children.get::<i64, _>("n") > 0 {
+                        return Err("请选择执行子任务补录投入".into());
+                    }
                     query("SELECT title FROM tasks WHERE id=?")
                         .bind(task)
                         .fetch_optional(&mut *tx)
@@ -467,7 +489,7 @@ async fn execute_timed(
                         .ok_or("任务已不存在")?
                         .get::<String, _>(0)
                 } else {
-                    "无关联专注".into()
+                    "无任务计时".into()
                 };
                 let id=query("INSERT INTO focus_sessions(task_id,category_id,planned_duration,actual_duration,started_at,ended_at,created_at,completed) VALUES(?,(SELECT category_id FROM tasks WHERE id=?),0,?,?,?,?,0)").bind(r.task_id).bind(r.task_id).bind(seconds).bind(start).bind(start+seconds*1000).bind(now).execute(&mut *tx).await.map_err(err)?.last_insert_rowid();
                 query("INSERT INTO focus_details(session_id,task_title,status,source,checkpoint_at) VALUES(?,?,'finished','manual',?)").bind(id).bind(title).bind(now).execute(&mut *tx).await.map_err(err)?;
@@ -619,6 +641,12 @@ mod tests {
                 query(sql).execute(&mut db).await.unwrap();
             }
         }
+        query(include_str!(
+            "../../src/db/migrations/0035_focus_intention.sql"
+        ))
+        .execute(&mut db)
+        .await
+        .unwrap();
         db
     }
     fn cmd(action: &str, id: Option<i64>) -> Request {
@@ -627,6 +655,50 @@ mod tests {
             session_id: id,
             ..Default::default()
         }
+    }
+    #[test]
+    fn unlinked_intention_survives_pause_and_finish() {
+        tauri::async_runtime::block_on(async {
+            let mut db = db().await;
+            let mut start = cmd("start", None);
+            start.intention = Some(" 完成草稿 ".into());
+            let record = execute_db(&mut db, &start, 1000, false)
+                .await
+                .unwrap()
+                .active
+                .unwrap();
+            assert_eq!(record.task_id, None);
+            assert_eq!(record.intention, "完成草稿");
+            execute_db(&mut db, &cmd("pause", Some(record.id)), 31000, false)
+                .await
+                .unwrap();
+            execute_db(&mut db, &cmd("finish", Some(record.id)), 91000, false)
+                .await
+                .unwrap();
+            let history = execute_db(&mut db, &cmd("list", None), 92000, false)
+                .await
+                .unwrap()
+                .sessions
+                .unwrap();
+            assert_eq!(history[0].intention, "完成草稿");
+            assert_eq!(history[0].actual_seconds, 30.0);
+        });
+    }
+    #[test]
+    fn summary_task_cannot_start_focus() {
+        tauri::async_runtime::block_on(async {
+            let mut db = db().await;
+            query("UPDATE tasks SET parent_id=1 WHERE id=2")
+                .execute(&mut db)
+                .await
+                .unwrap();
+            let mut start = cmd("start", None);
+            start.task_id = Some(1);
+            assert!(execute_db(&mut db, &start, 1000, false).await.is_err());
+            assert!(active(&mut db).await.unwrap().is_none());
+            start.task_id = Some(2);
+            assert!(execute_db(&mut db, &start, 1000, false).await.is_ok());
+        });
     }
     #[test]
     fn pause_finish_is_atomic_and_idempotent() {

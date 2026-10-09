@@ -1,0 +1,17 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "identifier": "com.dailyflow.experience-qa",
+  "app": {
+    "windows": [{
+      "label": "main",
+      "title": "DailyFlow",
+      "width": 1280,
+      "height": 800,
+      "minWidth": 820,
+      "minHeight": 560,
+      "decorations": false,
+      "visible": false,
+      "additionalBrowserArgs": "--remote-debugging-port=9225 --remote-allow-origins=http://127.0.0.1:9225"
+    }]
+  }
+}

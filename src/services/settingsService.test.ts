@@ -41,6 +41,7 @@ describe("SettingsService", () => {
       weekStart: "monday",
       defaultLayoutMode: "standard",
       themeMode: "system",
+      appearanceStyle: "classic",
       longTermWeeklyCapacityMinutes: 20 * 60,
     });
     const s = await service.getSettings();
@@ -163,6 +164,7 @@ describe("SettingsService", () => {
       weekStart: "monday",
       defaultLayoutMode: "standard",
       themeMode: "system",
+      appearanceStyle: "classic",
       longTermWeeklyCapacityMinutes: 1200,
     });
   });
